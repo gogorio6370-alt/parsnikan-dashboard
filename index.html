@@ -1839,8 +1839,8 @@ function renderProd(){
   </div>
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>روند روزانه ۷ ایستگاه اصلی <span class="muted">هرکدام با هدف روزانه مخصوص به خودش</span></h3>
-    <div class="hint" style="margin-bottom:10px;">چون هدف هر ایستگاه فرق می‌کند (مثلاً خط۱ ۲۵۰۰ ولی درپوش ۶۰۰)، هر ایستگاه نمودار کوچک جدای خودش را دارد تا مقیاس‌ها قاطی نشوند؛ خط‌چین همان هدف روزانه آن ایستگاه است.</div>
+    <h3>روند روزانه ۸ ایستگاه اصلی <span class="muted">هرکدام با هدف روزانه مخصوص به خودش</span></h3>
+    <div class="hint" style="margin-bottom:10px;">چون هدف هر ایستگاه فرق می‌کند (مثلاً خط۱ ۲۵۰۰ ولی درپوش ۶۰۰)، هر ایستگاه نمودار کوچک جدای خودش را دارد تا مقیاس‌ها قاطی نشوند؛ خط‌چین همان هدف روزانه آن ایستگاه است. جای خالی (شکاف) در خط، به‌همراه نشانگر ⛔ قرمز، یعنی آن روز ایستگاه توقف تولید داشته — نه اینکه تولید کم بوده.</div>
     <div class="grid grid-4" id="dailyStationGrid" style="gap:14px;">
       ${DAILY_STATION_DEFS.map(d=>`<div class="mini-chart-card"><div class="mini-title">${d.label}<span class="muted"> — هدف ${fmt(d.target,0)}</span></div><div class="chart-box" style="height:170px;"><canvas id="chDaily_${d.key}"></canvas></div></div>`).join('')}
     </div>
@@ -1974,13 +1974,18 @@ function renderProd(){
 
   DAILY_STATION_DEFS.forEach((d,i)=>{
     const data = rows.map(e=> e.lines[d.key].status==='stop' ? null : (e.lines[d.key].qty ?? null));
+    // نشانگر توقف تولید — روی محور صفر یک مثلث قرمز می‌گذارد تا با یک نگاه از «تولید کم» جدا شود
+    const stopMarkers = rows.map(e=> e.lines[d.key].status==='stop' ? 0 : null);
     const datasets = [
       { label:d.label, data, borderColor: PALETTE[i%PALETTE.length], backgroundColor: PALETTE[i%PALETTE.length]+'26',
-        fill:true, tension:.35, pointRadius:2, spanGaps:true },
+        fill:true, tension:.35, pointRadius:2, spanGaps:false },
+      { label:'⛔ توقف تولید', data: stopMarkers, showLine:false, pointStyle:'triangle', pointRadius:6, pointHoverRadius:7,
+        pointBackgroundColor:'#ff5d6c', pointBorderColor:'#ff5d6c', borderColor:'transparent', backgroundColor:'transparent', noLabel:true },
     ];
     if(d.target>0) datasets.push({ label:'هدف', data: rows.map(e=>d.target*dayShiftFactor(e)), borderColor:'#93a4c3', borderDash:[5,4], pointRadius:0, tension:0, noLabel:true });
     mkChart('chDaily_'+d.key, { type:'line', data:{ labels: rows.map(e=>e.date.slice(5)), datasets },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label==='⛔ توقف تولید' ? '⛔ توقف تولید در این روز' : (ctx.dataset.label+': '+fmt(ctx.parsed.y,0)) } } },
         scales:{ x:{grid:{display:false}, ticks:{font:{size:8.5}, maxRotation:0, autoSkip:true, maxTicksLimit:5}},
                  y:{grid:{color:'#182338'}, ticks:{font:{size:8.5}}} } } });
   });
