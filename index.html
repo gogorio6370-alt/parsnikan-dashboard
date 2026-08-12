@@ -1085,6 +1085,8 @@ async function loadAll(){
     DB.meta.activeMonth = keys2.length ? keys2[0] : '1405/04';
   }
   if(!DB.meta.months.includes(DB.meta.activeMonth)) DB.meta.months.push(DB.meta.activeMonth);
+  // رمز مدیر برای تأیید حذف — اگر قبلاً تنظیم نشده، مقدار پیش‌فرض گذاشته می‌شود (از تنظیمات قابل تغییر است)
+  if(!DB.meta.adminPin) DB.meta.adminPin = '1234';
 }
 let lastSavedAt = null;
 let savingNow = false;
@@ -1494,7 +1496,7 @@ function renderEntry(){
     renderEntry(); window.scrollTo({top:0, behavior:'smooth'});
   }));
   document.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', ()=>{
-    confirmModal('حذف ردیف', 'این روز حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» (بالای صفحه) آن را برگردانید.', ()=>{
+    confirmDeleteModal('حذف ردیف', 'این روز حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» (بالای صفحه) آن را برگردانید.', ()=>{
       const rec = DB.daily.find(x=>x.id===b.dataset.del);
       DB.daily = DB.daily.filter(x=>x.id!==b.dataset.del);
       if(rec) moveToTrash('daily', rec);
@@ -1676,7 +1678,7 @@ function renderStations(){
     renderStations(); window.scrollTo({top:0, behavior:'smooth'});
   }));
   document.querySelectorAll('[data-stdel]').forEach(b=>b.addEventListener('click', ()=>{
-    confirmModal('حذف ایستگاه', 'این ایستگاه از لیست حذف می‌شود؛ ثبت‌های قبلی آن در جدول باقی می‌مانند اما نام ایستگاه دیگر نشان داده نخواهد شد.', ()=>{
+    confirmDeleteModal('حذف ایستگاه', 'این ایستگاه از لیست حذف می‌شود؛ ثبت‌های قبلی آن در جدول باقی می‌مانند اما نام ایستگاه دیگر نشان داده نخواهد شد.', ()=>{
       DB.meta.stations = DB.meta.stations.filter(s=>s.id!==b.dataset.stdel);
       if(editing.station && editing.station.id===b.dataset.stdel) editing.station = null;
       scheduleSave(); toast('ایستگاه حذف شد.','ok'); renderStations();
@@ -1722,7 +1724,7 @@ function renderStations(){
     renderStations(); window.scrollTo({top:0, behavior:'smooth'});
   }));
   document.querySelectorAll('[data-shdel]').forEach(b=>b.addEventListener('click', ()=>{
-    confirmModal('حذف آمار ایستگاه', 'این ردیف حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» آن را برگردانید.', ()=>{
+    confirmDeleteModal('حذف آمار ایستگاه', 'این ردیف حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» آن را برگردانید.', ()=>{
       const rec = DB.stationHourly.find(x=>x.id===b.dataset.shdel);
       DB.stationHourly = DB.stationHourly.filter(x=>x.id!==b.dataset.shdel);
       if(rec) moveToTrash('stationHourly', rec);
@@ -2130,7 +2132,7 @@ function renderShort(){
   document.querySelectorAll('[data-sedit]').forEach(b=>b.addEventListener('click', ()=>{ editing.short = JSON.parse(JSON.stringify(DB.short.find(x=>x.id===b.dataset.sedit))); renderShort(); window.scrollTo({top:0,behavior:'smooth'}); }));
   document.querySelectorAll('[data-ssend]').forEach(b=>b.addEventListener('click', ()=>{ promptSendToManagement(DB.short.find(x=>x.id===b.dataset.ssend), 'short'); }));
   document.querySelectorAll('[data-sdel]').forEach(b=>b.addEventListener('click', ()=>{
-    confirmModal('حذف کسری','این مورد حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» آن را برگردانید.', ()=>{
+    confirmDeleteModal('حذف کسری','این مورد حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» آن را برگردانید.', ()=>{
       const rec = DB.short.find(x=>x.id===b.dataset.sdel);
       DB.short = DB.short.filter(x=>x.id!==b.dataset.sdel);
       if(rec) moveToTrash('short', rec);
@@ -2317,7 +2319,7 @@ function renderWaste(){
   const cw = document.getElementById('cancelWasteBtn'); if(cw) cw.addEventListener('click', ()=>{ editing.waste=null; renderWaste(); });
   document.querySelectorAll('[data-wedit]').forEach(b=>b.addEventListener('click', ()=>{ editing.waste = JSON.parse(JSON.stringify(DB.waste.find(x=>x.id===b.dataset.wedit))); renderWaste(); window.scrollTo({top:0,behavior:'smooth'}); }));
   document.querySelectorAll('[data-wdel]').forEach(b=>b.addEventListener('click', ()=>{
-    confirmModal('حذف ضایعات','این ردیف حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» آن را برگردانید.', ()=>{
+    confirmDeleteModal('حذف ضایعات','این ردیف حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» آن را برگردانید.', ()=>{
       const rec = DB.waste.find(x=>x.id===b.dataset.wdel);
       DB.waste = DB.waste.filter(x=>x.id!==b.dataset.wdel);
       if(rec) moveToTrash('waste', rec);
@@ -2490,7 +2492,7 @@ function renderStop(){
   document.querySelectorAll('[data-pedit]').forEach(b=>b.addEventListener('click', ()=>{ editing.stop = JSON.parse(JSON.stringify(DB.stop.find(x=>x.id===b.dataset.pedit))); renderStop(); window.scrollTo({top:0,behavior:'smooth'}); }));
   document.querySelectorAll('[data-psend]').forEach(b=>b.addEventListener('click', ()=>{ promptSendToManagement(DB.stop.find(x=>x.id===b.dataset.psend), 'stop'); }));
   document.querySelectorAll('[data-pdel]').forEach(b=>b.addEventListener('click', ()=>{
-    confirmModal('حذف توقف','این رویداد حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» آن را برگردانید.', ()=>{
+    confirmDeleteModal('حذف توقف','این رویداد حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» آن را برگردانید.', ()=>{
       const rec = DB.stop.find(x=>x.id===b.dataset.pdel);
       DB.stop = DB.stop.filter(x=>x.id!==b.dataset.pdel);
       if(rec) moveToTrash('stop', rec);
@@ -3995,7 +3997,7 @@ function openRecycleBin(){
   document.getElementById('rb_close').addEventListener('click', ()=> root.innerHTML='');
   document.getElementById('rb_empty').addEventListener('click', ()=>{
     if(!DB.trash.length){ toast('سطل بازیابی خالی است.','ok'); return; }
-    confirmModal('خالی کردن سطل بازیابی', 'همه‌ی ' + DB.trash.length + ' ردیف داخل سطل بازیابی برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', ()=>{
+    confirmDeleteModal('خالی کردن سطل بازیابی', 'همه‌ی ' + DB.trash.length + ' ردیف داخل سطل بازیابی برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', ()=>{
       DB.trash = []; scheduleSave(); updateTrashBadge(); toast('سطل بازیابی خالی شد.','ok'); root.innerHTML='';
     });
   });
@@ -4021,7 +4023,9 @@ function renderRecycleBinList(){
     </div>`;
   }).join('');
   el.querySelectorAll('[data-rbrestore]').forEach(b=>b.addEventListener('click', ()=> restoreFromTrash(b.dataset.rbrestore)));
-  el.querySelectorAll('[data-rbpurge]').forEach(b=>b.addEventListener('click', ()=> purgeFromTrash(b.dataset.rbpurge)));
+  el.querySelectorAll('[data-rbpurge]').forEach(b=>b.addEventListener('click', ()=>{
+    confirmDeleteModal('حذف همیشگی از سطل بازیابی', 'این رکورد برای همیشه پاک می‌شود و دیگر هیچ راهی برای بازگرداندنش نیست.', ()=> purgeFromTrash(b.dataset.rbpurge));
+  }));
 }
 function renderRecycleBin(){ renderRecycleBinList(); } // re-render list in place if the modal is open
 
@@ -4034,6 +4038,29 @@ function confirmModal(title, desc, onConfirm, okLabel){
   document.getElementById('mCancel').addEventListener('click', ()=> root.innerHTML='');
   document.getElementById('mbg').addEventListener('click', e=>{ if(e.target.id==='mbg') root.innerHTML=''; });
   document.getElementById('mOk').addEventListener('click', ()=>{ onConfirm(); root.innerHTML=''; });
+}
+// نسخه‌ی محافظت‌شدهٔ confirmModal برای عملیات حذف/پاک‌سازی — قبل از اجرا، رمز مدیر را می‌پرسد.
+// این یک قفل سمت مرورگر است (برای جلوگیری از حذف اشتباه/غیرمجاز توسط پرسنل روی خط تولید)، نه یک لایهٔ
+// امنیتی رمزنگاری‌شده؛ چون فایل HTML است، رمز در تنظیمات ذخیره می‌شود و قابل مشاهده در کد صفحه است.
+function confirmDeleteModal(title, desc, onConfirm, okLabel){
+  const root = document.getElementById('modalRoot');
+  const correctPin = DB.meta.adminPin || '1234';
+  root.innerHTML = `<div class="modal-bg" id="mbg"><div class="modal">
+    <h3>${esc(title)}</h3><p class="desc">${esc(desc)}</p>
+    <div class="field" style="margin-top:12px;"><label>رمز مدیر برای تأیید</label><input type="password" id="mPin" placeholder="••••" autocomplete="off" inputmode="numeric"></div>
+    <p id="mPinErr" style="color:#ff5d6c; font-size:12px; display:none; margin-top:2px;">رمز اشتباه است.</p>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">انصراف</button><button class="btn btn-danger" id="mOk">${esc(okLabel||'حذف کن')}</button></div>
+  </div></div>`;
+  document.getElementById('mCancel').addEventListener('click', ()=> root.innerHTML='');
+  document.getElementById('mbg').addEventListener('click', e=>{ if(e.target.id==='mbg') root.innerHTML=''; });
+  const doConfirm = ()=>{
+    const val = document.getElementById('mPin').value;
+    if(val !== correctPin){ document.getElementById('mPinErr').style.display='block'; document.getElementById('mPin').focus(); return; }
+    onConfirm(); root.innerHTML='';
+  };
+  document.getElementById('mOk').addEventListener('click', doConfirm);
+  document.getElementById('mPin').addEventListener('keydown', e=>{ if(e.key==='Enter') doConfirm(); });
+  setTimeout(()=>{ const el=document.getElementById('mPin'); if(el) el.focus(); }, 30);
 }
 function openSettings(){
   const root = document.getElementById('modalRoot');
@@ -4063,6 +4090,10 @@ function openSettings(){
     <div style="border-top:1px solid var(--line); margin:4px 0 16px; padding-top:14px;">
       <div class="field" style="margin-bottom:6px;"><label>📱 شماره موبایل مدیریت ارشد سازمان</label><input id="set_phone" placeholder="09121234567" value="${esc(ORG.managerPhone||'')}"></div>
       <div class="hint">این شماره برای دکمه‌های «ارسال به مدیریت» در تب‌های کسری قطعات و توقفات تولید استفاده می‌شود (پیامک/واتساپ) — مشترک بین همه‌ی خطوط تولید.</div>
+    </div>
+    <div style="border-top:1px solid var(--line); margin:4px 0 16px; padding-top:14px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+      <div><b style="font-size:13px;">🔐 رمز مدیر برای حذف</b><div class="hint" style="margin-top:2px;">قبل از هر حذف/پاک‌سازی این رمز پرسیده می‌شود تا فقط شما بتوانید داده حذف کنید.</div></div>
+      <button class="btn btn-ghost btn-sm" id="changePinBtn">تغییر رمز مدیر</button>
     </div>
     <div class="modal-actions">
       <button class="btn btn-danger" id="clearAllBtn">پاک‌سازی کامل داده‌های این خط</button>
@@ -4095,11 +4126,44 @@ function openSettings(){
   });
   document.getElementById('clearAllBtn').addEventListener('click', ()=>{
     root.innerHTML='';
-    confirmModal('پاک‌سازی کامل داده‌های این خط', 'همه ردیف‌های ثبت‌شده (تولید، ارسال، ضایعات، توقفات، کسری) برای خط «' + esc(DB.meta.unitName||'') + '» برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', async ()=>{
+    confirmDeleteModal('پاک‌سازی کامل داده‌های این خط', 'همه ردیف‌های ثبت‌شده (تولید، ارسال، ضایعات، توقفات، کسری) برای خط «' + esc(DB.meta.unitName||'') + '» برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', async ()=>{
       DB.daily.forEach(r=>moveToTrash('daily', r)); DB.waste.forEach(r=>moveToTrash('waste', r)); DB.stop.forEach(r=>moveToTrash('stop', r)); DB.short.forEach(r=>moveToTrash('short', r)); DB.stationHourly.forEach(r=>moveToTrash('stationHourly', r));
       DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], meta: DB.meta };
       await saveAll(true); toast('همه داده‌های این خط پاک شد.','ok'); goTo(currentTab);
     });
+  });
+  document.getElementById('changePinBtn').addEventListener('click', openChangePinModal);
+}
+// تغییر رمز مدیر — برای اینکه هرکسی که وارد تنظیمات می‌شود نتواند رمز را دستکاری کند،
+// این کار خودش به دانستن رمز فعلی نیاز دارد.
+function openChangePinModal(){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="modal-bg" id="pbg"><div class="modal">
+    <h3>🔐 تغییر رمز مدیر</h3><p class="desc">این رمز قبل از هر حذف/پاک‌سازی داده پرسیده می‌شود.</p>
+    <div class="field" style="margin-bottom:10px;"><label>رمز فعلی</label><input type="password" id="pin_old" autocomplete="off" inputmode="numeric"></div>
+    <div class="field" style="margin-bottom:10px;"><label>رمز جدید</label><input type="password" id="pin_new" autocomplete="off" inputmode="numeric" placeholder="حداقل ۴ کاراکتر"></div>
+    <div class="field" style="margin-bottom:6px;"><label>تکرار رمز جدید</label><input type="password" id="pin_new2" autocomplete="off" inputmode="numeric"></div>
+    <p id="pinChangeErr" style="color:#ff5d6c; font-size:12px; display:none;"></p>
+    <div class="modal-actions"><button class="btn btn-ghost" id="pinCancel">انصراف</button><button class="btn btn-primary" id="pinSave">ذخیره رمز جدید</button></div>
+  </div></div>`;
+  const back = ()=>{ root.innerHTML=''; openSettings(); };
+  document.getElementById('pinCancel').addEventListener('click', back);
+  document.getElementById('pbg').addEventListener('click', e=>{ if(e.target.id==='pbg') back(); });
+  document.getElementById('pinSave').addEventListener('click', ()=>{
+    const errEl = document.getElementById('pinChangeErr');
+    const showErr = (msg)=>{ errEl.textContent = msg; errEl.style.display='block'; };
+    const oldV = document.getElementById('pin_old').value;
+    const newV = document.getElementById('pin_new').value;
+    const new2 = document.getElementById('pin_new2').value;
+    const correctPin = DB.meta.adminPin || '1234';
+    if(oldV !== correctPin) return showErr('رمز فعلی اشتباه است.');
+    if(newV.length < 4) return showErr('رمز جدید باید حداقل ۴ کاراکتر باشد.');
+    if(newV !== new2) return showErr('تکرار رمز جدید با رمز جدید یکسان نیست.');
+    DB.meta.adminPin = newV;
+    scheduleSave();
+    root.innerHTML='';
+    toast('رمز مدیر تغییر کرد.','ok');
+    openSettings();
   });
 }
 
@@ -4262,7 +4326,7 @@ document.getElementById('importJsonInput').addEventListener('change', (e)=>{
     try{ parsed = JSON.parse(reader.result); }
     catch(err){ toast('فایل پشتیبان معتبر نیست.','err'); e.target.value=''; return; }
     if(!parsed || !Array.isArray(parsed.daily)){ toast('ساختار فایل پشتیبان شناسایی نشد.','err'); e.target.value=''; return; }
-    confirmModal('بازیابی از فایل پشتیبان',
+    confirmDeleteModal('بازیابی از فایل پشتیبان',
       'داده‌های فعلی خط «' + (DB.meta.unitName||'') + '» (' + DB.daily.length + ' روز ثبت‌شده) با محتوای این فایل جایگزین می‌شود. وضعیت فعلی قبل از جایگزینی به سطل بازیابی منتقل می‌شود.',
       ()=>{
         DB.daily.forEach(r=>moveToTrash('daily', r));
