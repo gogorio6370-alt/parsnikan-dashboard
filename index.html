@@ -187,6 +187,8 @@ td.num, th.num{ text-align:left; font-variant-numeric:tabular-nums; direction:lt
 .tbl-empty{ padding:34px 10px; text-align:center; color:var(--text-mute); font-size:12.5px; }
 
 .badge{ display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+.cover-clickable{ transition:transform .15s ease, box-shadow .15s ease, background .15s ease; }
+.cover-clickable:hover{ transform:translateY(-2px); box-shadow:0 10px 26px rgba(0,0,0,.35); background:rgba(255,255,255,.03); }
 .badge-stop{ background:rgba(255,93,108,.14); color:#ffb0b8; }
 .badge-run{ background:rgba(47,217,196,.14); color:#8ff0c8; }
 .badge-warn{ background:rgba(255,207,92,.14); color:#ffe19c; }
@@ -2688,8 +2690,9 @@ function coverRing(pctVal, color){
     <div style="width:76px; height:76px; border-radius:50%; background:#0a1220; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:19px; color:#fff;">${txt}</div>
   </div>`;
 }
-function coverKpiCard(icon, title, formula, ring, bigVal, color){
-  return `<div style="background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:18px; padding:18px 14px; text-align:center; backdrop-filter:blur(6px); box-shadow:0 8px 24px rgba(0,0,0,.25);">
+function coverKpiCard(icon, title, formula, ring, bigVal, color, gotoTab){
+  const clickAttrs = gotoTab? `data-goto="${esc(gotoTab)}" style="cursor:pointer;"` : '';
+  return `<div ${clickAttrs} class="cover-clickable" style="background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:18px; padding:18px 14px; text-align:center; backdrop-filter:blur(6px); box-shadow:0 8px 24px rgba(0,0,0,.25);">
     <div style="font-size:22px; margin-bottom:6px;">${icon}</div>
     <div style="font-size:13px; font-weight:800; color:#e8edf7; margin-bottom:12px;">${title}</div>
     ${ring!==undefined ? ring : `<div style="font-size:26px; font-weight:900; color:${color}; margin:10px 0;">${bigVal}</div>`}
@@ -2706,22 +2709,23 @@ function coverProgressBar(pct){
   </div>`;
 }
 // کارت آماری بزرگ بدون رینگ — برای اعداد خام (نه درصد) مثل «جمع کل تولید»
-function coverStat(icon, label, value, sub, color){
-  return `<div style="background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:16px; padding:16px; text-align:center;">
+function coverStat(icon, label, value, sub, color, gotoTab){
+  const clickAttrs = gotoTab? `data-goto="${esc(gotoTab)}" style="cursor:pointer;"` : '';
+  return `<div ${clickAttrs} class="cover-clickable" style="background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:16px; padding:16px; text-align:center;">
     <div style="font-size:19px; margin-bottom:4px;">${icon}</div>
     <div style="font-size:11.5px; font-weight:700; color:#9fb0d1; margin-bottom:6px;">${label}</div>
     <div style="font-size:22px; font-weight:900; color:${color};">${value}</div>
     ${sub? `<div style="font-size:10.5px; color:#8b98b5; margin-top:4px;">${sub}</div>` : ''}
   </div>`;
 }
-// لیست میله‌ای Top-5 — برای «مهم‌ترین علل توقفات/ضایعات»
-function coverBarList(icon, title, items, unit){
+// لیست میله‌ای Top-5 — برای «مهم‌ترین علل توقفات/ضایعات»؛ روی هر ردیف کلیک کنید تا با همان فیلتر به تب مربوطه بروید
+function coverBarList(icon, title, items, unit, clickKind){
   const top = items.slice(0,5);
   const max = top.length? top[0].value : 0;
   return `<div style="background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:18px; padding:18px; backdrop-filter:blur(6px);">
     <div style="font-size:13.5px; font-weight:800; color:#e8edf7; margin-bottom:14px;">${icon} ${title}</div>
     ${top.length? top.map(it=>`
-      <div style="margin-bottom:10px;">
+      <div class="cover-clickable" ${clickKind? `data-${clickKind}="${esc(it.label)}" style="cursor:pointer; margin-bottom:10px;"` : 'style="margin-bottom:10px;"'}>
         <div style="display:flex; justify-content:space-between; font-size:11.5px; color:#c7d0e3; margin-bottom:4px;">
           <span>${esc(it.label)}</span><span style="font-weight:800; color:#fff;">${fmt(it.value,1)} ${unit}</span>
         </div>
@@ -2778,32 +2782,34 @@ function renderCover(){
     </div>
 
     <div style="background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:18px; padding:20px; margin-bottom:16px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
-        <div style="font-size:14px; font-weight:800; color:#e8edf7;">📊 میزان پیشرفت تا هدف ماهانه</div>
-        <div style="font-size:12px; color:#9fb0d1;">${fmt(cumTotal,0)} از ${monthlyTarget? fmt(monthlyTarget,0) : '—'}</div>
+      <div class="cover-clickable" data-goto="target" style="cursor:pointer;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+          <div style="font-size:14px; font-weight:800; color:#e8edf7;">📊 میزان پیشرفت تا هدف ماهانه</div>
+          <div style="font-size:12px; color:#9fb0d1;">${fmt(cumTotal,0)} از ${monthlyTarget? fmt(monthlyTarget,0) : '—'}</div>
+        </div>
+        ${coverProgressBar(progressPct)}
       </div>
-      ${coverProgressBar(progressPct)}
       <div class="grid grid-3" style="gap:12px; margin-top:18px;">
-        ${coverStat('📦','جمع کل تولید', fmt(cumTotal,0), 'از ابتدای '+esc(monthLabel(DB.meta.activeMonth)), '#4c8dff')}
-        ${coverStat('🚚','جمع کل قطعات ارسالی', fmt(totalShipped,0), 'ارسال به انبار', '#2fd9c4')}
-        ${coverStat('🔮','فاصله پیش‌بینی تا هدف ماه', monthlyTarget? (forecastGap>=0? '+':'')+fmt(forecastGap,0) : '—', monthlyTarget? (forecastGap>=0? 'پیش‌بینی می‌شود هدف محقق شود':'پیش‌بینی می‌شود کسری داشته باشیم') : 'هدف ماهانه تنظیم نشده', monthlyTarget? (forecastGap>=0?'#2fd9c4':'#ff5d6c') : '#93a4c3')}
+        ${coverStat('📦','جمع کل تولید', fmt(cumTotal,0), 'از ابتدای '+esc(monthLabel(DB.meta.activeMonth)), '#4c8dff', 'entry')}
+        ${coverStat('🚚','جمع کل قطعات ارسالی', fmt(totalShipped,0), 'ارسال به انبار', '#2fd9c4', 'ship')}
+        ${coverStat('🔮','فاصله پیش‌بینی تا هدف ماه', monthlyTarget? (forecastGap>=0? '+':'')+fmt(forecastGap,0) : '—', monthlyTarget? (forecastGap>=0? 'پیش‌بینی می‌شود هدف محقق شود':'پیش‌بینی می‌شود کسری داشته باشیم') : 'هدف ماهانه تنظیم نشده', monthlyTarget? (forecastGap>=0?'#2fd9c4':'#ff5d6c') : '#93a4c3', 'target')}
       </div>
     </div>
 
     <div class="grid grid-2" style="gap:16px; margin-bottom:16px;">
-      ${coverBarList('⏱️','مهم‌ترین علل توقفات', stopReasons, 'ساعت')}
-      ${coverBarList('🗑️','مهم‌ترین علل ضایعات', wasteReasons, 'عدد')}
+      ${coverBarList('⏱️','مهم‌ترین علل توقفات — روی هرکدام بزنید', stopReasons, 'ساعت', 'stopreason')}
+      ${coverBarList('🗑️','مهم‌ترین علل ضایعات — روی هرکدام بزنید', wasteReasons, 'عدد', 'wastetype')}
     </div>
 
     <div style="text-align:center; margin-bottom:18px;">
-      <span style="display:inline-block; font-size:12.5px; font-weight:800; color:#dfe6f5; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); padding:6px 16px; border-radius:20px;">سایر شاخص‌های کلیدی (KPI)</span>
+      <span style="display:inline-block; font-size:12.5px; font-weight:800; color:#dfe6f5; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); padding:6px 16px; border-radius:20px;">سایر شاخص‌های کلیدی (KPI) — برای جزئیات بزنید</span>
     </div>
     <div class="grid grid-3" style="gap:14px;">
-      ${coverKpiCard('🎯','OEE — اثربخشی کلی تجهیزات','دسترسی × عملکرد × کیفیت', coverRing(oee, metricColor(oee)))}
-      ${coverKpiCard('📈','راندمان تولید','تولید واقعی ÷ برنامه‌ریزی‌شده', coverRing(performance, metricColor(performance)))}
-      ${coverKpiCard('🗑️','نرخ ضایعات','تعداد ضایعات ÷ کل تولید', coverRing(wasteRate, metricColor(wasteRate, true)))}
-      ${coverKpiCard('⏱️','توقفات','زمان توقف ÷ زمان برنامه‌ریزی‌شده', coverRing(downtimeRate, metricColor(downtimeRate, true)))}
-      ${coverKpiCard('🏅','کیفیت','تعداد محصول سالم ÷ کل تولید', coverRing(quality, metricColor(quality)))}
+      ${coverKpiCard('🎯','OEE — اثربخشی کلی تجهیزات','دسترسی × عملکرد × کیفیت', coverRing(oee, metricColor(oee)), undefined, undefined, 'lean')}
+      ${coverKpiCard('📈','راندمان تولید','تولید واقعی ÷ برنامه‌ریزی‌شده', coverRing(performance, metricColor(performance)), undefined, undefined, 'lean')}
+      ${coverKpiCard('🗑️','نرخ ضایعات','تعداد ضایعات ÷ کل تولید', coverRing(wasteRate, metricColor(wasteRate, true)), undefined, undefined, 'waste')}
+      ${coverKpiCard('⏱️','توقفات','زمان توقف ÷ زمان برنامه‌ریزی‌شده', coverRing(downtimeRate, metricColor(downtimeRate, true)), undefined, undefined, 'stop')}
+      ${coverKpiCard('🏅','کیفیت','تعداد محصول سالم ÷ کل تولید', coverRing(quality, metricColor(quality)), undefined, undefined, 'lean')}
     </div>
   </div>`;
 
@@ -2817,6 +2823,23 @@ function renderCover(){
   };
   updateClock();
   coverClockTimer = setInterval(updateClock, 1000);
+
+  // کلیک روی هر آیتم (کارت‌های KPI، آمار، و ردیف‌های علل توقف/ضایعات) → رفتن به تب مرتبط با فیلتر همان مورد
+  document.querySelectorAll('#view [data-goto]').forEach(el=>{
+    el.addEventListener('click', ()=> goTo(el.dataset.goto));
+  });
+  document.querySelectorAll('#view [data-stopreason]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      filters.stopReason = el.dataset.stopreason; filters.stop = ''; filters.stopDate = '';
+      goTo('stop');
+    });
+  });
+  document.querySelectorAll('#view [data-wastetype]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      filters.waste = el.dataset.wastetype; filters.wasteCat = 'all';
+      goTo('waste');
+    });
+  });
 }
 
 function renderLean(){
