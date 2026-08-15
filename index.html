@@ -3938,6 +3938,14 @@ function legacyCopy(text){
     toast('متن پیام کپی شد.','ok');
   }catch(e){ toast('کپی خودکار پشتیبانی نشد — متن را دستی انتخاب و کپی کنید.','err'); }
 }
+function sendSmsViaKavenegar(phone, text){
+  if(!GSHEET.url) return Promise.resolve({ok:false, error:'no-gsheet'});
+  return fetch(GSHEET.url, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({ token: GSHEET.token, action:'sendSms', phone, message: text })
+  }).then(r=>r.json()).catch(e=>({ok:false, error:String(e)}));
+}
 function promptSendToManagement(rec, kind){
   // kind: 'short' | 'stop'
   const phone = normPhoneIntl(ORG.managerPhone);
@@ -3945,16 +3953,19 @@ function promptSendToManagement(rec, kind){
   const text = kind==='short' ? buildShortMessage(rec) : buildStopMessage(rec);
   const root = document.getElementById('modalRoot');
   const titleTxt = kind==='short' ? 'ارسال کسری به مدیریت ارشد؟' : 'ارسال توقف به مدیریت ارشد؟';
+  const canAutoSms = !!GSHEET.url; // ارسال خودکار فقط وقتی به گوگل‌شیت (و از آنجا به کاوه‌نگار) وصل باشیم ممکن است
   root.innerHTML = `<div class="modal-bg" id="smbg"><div class="modal">
     <h3>📤 ${titleTxt}</h3>
     <div class="hint" style="margin-bottom:10px;">شماره مقصد: <b style="color:var(--text); direction:ltr; display:inline-block;">${esc(phone)}</b></div>
     <p class="desc" style="white-space:pre-line;">${esc(text)}</p>
-    <div class="hint" style="margin-bottom:14px;">با تپ روی هرکدام، اپ پیامک یا واتساپ گوشی <b>شما</b> با متن آماده باز می‌شود — پیام از طرف شما ارسال می‌شود؛ کافیست دکمه‌ی ارسال را در همان اپ بزنید. اگر با تپ هیچ اپی باز نشد، از دکمه «کپی متن پیام» استفاده کنید و در واتساپ/پیامک به‌صورت دستی برای همین شماره بفرستید.</div>
+    ${canAutoSms ? `<div class="hint" style="margin-bottom:10px;">با «ارسال خودکار پیامک» پیام مستقیماً از سرور (کاوه‌نگار) فرستاده می‌شود — نیازی به باز شدن اپ گوشی شما نیست.</div>` : ''}
+    <div class="hint" style="margin-bottom:14px;">با تپ روی گزینه‌های دیگر، اپ پیامک یا واتساپ گوشی <b>شما</b> با متن آماده باز می‌شود؛ کافیست دکمه‌ی ارسال را در همان اپ بزنید. اگر با تپ هیچ اپی باز نشد، از دکمه «کپی متن پیام» استفاده کنید.</div>
     <div class="modal-actions" style="flex-wrap:wrap;">
       <button class="btn btn-ghost" id="sm_cancel">فعلاً نه</button>
       <button class="btn btn-ghost" id="sm_copy">کپی متن پیام</button>
       <a class="btn btn-ghost" id="sm_wa" href="${waHref(phone, text)}" target="_blank" rel="noopener" style="border-color:rgba(56,161,105,.5); color:#68d391;">ارسال با واتساپ</a>
-      <a class="btn btn-primary" id="sm_sms" href="${smsHref(phone, text)}">ارسال با پیامک</a>
+      <a class="btn btn-ghost" id="sm_sms" href="${smsHref(phone, text)}">ارسال با پیامک گوشی</a>
+      ${canAutoSms ? `<button class="btn btn-primary" id="sm_auto">📡 ارسال خودکار پیامک (کاوه‌نگار)</button>` : ''}
     </div>
   </div></div>`;
   document.getElementById('smbg').addEventListener('click', e=>{ if(e.target.id==='smbg') root.innerHTML=''; });
@@ -3962,6 +3973,13 @@ function promptSendToManagement(rec, kind){
   document.getElementById('sm_copy').addEventListener('click', ()=> copyText(text));
   document.getElementById('sm_wa').addEventListener('click', ()=> setTimeout(()=>{ root.innerHTML=''; }, 200));
   document.getElementById('sm_sms').addEventListener('click', ()=> setTimeout(()=>{ root.innerHTML=''; }, 200));
+  const autoBtn = document.getElementById('sm_auto');
+  if(autoBtn) autoBtn.addEventListener('click', async ()=>{
+    autoBtn.disabled = true; autoBtn.textContent = 'در حال ارسال…';
+    const res = await sendSmsViaKavenegar(phone, text);
+    if(res && res.ok){ toast('پیامک با موفقیت ارسال شد.','ok'); root.innerHTML=''; }
+    else { toast('ارسال خودکار ناموفق بود — از گزینه‌های دیگر استفاده کنید.','err'); autoBtn.disabled=false; autoBtn.textContent='📡 ارسال خودکار پیامک (کاوه‌نگار)'; console.warn('Kavenegar send failed:', res); }
+  });
 }
 
 /* ---------------------------- recycle bin (restore deleted rows) ---------------------------- */
