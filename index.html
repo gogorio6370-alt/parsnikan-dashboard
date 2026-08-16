@@ -1719,13 +1719,17 @@ function renderStations(){
     const updatePreview = ()=>{
       const st = stationById(stEl.value);
       const sum = num(totalEl.value)||0;
-      const target = st ? st.dailyTarget : 0;
+      const hoursWorked = hoursBetweenTimes(readTimePicker('sh_shiftStart'), readTimePicker('sh_shiftEnd'));
+      const target = proratedStationTarget(st, hoursWorked);
       const dev = target ? (sum-target)/target : null;
-      previewEl.value = fmt(target,0) + (dev===null? '' : '  (' + pct(dev,1) + ')');
+      previewEl.value = fmt(target,0) + (hoursWorked? '  («'+fmt(hoursWorked,1)+' ساعت کاری»)' : '  (هدف کامل روزانه — ساعت کاری وارد نشده)') + (dev===null? '' : '  ' + pct(dev,1));
       previewEl.style.color = dev===null ? 'var(--text)' : (dev>=0? '#8ff0c8':'#ffb0b8');
     };
     totalEl.addEventListener('input', updatePreview);
     stEl.addEventListener('change', updatePreview);
+    ['sh_shiftStart_h','sh_shiftStart_m','sh_shiftEnd_h','sh_shiftEnd_m'].forEach(id=>{
+      const el = document.getElementById(id); if(el) el.addEventListener('change', updatePreview);
+    });
     updatePreview();
 
     document.getElementById('saveStHourlyBtn').addEventListener('click', ()=>{
@@ -1735,8 +1739,10 @@ function renderStations(){
       if(!date || !stationId || total===null){ toast('تاریخ، ایستگاه و مقدار تولید الزامی است.','err'); return; }
       const st = stationById(stationId);
       const opNames = [document.getElementById('sh_op0').value, document.getElementById('sh_op1').value, document.getElementById('sh_op2').value].filter(Boolean);
-      const rec = { id: draft.id || uid(), date, stationId, total, target: st? st.dailyTarget : 0, operator: [...new Set(opNames)].join('، '),
-        shiftStart: readTimePicker('sh_shiftStart'), shiftEnd: readTimePicker('sh_shiftEnd'), product: document.getElementById('sh_product').value,
+      const shiftStart = readTimePicker('sh_shiftStart'), shiftEnd = readTimePicker('sh_shiftEnd');
+      const hoursWorked = hoursBetweenTimes(shiftStart, shiftEnd);
+      const rec = { id: draft.id || uid(), date, stationId, total, target: proratedStationTarget(st, hoursWorked), operator: [...new Set(opNames)].join('، '),
+        shiftStart, shiftEnd, product: document.getElementById('sh_product').value,
         traceId: document.getElementById('sh_traceId').value.trim(), inspectionId: document.getElementById('sh_inspectionId').value.trim() };
       if(draft.id){ DB.stationHourly = DB.stationHourly.map(x=>x.id===draft.id?rec:x); toast('ویرایش شد.','ok'); }
       else{ DB.stationHourly.push(rec); toast('آمار روزانه ثبت شد.','ok'); }
@@ -3991,6 +3997,25 @@ function readDatePicker(idPrefix){
   return el ? normDate(el.value) : '';
 }
 // ساعت کشویی (ساعت/دقیقه، گام ۱۵ دقیقه‌ای) — به‌جای تایپ دستی؛ اختیاری (می‌تواند خالی بماند)
+// اختلاف زمانی بین دو ساعت «HH:MM» به ساعت اعشاری (اگر پایان از شروع کوچک‌تر بود یعنی از نیمه‌شب رد شده)
+function hoursBetweenTimes(startStr, endStr){
+  if(!startStr || !endStr) return null;
+  const sp = startStr.split(':').map(Number), ep = endStr.split(':').map(Number);
+  if(sp.length<2 || ep.length<2 || isNaN(sp[0]) || isNaN(ep[0])) return null;
+  let mins = (ep[0]*60+ep[1]) - (sp[0]*60+sp[1]);
+  if(mins < 0) mins += 24*60;
+  return mins/60;
+}
+// هدف واقعی یک ثبت ساعتی ایستگاه — اگر بازه ساعت شروع/پایان مشخص شده باشد، هدف متناسب با همان چند ساعت
+// محاسبه می‌شود (استاندارد ساعتی × ساعت کارکرد)، نه همیشه هدف کامل روزانه. اگر بازه خالی بود، محافظه‌کارانه
+// هدف کامل روزانه در نظر گرفته می‌شود (رفتار قبلی، برای رکوردهایی که ساعت کاری وارد نشده).
+function proratedStationTarget(st, hoursWorked){
+  if(!st) return 0;
+  if(hoursWorked!==null && hoursWorked!==undefined && hoursWorked>0 && st.hourlyStandard>0){
+    return Math.round(st.hourlyStandard * hoursWorked);
+  }
+  return st.dailyTarget||0;
+}
 function timePickerHtml(idPrefix, currentTimeStr){
   const parts = String(currentTimeStr||'').split(':');
   const curH = (parts[0]!==undefined && parts[0]!=='') ? parseInt(parts[0],10) : null;
