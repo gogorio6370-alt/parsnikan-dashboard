@@ -3991,13 +3991,33 @@ function shiftJalaliMonth_(y, m, delta){
   while(mm > 12){ mm -= 12; yy++; }
   return [yy, mm];
 }
+// تاریخ کشویی یک‌فیلدی — یک select با مقدار کامل «۱۴۰۵/۰۵/۲۰».
+// نکته مهم (رفع محدودیت قبلی): بازهٔ نمایش‌داده‌شده فقط به «ماه فعال» گره نمی‌خورد (چون اگر ماه فعال قدیمی
+// می‌ماند، کشویی هم عملاً قفل می‌شد و نمی‌شد تاریخ آینده انتخاب کرد). به‌جایش دو بازه با هم ترکیب می‌شوند:
+// ۱) یک ماه قبل تا یک ماه بعد از «ماه فعال» (برای هماهنگی با جایی که کاربر الان در حال کار روی آن است)
+// ۲) دو ماه قبل تا چهار ماه بعد از «تاریخ واقعی امروز» (تا کشویی همیشه خودش را با گذر زمان جلو می‌کشد
+//    و هیچ‌وقت متوقف نمی‌ماند، چه کسی ماه فعال را عوض کند چه نکند)
+// اگر مقدار فعلی رکورد بازهم بیرون این بازه بود (مثلاً ویرایش یک رکورد خیلی قدیمی)، همان مقدار به‌عنوان
+// یک گزینهٔ اضافه نگه داشته می‌شود تا چیزی گم نشود.
 function datePickerHtml(idPrefix, currentDateStr){
   const cur = normDate(currentDateStr||'');
   const activeParts = (DB.meta.activeMonth||'').split('/');
   const curParts = cur.split('/');
   const y = parseInt(curParts[0] || activeParts[0] || '1405', 10);
   const m = curParts[1] ? parseInt(curParts[1],10) : (parseInt(activeParts[1],10) || 1);
-  const months = [shiftJalaliMonth_(y,m,-1), [y,m], shiftJalaliMonth_(y,m,1)];
+  const todayParts = todayJalaliStr().split('/').map(x=>parseInt(x,10));
+
+  const monthKeySet = new Map(); // "yyyy/mm" -> [yy,mm]  — برای حذف تکراری‌ها با حفظ ترتیب
+  const addRange = (baseY, baseM, fromOffset, toOffset)=>{
+    for(let off=fromOffset; off<=toOffset; off++){
+      const [yy,mm] = shiftJalaliMonth_(baseY, baseM, off);
+      monthKeySet.set(yy+'/'+String(mm).padStart(2,'0'), [yy,mm]);
+    }
+  };
+  addRange(y, m, -1, 1);                          // اطراف ماه فعال/مقدار فعلی
+  addRange(todayParts[0], todayParts[1], -2, 4);   // اطراف تاریخ واقعی امروز (همیشه به‌روز می‌ماند)
+
+  const months = [...monthKeySet.values()].sort((a,b)=> (a[0]*100+a[1]) - (b[0]*100+b[1]));
   const days = Array.from({length:31}, (_,i)=>i+1);
   let optHtml = '<option value="">— انتخاب —</option>';
   months.forEach(([yy,mm])=>{
