@@ -1594,7 +1594,7 @@ function renderStations(){
       <tbody>
       ${stations.length===0? `<tr><td colspan="5"><div class="tbl-empty">هنوز ایستگاهی تعریف نشده — پایین همین کارت یک ایستگاه اضافه کنید.</div></td></tr>` :
       stations.map(st=>`<tr>
-        <td>${esc(st.name)}</td><td class="num">${fmt(st.hourlyStandard,0)}</td><td class="num">${fmt(st.dailyTarget,0)}</td>
+        <td>${esc(st.name)} ${st.noQty?'<span class="badge badge-mute" style="margin-right:6px;">فقط ساعت کاری</span>':''}</td><td class="num">${st.noQty?'—':fmt(st.hourlyStandard,0)}</td><td class="num">${st.noQty?'—':fmt(st.dailyTarget,0)}</td>
         <td>${st.stage?`<span class="tag" style="background:#1c2a44;color:#8fb2ff;padding:2px 9px;border-radius:10px;font-size:10.5px;">${esc(st.stage)}</span>`:'<span class="muted">—</span>'}</td>
         <td><div style="display:flex; gap:6px;">
           <button class="icon-btn" data-stedit="${st.id}" title="ویرایش ایستگاه"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
@@ -1617,6 +1617,9 @@ function renderStations(){
         ${editing.station? '<button class="btn btn-ghost" id="cancelStationEditBtn">انصراف</button>':''}
       </div>
     </div>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12.5px; cursor:pointer;">
+      <input type="checkbox" id="newStNoQty" ${editing.station?.noQty?'checked':''}> این ایستگاه آمار تعدادی ندارد (مثل تست/متفرقه) — فقط ساعت کاری ثبت می‌شود، بدون هدف/انحراف
+    </label>
     <div class="hint" style="margin-top:8px;">اگر چند ایستگاه سریالی با هم یک زیرخط (مثلاً «اتاق قرص») را می‌سازند و مجموعاً باید بیشتر از هدف نهایی خط تولید کنند (مثلاً برای پوشش ضایعات یا تغذیه چند خط)، همه را با یک نام «مرحله جریان» یکسان علامت بزنید — سپس در تب «نقشه خط و گلوگاه‌ها» می‌توانید هدف ورودی موردنیاز همان مرحله را جداگانه تعریف کنید.</div>
   </div>
 
@@ -1625,8 +1628,8 @@ function renderStations(){
     ${stations.length===0? '<div class="tbl-empty">اول یک ایستگاه در بخش بالا تعریف کنید.</div>' : `
     <div class="form-grid">
       <div class="field"><label>تاریخ</label>${datePickerHtml('sh_date', draft.date)}</div>
-      <div class="field"><label>ایستگاه</label><select id="sh_station">${stations.map(st=>`<option value="${st.id}" ${draft.stationId===st.id?'selected':''}>${esc(st.name)} (هدف: ${fmt(st.dailyTarget,0)})</option>`).join('')}</select></div>
-      <div class="field"><label>تولید روز</label><input id="sh_total" type="text" inputmode="numeric" value="${draft.total ?? ''}" placeholder="0"></div>
+      <div class="field"><label>ایستگاه</label><select id="sh_station">${stations.map(st=>`<option value="${st.id}" ${draft.stationId===st.id?'selected':''}>${esc(st.name)}${st.noQty?' — فقط ساعت کاری':' (هدف: '+fmt(st.dailyTarget,0)+')'}</option>`).join('')}</select></div>
+      <div class="field"><label>تولید روز <span class="muted" id="sh_total_optional_hint" style="display:none;">(اختیاری برای این ایستگاه)</span></label><input id="sh_total" type="text" inputmode="numeric" value="${draft.total ?? ''}" placeholder="0"></div>
       <div class="field"><label>هدف / انحراف</label><input id="sh_preview" readonly style="color:var(--text); font-weight:800;" value="—"></div>
       <div class="field"><label>اپراتور ۱</label><select id="sh_op0">${(()=>{ const sel=(draft.operator||'').split(/[،,]/).map(s=>s.trim()).filter(Boolean); const all=allOperatorNames(); return '<option value="">— انتخاب نشده —</option>'+all.map(n=>`<option value="${esc(n)}" ${sel[0]===n?'selected':''}>${esc(n)}</option>`).join(''); })()}</select></div>
       <div class="field"><label>اپراتور ۲</label><select id="sh_op1">${(()=>{ const sel=(draft.operator||'').split(/[،,]/).map(s=>s.trim()).filter(Boolean); const all=allOperatorNames(); return '<option value="">— انتخاب نشده —</option>'+all.map(n=>`<option value="${esc(n)}" ${sel[1]===n?'selected':''}>${esc(n)}</option>`).join(''); })()}</select></div>
@@ -1689,17 +1692,18 @@ function renderStations(){
     const hourly = num(document.getElementById('newStHourly').value);
     const daily = num(document.getElementById('newStDaily').value);
     const stage = document.getElementById('newStStage').value.trim();
+    const noQty = document.getElementById('newStNoQty').checked;
     if(!name){ toast('نام ایستگاه را وارد کنید.','err'); return; }
     DB.meta.stations = DB.meta.stations || [];
     if(editing.station){
       const st = DB.meta.stations.find(s=>s.id===editing.station.id);
-      if(st){ st.name = name; st.hourlyStandard = hourly||0; st.dailyTarget = daily || (hourly? hourly*10 : 0); st.stage = stage||''; }
+      if(st){ st.name = name; st.hourlyStandard = noQty? 0 : (hourly||0); st.dailyTarget = noQty? 0 : (daily || (hourly? hourly*10 : 0)); st.stage = stage||''; st.noQty = noQty; }
       // keep target/name in any already-saved daily records referencing this station in sync
-      (DB.stationHourly||[]).forEach(r=>{ if(r.stationId===editing.station.id) r.target = st.dailyTarget; });
+      (DB.stationHourly||[]).forEach(r=>{ if(r.stationId===editing.station.id) r.target = noQty? null : st.dailyTarget; });
       editing.station = null;
       scheduleSave(); toast('ایستگاه ویرایش شد.','ok'); renderStations();
     } else {
-      DB.meta.stations.push({ id: uid(), name, hourlyStandard: hourly||0, dailyTarget: daily || (hourly? hourly*10 : 0), stage: stage||'' });
+      DB.meta.stations.push({ id: uid(), name, hourlyStandard: noQty? 0 : (hourly||0), dailyTarget: noQty? 0 : (daily || (hourly? hourly*10 : 0)), stage: stage||'', noQty });
       scheduleSave(); toast('ایستگاه اضافه شد.','ok'); renderStations();
     }
   });
@@ -1723,6 +1727,14 @@ function renderStations(){
     const previewEl = document.getElementById('sh_preview');
     const updatePreview = ()=>{
       const st = stationById(stEl.value);
+      const optHint = document.getElementById('sh_total_optional_hint');
+      if(st && st.noQty){
+        if(optHint) optHint.style.display = 'inline';
+        previewEl.value = 'این ایستگاه آمار تعدادی/هدف ندارد — فقط ساعت کاری ثبت می‌شود';
+        previewEl.style.color = 'var(--text-mute)';
+        return;
+      }
+      if(optHint) optHint.style.display = 'none';
       const sum = num(totalEl.value)||0;
       const hoursWorked = hoursBetweenTimes(readTimePicker('sh_shiftStart'), readTimePicker('sh_shiftEnd'));
       const target = proratedStationTarget(st, hoursWorked);
@@ -1740,13 +1752,13 @@ function renderStations(){
     document.getElementById('saveStHourlyBtn').addEventListener('click', ()=>{
       const date = readDatePicker('sh_date');
       const stationId = stEl.value;
-      const total = num(totalEl.value);
-      if(!date || !stationId || total===null){ toast('تاریخ، ایستگاه و مقدار تولید الزامی است.','err'); return; }
       const st = stationById(stationId);
+      const total = num(totalEl.value);
+      if(!date || !stationId || (total===null && !(st && st.noQty))){ toast('تاریخ، ایستگاه و مقدار تولید الزامی است.','err'); return; }
       const opNames = [document.getElementById('sh_op0').value, document.getElementById('sh_op1').value, document.getElementById('sh_op2').value].filter(Boolean);
       const shiftStart = readTimePicker('sh_shiftStart'), shiftEnd = readTimePicker('sh_shiftEnd');
       const hoursWorked = hoursBetweenTimes(shiftStart, shiftEnd);
-      const rec = { id: draft.id || uid(), date, stationId, total, target: proratedStationTarget(st, hoursWorked), operator: [...new Set(opNames)].join('، '),
+      const rec = { id: draft.id || uid(), date, stationId, total, target: (st && st.noQty)? null : proratedStationTarget(st, hoursWorked), operator: [...new Set(opNames)].join('، '),
         shiftStart, shiftEnd, product: document.getElementById('sh_product').value,
         traceId: document.getElementById('sh_traceId').value.trim(), inspectionId: document.getElementById('sh_inspectionId').value.trim() };
       if(draft.id){ DB.stationHourly = DB.stationHourly.map(x=>x.id===draft.id?rec:x); toast('ویرایش شد.','ok'); }
