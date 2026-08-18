@@ -2536,7 +2536,9 @@ function renderStop(){
     if(editing.stop){ DB.stop = DB.stop.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
     else{ DB.stop.push(rec); toast('توقف ثبت شد.','ok'); }
     editing.stop = null; scheduleSave(); renderStop();
-    if(isNew) promptSendToManagement(rec, 'stop');
+    if(isNew){
+      if(hours>1) autoSendStopToManagement(rec); else promptSendToManagement(rec, 'stop');
+    }
   });
   const cp = document.getElementById('cancelStopBtn'); if(cp) cp.addEventListener('click', ()=>{ editing.stop=null; renderStop(); });
   document.querySelectorAll('[data-pedit]').forEach(b=>b.addEventListener('click', ()=>{ editing.stop = JSON.parse(JSON.stringify(DB.stop.find(x=>x.id===b.dataset.pedit))); renderStop(); window.scrollTo({top:0,behavior:'smooth'}); }));
@@ -2805,6 +2807,11 @@ function renderCover(){
       </div>
     </div>
 
+    <div style="background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:18px; padding:20px; margin-bottom:16px;" class="cover-clickable" data-goto="target">
+      <div style="font-size:14px; font-weight:800; color:#e8edf7; margin-bottom:6px;">📉 روند روزانه تولید و ارسال در برابر هدف روزانه</div>
+      <div class="chart-box" style="height:220px;"><canvas id="chCoverTrend"></canvas></div>
+    </div>
+
     <div class="grid grid-2" style="gap:16px; margin-bottom:16px;">
       ${coverBarList('⏱️','مهم‌ترین علل توقفات — روی هرکدام بزنید', stopReasons, 'ساعت', 'stopreason')}
       ${coverBarList('🗑️','مهم‌ترین علل ضایعات — روی هرکدام بزنید', wasteReasons, 'عدد', 'wastetype')}
@@ -2821,6 +2828,19 @@ function renderCover(){
       ${coverKpiCard('🏅','کیفیت','تعداد محصول سالم ÷ کل تولید', coverRing(quality, metricColor(quality)), undefined, undefined, 'lean')}
     </div>
   </div>`;
+
+  // نمودار روند روزانه تولید/ارسال در برابر هدف روزانه (هدف با ضریب روزهای کوتاه/تعطیل تنظیم می‌شود)
+  const dailyTargetBase = workingDays ? monthlyTarget/workingDays : 0;
+  mkChart('chCoverTrend', { type:'line', data:{ labels: rows.map(e=>e.date.slice(5)), datasets:[
+      { label:'تولید روزانه', data: rows.map(e=>allLinesTotal(e)), borderColor:'#4c8dff', backgroundColor:'#4c8dff26', fill:true, tension:.35, pointRadius:2 },
+      { label:'ارسال روزانه', data: rows.map(e=>shipTotal(e)), borderColor:'#2fd9c4', backgroundColor:'#2fd9c426', fill:true, tension:.35, pointRadius:2 },
+      { label:'هدف روزانه', data: rows.map(e=>Math.round(dailyTargetBase*dayShiftFactor(e))), borderColor:'#93a4c3', borderDash:[5,4], pointRadius:0, tension:0, fill:false },
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:true, position:'bottom', labels:{color:'#c7d0e3', boxWidth:12, font:{size:10.5}}},
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label+': '+fmt(ctx.parsed.y,0) } } },
+      scales:{ x:{grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#8b98b5', font:{size:9.5}, maxRotation:0, autoSkip:true, maxTicksLimit:8}},
+               y:{grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#8b98b5', font:{size:9.5}}} } } });
 
   const updateClock = ()=>{
     const t = document.getElementById('coverClockTime');
@@ -4167,6 +4187,17 @@ function sendSmsViaKavenegar(phone, text){
     headers:{'Content-Type':'text/plain;charset=utf-8'},
     body: JSON.stringify({ token: GSHEET.token, action:'sendSms', phone, message: text })
   }).then(r=>r.json()).catch(e=>({ok:false, error:String(e)}));
+}
+// توقف بالای ۱ ساعت → بدون نیاز به تأیید دستی، پیامک خودکار برای مدیریت ارشد فرستاده می‌شود.
+// اگر کاوه‌نگار/گوگل‌شیت وصل نبود، به‌جای شکست ساکت، همان پنجرهٔ ارسال دستی معمولی باز می‌شود.
+async function autoSendStopToManagement(rec){
+  const phone = normPhoneIntl(ORG.managerPhone);
+  if(!phone || !GSHEET.url){ promptSendToManagement(rec, 'stop'); return; }
+  const text = buildStopMessage(rec);
+  toast('توقف بالای ۱ ساعت — در حال ارسال خودکار پیامک به مدیریت…','ok');
+  const res = await sendSmsViaKavenegar(phone, text);
+  if(res && res.ok){ toast('پیامک توقف به‌صورت خودکار برای مدیریت ارسال شد.','ok'); }
+  else { toast('ارسال خودکار پیامک ناموفق بود — از گزینه‌های دیگر استفاده کنید.','err'); console.warn('Auto stop SMS failed:', res); promptSendToManagement(rec, 'stop'); }
 }
 function promptSendToManagement(rec, kind){
   // kind: 'short' | 'stop'
