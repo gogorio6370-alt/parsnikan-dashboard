@@ -1445,12 +1445,14 @@ function renderEntry(){
       <thead><tr>
         <th>تاریخ</th><th>روز</th><th class="num">خط۱</th><th class="num">خط۲</th><th class="num">خط۳</th><th class="num">خط۴</th>
         <th class="num">CKD</th><th class="num">سه‌راهی۲۰۶</th><th class="num">درپوش</th><th class="num">دیزل/بنز</th>
-        <th class="num">جمع ۴خط</th><th class="num">جمع کل</th><th class="num">ارسال</th><th>وضعیت</th><th></th>
+        <th class="num">جمع ۴خط</th><th class="num">جمع کل</th><th class="num">ارسال</th><th>وضعیت</th><th class="num">انحراف٪ (۴خط اصلی)</th><th></th>
       </tr></thead>
       <tbody>
-      ${M.daily.length===0? `<tr><td colspan="15"><div class="tbl-empty">هنوز داده‌ای برای این ماه ثبت نشده است.</div></td></tr>` :
+      ${M.daily.length===0? `<tr><td colspan="16"><div class="tbl-empty">هنوز داده‌ای برای این ماه ثبت نشده است.</div></td></tr>` :
         [...M.daily].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date)).map(e=>{
-          const dev = mainFourTotal(e) - dayTarget4Lines(e);
+          const t4 = dayTarget4Lines(e);
+          const dev = mainFourTotal(e) - t4;
+          const devPct = t4? (dev/t4) : null;
           const stopped = ['line1','line2','line3','line4'].filter(k=>e.lines[k].status==='stop').length;
           return `<tr>
             <td>${esc(e.date)}</td><td>${esc(e.day)}</td>
@@ -1466,6 +1468,7 @@ function renderEntry(){
             <td class="num">${fmt(allLinesTotal(e),0)}</td>
             <td class="num">${fmt(shipTotal(e),0)}</td>
             <td>${stopped>0?`<span class="badge badge-stop">${stopped} خط متوقف</span>`:dev<0?`<span class="badge badge-warn">${fmt(dev,0)} کمتر از هدف</span>`:`<span class="badge badge-run">مطابق هدف</span>`}</td>
+            <td class="num" style="color:${devPct===null?'var(--text-mute)':devPct>=0?'#8ff0c8':'#ffb0b8'}; font-weight:800;">${pct(devPct,1)}</td>
             <td><div style="display:flex; gap:6px;">
               <button class="icon-btn" data-edit="${e.id}" title="ویرایش"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
               <button class="icon-btn" data-del="${e.id}" title="حذف"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
@@ -1536,13 +1539,17 @@ function renderEntry(){
     });
   }));
   document.getElementById('expDailyCsv').addEventListener('click', ()=>{
-    const headers = ['تاریخ','روز','خط1','خط2','خط3','خط4','CKD','سه‌راهی206','درپوش','دیزل/بنز','جمع4خط','جمع کل','جمع ارسال'];
-    const rows = M.daily.map(e=>[e.date,e.day,
+    const headers = ['تاریخ','روز','خط1','خط2','خط3','خط4','CKD','سه‌راهی206','درپوش','دیزل/بنز','جمع4خط','جمع کل','جمع ارسال','انحراف% (4خط اصلی)'];
+    const rows = M.daily.map(e=>{
+      const t4 = dayTarget4Lines(e);
+      const devPct = t4? ((mainFourTotal(e)-t4)/t4*100) : '';
+      return [e.date,e.day,
       e.lines.line1.status==='stop'?'توقف':e.lines.line1.qty, e.lines.line2.status==='stop'?'توقف':e.lines.line2.qty,
       e.lines.line3.status==='stop'?'توقف':e.lines.line3.qty, e.lines.line4.status==='stop'?'توقف':e.lines.line4.qty,
       e.lines.ckd.status==='stop'?'توقف':e.lines.ckd.qty, e.lines.se206.status==='stop'?'توقف':e.lines.se206.qty, e.lines.darpoosh.status==='stop'?'توقف':e.lines.darpoosh.qty,
       e.lines.diesel.status==='stop'?'توقف':e.lines.diesel.qty,
-      mainFourTotal(e), allLinesTotal(e), shipTotal(e)]);
+      mainFourTotal(e), allLinesTotal(e), shipTotal(e), devPct===''?'':devPct.toFixed(1)];
+    });
     downloadFile('ورود-داده-روزانه.csv', toCSV(headers, rows), 'text/csv;charset=utf-8');
   });
 }
