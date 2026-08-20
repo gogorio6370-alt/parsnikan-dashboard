@@ -4514,8 +4514,15 @@ function confirmModal(title, desc, onConfirm, okLabel){
 // نسخه‌ی محافظت‌شدهٔ confirmModal برای عملیات حذف/پاک‌سازی — قبل از اجرا، رمز مدیر را می‌پرسد.
 // این یک قفل سمت مرورگر است (برای جلوگیری از حذف اشتباه/غیرمجاز توسط پرسنل روی خط تولید)، نه یک لایهٔ
 // امنیتی رمزنگاری‌شده؛ چون فایل HTML است، رمز در تنظیمات ذخیره می‌شود و قابل مشاهده در کد صفحه است.
+// نسخه‌ی محافظت‌شدهٔ confirmModal برای عملیات حذف/پاک‌سازی — اگر با نشست مدیر (admin) وارد شده باشید،
+// چون هویت‌تان همان اول ورود تأیید شده، دیگر دوباره رمز نمی‌پرسد و فقط یک تأیید ساده کافی است.
+// برای پرسنل عادی (اپراتور) همچنان رمز مدیر پرسیده می‌شود.
 function confirmDeleteModal(title, desc, onConfirm, okLabel){
   const root = document.getElementById('modalRoot');
+  if(currentSessionRole()==='admin'){
+    confirmModal(title, desc, onConfirm, okLabel);
+    return;
+  }
   const correctPin = DB.meta.adminPin || '1234';
   root.innerHTML = `<div class="modal-bg" id="mbg"><div class="modal">
     <h3>${esc(title)}</h3><p class="desc">${esc(desc)}</p>
@@ -4853,9 +4860,12 @@ function hasActiveSession(){
 function currentSessionName(){
   try{ return sessionStorage.getItem('pn_session_name') || ''; }catch(e){ return ''; }
 }
+function currentSessionRole(){
+  try{ return sessionStorage.getItem('pn_session_role') || ''; }catch(e){ return ''; }
+}
 function renderLoginScreen(){
   const root = document.getElementById('loginScreen');
-  const people = (DB.meta.personnel||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','fa'));
+  const people = (DB.meta.personnel||[]).filter(p=>p.workType!=='admin').slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','fa'));
   root.innerHTML = `<div style="position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;
       background:radial-gradient(1200px 600px at 50% -10%, rgba(76,141,255,.18), transparent), linear-gradient(180deg,#0a1120,#0d1730 55%,#0a1120);">
     <div style="width:100%; max-width:420px; background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:22px; padding:34px 28px; box-shadow:0 20px 60px rgba(0,0,0,.4);">
