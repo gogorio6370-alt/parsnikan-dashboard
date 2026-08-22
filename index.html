@@ -455,6 +455,15 @@ function fmt(v, digits){
 }
 function pct(v,digits){ if(v===null||v===undefined||isNaN(v)) return '—'; return (v*100).toLocaleString('en-US',{maximumFractionDigits:digits??1}) + '٪'; }
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// برای تشخیص «همان متن، فقط با فاصله‌بندی/حروف متفاوت» — نیم‌فاصله، فاصله‌های چندگانه، رفع فاصله بین
+// کلمات چسبیده (مثل «در پوش» در برابر «درپوش»)، و یکسان‌سازی حروف عربی/فارسی مشابه.
+function normalizeForGrouping(s){
+  return String(s||'')
+    .replace(/[\u200c\u200f\u200e]/g, '')
+    .replace(/\s+/g, '')
+    .replace(/ك/g, 'ک').replace(/ي/g, 'ی').replace(/ة/g, 'ه')
+    .trim();
+}
 
 function jalaliToGregorian(jy,jm,jd){
   jy = parseInt(jy,10); jm = parseInt(jm,10); jd = parseInt(jd,10);
@@ -3510,9 +3519,20 @@ function renderDash(){
   const stationParetoW = paretoFrom(M.waste, x=>x.station, x=>x.wasteCount).slice(0,6);
   const stationParetoS = paretoFrom(M.stop, x=>x.station, x=>x.hours).slice(0,6);
   const problemPareto = (()=>{
-    const map = {};
-    M.daily.forEach(e=> (e.notes.problems||'').split('|').map(s=>s.trim()).filter(Boolean).forEach(p=>{ map[p]=(map[p]||0)+1; }));
-    return Object.entries(map).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,6);
+    // مشکلات ثبت‌شده متن آزادند؛ تفاوت‌های جزئی نوشتاری (فاصله «درپوش» در برابر «در پوش»، نیم‌فاصله،
+    // چندفاصله پشت‌سرهم) نباید یک مشکل واحد را به چند ردیف جدا در نمودار تقسیم کند. برای شمارش، متن
+    // نرمال می‌شود (بی‌فاصله، حروف عربی/فارسی یکسان)، ولی برای نمایش، رایج‌ترین نگارش اصلی حفظ می‌شود.
+    const groups = {}; // normKey -> { count, labelCounts:{originalText:count} }
+    M.daily.forEach(e=> (e.notes.problems||'').split('|').map(s=>s.trim()).filter(Boolean).forEach(p=>{
+      const key = normalizeForGrouping(p);
+      if(!groups[key]) groups[key] = { count:0, labels:{} };
+      groups[key].count++;
+      groups[key].labels[p] = (groups[key].labels[p]||0) + 1;
+    }));
+    return Object.values(groups).map(g=>{
+      const bestLabel = Object.entries(g.labels).sort((a,b)=>b[1]-a[1])[0][0];
+      return { label: bestLabel, value: g.count };
+    }).sort((a,b)=>b.value-a.value).slice(0,6);
   })();
 
   // ---- ۰) «امروز» — آخرین روز ثبت‌شده در ماه فعال (نه لزوماً تاریخ تقویمی امروز، چون این یک ابزار
