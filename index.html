@@ -325,6 +325,10 @@ td.num, th.num{ text-align:left; font-variant-numeric:tabular-nums; direction:lt
         </div>
       </div>
       <div class="topbar-actions">
+        <button class="btn btn-ghost btn-sm" id="backToLoginBtn" title="بازگشت به صفحه ورود">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          بازگشت به صفحه اول
+        </button>
         <button class="icon-btn" id="trashBtn" title="سطل بازیابی" style="position:relative;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
           <span id="trashCount" style="display:none; position:absolute; top:-5px; left:-5px; background:var(--red); color:#fff; font-size:10px; font-weight:800; min-width:16px; height:16px; border-radius:8px; align-items:center; justify-content:center; padding:0 3px;"></span>
@@ -1275,10 +1279,16 @@ document.addEventListener('visibilitychange', function(){ if(document.visibility
 window.addEventListener('pagehide', function(){ flushPendingSave(); });
 
 /* ---------------------------- nav / routing ---------------------------- */
+// تب‌هایی که اپراتور (نیروی تولیدی) اجازه دارد ببیند — بقیه فقط برای مدیر (admin) نمایش داده می‌شود
+const STAFF_ALLOWED_TABS = ['entry','stations'];
+function visibleNavForRole(){
+  if(currentSessionRole()==='admin') return NAV;
+  return NAV.filter(item=> STAFF_ALLOWED_TABS.includes(item.id));
+}
 function renderNav(){
   const el = document.getElementById('navList');
   let html = ''; let lastGroup = null;
-  NAV.forEach(item=>{
+  visibleNavForRole().forEach(item=>{
     if(item.group !== lastGroup){ html += `<div class="nav-label">${item.group}</div>`; lastGroup = item.group; }
     html += `<div class="nav-item ${currentTab===item.id?'active':''}" data-tab="${item.id}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[item.icon]}</svg>
@@ -1288,6 +1298,8 @@ function renderNav(){
   el.querySelectorAll('.nav-item').forEach(n=> n.addEventListener('click', ()=>{ goTo(n.dataset.tab); document.getElementById('sidebar').classList.remove('open'); }));
 }
 function goTo(tab){
+  // اپراتور اگر (مثلاً از طریق لینک قدیمی/کلیک از نمایشگر) به تبی خارج از دسترسی مجازش برسد، به «ورود داده» برمی‌گردد
+  if(currentSessionRole()!=='admin' && !STAFF_ALLOWED_TABS.includes(tab)) tab = 'entry';
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
@@ -4989,9 +5001,15 @@ function startApp(){
   if(nameBox) nameBox.textContent = '👤 ' + (currentSessionName() || '—');
   const logoutBtn = document.getElementById('logoutBtn');
   if(logoutBtn) logoutBtn.addEventListener('click', logoutSession);
+  const backToLoginBtn = document.getElementById('backToLoginBtn');
+  if(backToLoginBtn) backToLoginBtn.addEventListener('click', logoutSession);
+  if(currentSessionRole()!=='admin'){
+    // این دکمه‌ها تب‌بندی نیستند (در نوار بالا هستند)، پس جدا از فیلتر منو باید برای اپراتور مخفی شوند
+    ['settingsBtn','trashBtn','importJsonBtn'].forEach(id=>{ const el = document.getElementById(id); if(el) el.style.display = 'none'; });
+  }
   renderLineSwitcher();
   renderNav();
-  goTo('dash');
+  goTo(currentSessionRole()==='admin' ? 'dash' : 'entry');
   if(!hasCloudBackend()){
     setTimeout(()=> toast('هنوز به هیچ فضای ابری وصل نیستید — روی نوار پایین سایدبار بزنید تا گوگل‌شیت را وصل کنید.', 'err'), 900);
   }
