@@ -2735,12 +2735,13 @@ function renderPersonnel(){
     </div>
     <div class="hint" style="margin-top:6px;">این قفل فقط در همین مرورگر و همین نشست فعال است — با رفرش صفحه دوباره قفل می‌شود. خروجی CSV هم فقط وقتی رمز باز باشد شامل شماره تماس می‌شود.</div>
     <div class="table-wrap" style="max-height:560px; overflow:auto; margin-top:10px;"><table>
-      <thead><tr><th>#</th><th>نام</th><th class="num">کد پرسنلی</th><th>نوع نیرو</th><th class="num">سابقه (سال)</th><th>مهارت‌ها</th><th>ایستگاه اصلی</th><th>تلفن</th><th></th></tr></thead>
+      <thead><tr><th>#</th><th>نام</th><th class="num">کد پرسنلی</th><th>نوع نیرو</th><th class="num">سن</th><th class="num">سابقه (سال)</th><th>مهارت‌ها</th><th>ایستگاه اصلی</th><th>تلفن</th><th></th></tr></thead>
       <tbody>
-      ${filtered.length===0? `<tr><td colspan="9"><div class="tbl-empty">${list.length===0?'هنوز پرسنلی ثبت نشده.':'موردی یافت نشد.'}</div></td></tr>` :
+      ${filtered.length===0? `<tr><td colspan="10"><div class="tbl-empty">${list.length===0?'هنوز پرسنلی ثبت نشده.':'موردی یافت نشد.'}</div></td></tr>` :
       filtered.map((p,i)=>`<tr>
         <td>${i+1}</td><td>${esc(p.name)}</td><td class="num">${p.code!==undefined && p.code!==null && p.code!==''? esc(p.code) : '<span class="muted">—</span>'}</td>
         <td>${p.workType==='admin'? '<span class="badge" style="background:rgba(167,139,250,.15); color:#c4b5fd;">ستادی (اداری)</span>' : '<span class="badge" style="background:rgba(47,217,196,.15); color:#7ce9d8;">تولیدی (صف)</span>'}</td>
+        <td class="num">${fmt(p.age,0)}</td>
         <td class="num">${fmt(p.experienceYears,0)}</td>
         <td style="max-width:280px; white-space:normal;">${esc(p.skills)||'—'}</td><td>${esc(p.mainStation)||'—'}</td>
         <td>${personnelUnlocked? '<span style="direction:ltr; display:inline-block;">'+esc(p.phone||'—')+'</span>' : '<span class="muted">•••• •••• ••••</span>'}</td>
@@ -2760,8 +2761,8 @@ function renderPersonnel(){
     openPersonnelPasswordModal();
   });
   document.getElementById('expPersonnelCsv').addEventListener('click', ()=>{
-    const headers = ['نام','کد پرسنلی','نوع نیرو','سابقه (سال)','مهارت‌ها','ایستگاه اصلی','تلفن'];
-    const rr = filtered.map(p=>[p.name, p.code||'', p.workType==='admin'?'ستادی':'تولیدی', p.experienceYears, p.skills, p.mainStation, personnelUnlocked? p.phone : '']);
+    const headers = ['نام','کد پرسنلی','نوع نیرو','سن','سابقه (سال)','مهارت‌ها','ایستگاه اصلی','تلفن'];
+    const rr = filtered.map(p=>[p.name, p.code||'', p.workType==='admin'?'ستادی':'تولیدی', p.age, p.experienceYears, p.skills, p.mainStation, personnelUnlocked? p.phone : '']);
     downloadFile('پرسنل.csv', toCSV(headers, rr), 'text/csv;charset=utf-8');
   });
   document.getElementById('addPersonBtn').addEventListener('click', ()=> openPersonnelEditModal(null));
@@ -2790,6 +2791,7 @@ function openPersonnelEditModal(person){
         </select>
       </div>
       <div class="field"><label>سابقه فعالیت (سال)</label><input id="pm_exp" value="${esc(person?.experienceYears??'')}" inputmode="numeric"></div>
+      <div class="field"><label>سن</label><input id="pm_age" value="${esc(person?.age??'')}" inputmode="numeric"></div>
       <div class="field" style="grid-column:1/-1;"><label>شماره تماس</label><input id="pm_phone" value="${esc(person?.phone||'')}" style="direction:ltr;"></div>
       <div class="field" style="grid-column:1/-1;"><label>ایستگاه اصلی</label><input id="pm_station" value="${esc(person?.mainStation||'')}"></div>
       <div class="field" style="grid-column:1/-1;"><label>مهارت‌ها</label><input id="pm_skills" value="${esc(person?.skills||'')}"></div>
@@ -2811,6 +2813,7 @@ function openPersonnelEditModal(person){
       code: document.getElementById('pm_code').value.trim(),
       workType: document.getElementById('pm_workType').value,
       experienceYears: num(document.getElementById('pm_exp').value),
+      age: num(document.getElementById('pm_age').value),
       phone: document.getElementById('pm_phone').value.trim(),
       mainStation: document.getElementById('pm_station').value.trim(),
       skills: document.getElementById('pm_skills').value.trim(),
@@ -3693,6 +3696,15 @@ function renderDash(){
       </button>
       <button class="btn btn-ghost btn-sm" id="exportAllCsvBtn">خروجی کامل CSV تولید</button>
     </div>
+  </div>
+
+  <div class="card" id="aiAnalysisCard" style="margin-top:16px;">
+    <div class="flexbar">
+      <h3 style="margin:0;">🤖 تحلیل وضعیت با هوش مصنوعی</h3>
+      <button class="btn btn-primary btn-sm" id="aiAnalyzeBtn">دریافت تحلیل</button>
+    </div>
+    <div class="hint" style="margin-top:4px;">با یک کلیک، خلاصه‌ای حرفه‌ای از عملکرد ماه جاری (OEE، راندمان، ضایعات، توقفات، پیشرفت نسبت به هدف و مهم‌ترین ریسک‌ها) تهیه می‌شود.</div>
+    <div id="aiAnalysisBox" style="margin-top:12px; min-height:40px;"></div>
   </div>`;
 
   mkChart('dChTrend', { type:'line', data:{ labels: rows.map(e=>e.date), datasets:[
@@ -3736,6 +3748,60 @@ function renderDash(){
     const rr = rows.map(e=>[e.date,e.day,e.lines.line1.qty,e.lines.line2.qty,e.lines.line3.qty,e.lines.line4.qty, mainFourTotal(e), dayTarget4Lines(e), mainFourTotal(e)-dayTarget4Lines(e), allLinesTotal(e), shipTotal(e)]);
     downloadFile('داشبورد-مدیریتی-تولید.csv', toCSV(headers, rr), 'text/csv;charset=utf-8');
   });
+
+  document.getElementById('aiAnalyzeBtn').addEventListener('click', ()=> runAiAnalysis({
+    oee: (()=>{ const o = computeOEE(rows, M); return o; })(),
+    avgDevPct, sumAll, combinedTarget, totalShip, wasteRate, totalStopHours,
+    stationParetoW, stationParetoS, problemPareto, negDays, shortDays,
+    monthLabel: monthLabel(DB.meta.activeMonth), unitName: DB.meta.unitName||currentLineName()
+  }));
+}
+// ساخت خلاصه‌ی متنی از وضعیت ماه (بدون هیچ داده شخصی/محرمانه) و ارسال آن برای تحلیل هوش مصنوعی —
+// از طریق همان Google Apps Script که قبلاً برای گوگل‌شیت/کاوه‌نگار وصل کردید (چون فراخوانی مستقیم API هوش
+// مصنوعی از داخل مرورگر نه امن است و نه معمولاً روی هاست‌های ساده مثل GitHub Pages جواب می‌دهد).
+function buildAiSummaryText(d){
+  const o = d.oee || {};
+  const lines = [
+    `واحد/خط تولید: ${d.unitName}`,
+    `ماه گزارش: ${d.monthLabel}`,
+    `جمع کل تولید: ${fmt(d.sumAll,0)} از هدف ${fmt(d.combinedTarget,0)} (انحراف نسبت به هدف ۴خط اصلی: ${pct(d.avgDevPct,1)})`,
+    `جمع ارسال به انبار: ${fmt(d.totalShip,0)}`,
+    `OEE: ${pct(o.oee,1)} | راندمان تولید: ${pct(o.performance,1)} | کیفیت: ${pct(o.quality,1)} | دسترسی: ${pct(o.availability,1)}`,
+    `MTBF: ${fmt(o.mtbf,1)} ساعت | MTTR: ${fmt(o.mttr,2)} ساعت`,
+    `نرخ ضایعات: ${pct(d.wasteRate,2)}`,
+    `جمع ساعات توقف: ${fmt(d.totalStopHours,1)} ساعت`,
+    `تعداد روزهای زیر هدف: ${d.negDays} | تعداد روزهایی که کسری قطعه ثبت شده: ${d.shortDays}`,
+    `${d.stationParetoS.length? 'مهم‌ترین ایستگاه‌های توقف: '+d.stationParetoS.slice(0,5).map(x=>x.label+' ('+fmt(x.value,1)+' ساعت)').join('، ') : ''}`,
+    `${d.stationParetoW.length? 'مهم‌ترین ایستگاه‌های ضایعات: '+d.stationParetoW.slice(0,5).map(x=>x.label+' ('+fmt(x.value,0)+' عدد)').join('، ') : ''}`,
+    `${d.problemPareto.length? 'مکررترین مشکلات ثبت‌شده: '+d.problemPareto.slice(0,5).map(x=>x.label+' ('+x.value+' بار)').join('، ') : ''}`,
+  ];
+  return lines.filter(Boolean).join('\n');
+}
+async function runAiAnalysis(data){
+  const box = document.getElementById('aiAnalysisBox');
+  const btn = document.getElementById('aiAnalyzeBtn');
+  if(!GSHEET.url){
+    box.innerHTML = `<div class="hint" style="color:#ffb0b8;">برای این قابلیت اول باید به فضای ابری (گوگل‌شیت) وصل باشید — روی نوار پایین سایدبار بزنید.</div>`;
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'در حال تحلیل…';
+  box.innerHTML = `<div class="hint">⏳ در حال ساخت تحلیل — چند ثانیه صبر کنید…</div>`;
+  const summary = buildAiSummaryText(data);
+  try{
+    const res = await fetch(GSHEET.url, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ token: GSHEET.token, action:'aiAnalyze', summary })
+    }).then(r=>r.json());
+    if(res && res.ok && res.text){
+      box.innerHTML = `<div style="background:#0e1626; border:1px solid var(--panel-border); border-radius:12px; padding:16px; white-space:pre-line; line-height:2; font-size:13.5px;">${esc(res.text)}</div>`;
+    } else {
+      box.innerHTML = `<div class="hint" style="color:#ffb0b8;">تحلیل انجام نشد (${esc(res && res.error || 'خطای نامشخص')}). اگر تازه این قابلیت را فعال کرده‌اید، مطمئن شوید کلید API هوش مصنوعی داخل Apps Script تنظیم شده.</div>`;
+    }
+  }catch(e){
+    box.innerHTML = `<div class="hint" style="color:#ffb0b8;">خطا در ارتباط با سرویس تحلیل. اتصال اینترنت یا تنظیمات گوگل‌شیت را بررسی کنید.</div>`;
+  }
+  btn.disabled = false; btn.textContent = 'دریافت تحلیل';
 }
 
 /* =========================================================================
