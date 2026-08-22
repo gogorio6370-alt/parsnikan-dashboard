@@ -1180,6 +1180,12 @@ function enrichPersonnelCodes(){
     DB.meta.personnel.push({ id: uid(), name:'رضا کشاورز افشار', code:566, workType:'admin', phone:'', experienceYears:null, skills:'', mainStation:'' });
     changed = true;
   }
+  // رامین شقاقی و ماریا امجدیان با اینکه ستادی‌اند، به‌صراحت اجازه دارند از کشویی ورود پرسنل هم وارد شوند
+  // و دسترسی کامل (مثل مدیر) داشته باشند — طبق درخواست مدیریت.
+  ['رامین شقاقی','ماریا امجدیان'].forEach(nm=>{
+    const p = DB.meta.personnel.find(x=> personnelNameKey(x.name)===personnelNameKey(nm));
+    if(p && !p.fullAccess){ p.fullAccess = true; changed = true; }
+  });
   if(changed) scheduleSave();
 }
 
@@ -2807,6 +2813,9 @@ function openPersonnelEditModal(person){
       <div class="field" style="grid-column:1/-1;"><label>شماره تماس</label><input id="pm_phone" value="${esc(person?.phone||'')}" style="direction:ltr;"></div>
       <div class="field" style="grid-column:1/-1;"><label>ایستگاه اصلی</label><input id="pm_station" value="${esc(person?.mainStation||'')}"></div>
       <div class="field" style="grid-column:1/-1;"><label>مهارت‌ها</label><input id="pm_skills" value="${esc(person?.skills||'')}"></div>
+      <label style="grid-column:1/-1; display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer; margin-top:2px;">
+        <input type="checkbox" id="pm_fullAccess" ${person?.fullAccess?'checked':''}> در ورود با کد پرسنلی، دسترسی کامل (مثل مدیر) داشته باشد
+      </label>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="pm_cancel">انصراف</button>
@@ -2829,6 +2838,7 @@ function openPersonnelEditModal(person){
       phone: document.getElementById('pm_phone').value.trim(),
       mainStation: document.getElementById('pm_station').value.trim(),
       skills: document.getElementById('pm_skills').value.trim(),
+      fullAccess: document.getElementById('pm_fullAccess').checked,
     };
     DB.meta.personnel = DB.meta.personnel || [];
     if(isEdit) DB.meta.personnel = DB.meta.personnel.map(p=>p.id===rec.id? rec : p);
@@ -4943,7 +4953,7 @@ function currentSessionRole(){
 }
 function renderLoginScreen(){
   const root = document.getElementById('loginScreen');
-  const people = (DB.meta.personnel||[]).filter(p=>p.workType!=='admin').slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','fa'));
+  const people = (DB.meta.personnel||[]).filter(p=>p.workType!=='admin' || p.fullAccess).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','fa'));
   root.innerHTML = `<div style="position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;
       background:radial-gradient(1200px 600px at 50% -10%, rgba(76,141,255,.18), transparent), linear-gradient(180deg,#0a1120,#0d1730 55%,#0a1120);">
     <div style="width:100%; max-width:420px; background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:22px; padding:34px 28px; box-shadow:0 20px 60px rgba(0,0,0,.4);">
@@ -4972,19 +4982,20 @@ function renderLoginScreen(){
     const errEl = document.getElementById('loginErr');
     const showErr = (m)=>{ errEl.textContent = m; errEl.style.display = 'block'; };
     if(!userVal) return showErr('لطفاً نام کاربری را انتخاب کنید.');
-    let ok = false, displayName = '';
+    let ok = false, displayName = '', role = 'staff';
     if(userVal==='__admin__'){
-      ok = pass==='1363'; displayName = 'مدیر سیستم';
+      ok = pass==='1363'; displayName = 'مدیر سیستم'; role = 'admin';
     } else {
       const p = (DB.meta.personnel||[]).find(x=>x.id===userVal);
       displayName = p? p.name : '';
       ok = !!(p && pass!=='' && String(p.code??'')===pass);
+      role = (p && p.fullAccess) ? 'admin' : 'staff';
     }
     if(!ok) return showErr('نام کاربری یا رمز عبور اشتباه است.');
     try{
       sessionStorage.setItem('pn_session','ok');
       sessionStorage.setItem('pn_session_name', displayName);
-      sessionStorage.setItem('pn_session_role', userVal==='__admin__'?'admin':'staff');
+      sessionStorage.setItem('pn_session_role', role);
     }catch(e){}
     root.innerHTML = '';
     startApp();
