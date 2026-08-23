@@ -405,8 +405,8 @@ const NAV = [
   {id:'stations',label:'آمار روزانه ایستگاه‌ها', group:'ثبت اطلاعات', icon:'clock'},
   {id:'personnel', label:'👥 پرسنل',        group:'ثبت اطلاعات', icon:'users'},
   {id:'prod',    label:'تولید خط تولید',    group:'گزارش‌ها',    icon:'factory'},
-  {id:'productOutput', label:'تولید به‌تفکیک محصول', group:'گزارش‌ها', icon:'box'},
   {id:'ship',    label:'ارسال به انبار',    group:'گزارش‌ها',    icon:'truck'},
+  {id:'productOutput', label:'ارسال به‌تفکیک محصول', group:'گزارش‌ها', icon:'box'},
   {id:'short',   label:'کسری قطعات',        group:'گزارش‌ها',    icon:'alert'},
   {id:'waste',   label:'ضایعات تولید',      group:'گزارش‌ها',    icon:'trash'},
   {id:'stop',    label:'توقفات تولید',      group:'گزارش‌ها',    icon:'pause'},
@@ -443,7 +443,7 @@ let dirty = { daily:false, waste:false, stop:false, short:false, meta:false };
 let currentTab = 'dash';
 let charts = {};
 let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null };
-let filters = { waste:'', stop:'', short:'', wasteCat:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name' };
+let filters = { waste:'', stop:'', short:'', wasteCat:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'' };
 let personnelUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
 
 /* ---------------------------- utils ---------------------------- */
@@ -1326,7 +1326,7 @@ function goTo(tab){
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
-  const titles = {cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', prod:'گزارش تولید خط تولید', productOutput:'تولید به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
+  const titles = {cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
     waste:'ضایعات تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', dash:'داشبورد مدیریتی'};
   const subs = {
     cover:'نمای کلی زنده برای مدیریت ارشد و مشتری — تاریخ، ساعت و شاخص‌های کلیدی',
@@ -1334,7 +1334,7 @@ function goTo(tab){
     stations:'ثبت تولید روزانه هر ایستگاه و مقایسه با استاندارد',
     personnel:'فهرست پرسنل، سابقه و مهارت‌ها — شماره تماس محرمانه و رمزدار',
     prod:'عملکرد روزانه خطوط اصلی در مقابل هدف تولید',
-    productOutput:'ثبت تولید به‌تفکیک هر محصول/کد کالا و پایش تحقق برنامه ماهانه هر محصول',
+    productOutput:'ثبت ارسال به‌تفکیک هر محصول/کد کالا و پایش تحقق برنامه ماهانه — زیرمجموعه «ارسال به انبار»',
     ship:'گزارش تجمیعی قطعات ارسالی به انبار',
     short:'رویدادنامه کسری قطعات موردی خط تولید',
     waste:'ثبت و تحلیل پارتو ضایعات به تفکیک ایستگاه',
@@ -2217,6 +2217,7 @@ function handleProductPlanUpload_(file){
 function renderProductOutput(){
   const M = monthData();
   const list = [...(M.productOutput||[])].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date));
+  const filteredList = filters.poDateFocus ? list.filter(x=>x.date===filters.poDateFocus) : list;
   const targets = DB.meta.productMonthlyTargets || {};
   const productNames = [...new Set([...Object.keys(targets), ...list.map(x=>x.product)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fa'));
 
@@ -2254,29 +2255,29 @@ function renderProductOutput(){
   <div class="grid grid-4" style="margin-bottom:16px;">
     ${kpiCard('تعداد محصول/کد کالا با برنامه','محصول', fmt(productNames.length,0), null, '#4c8dff')}
     ${kpiCard('جمع هدف ماه (همه محصولات)','عدد', fmt(totalTarget,0), null, '#93a4c3')}
-    ${kpiCard('جمع تولید تا امروز','عدد', fmt(totalProduced,0), null, '#2fd9c4')}
+    ${kpiCard('جمع ارسال تا امروز','عدد', fmt(totalProduced,0), null, '#2fd9c4')}
     ${kpiCard('محصولات عقب‌افتاده از برنامه (بیش از ۱۰٪ کسری)','محصول', fmt(behindCount,0), null, '#ff5d6c')}
   </div>
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>📤 آپلود برنامه تولید ماهانه (اکسل)</h3>
+    <h3>📤 آپلود برنامه ارسال ماهانه (اکسل)</h3>
     <div class="hint" style="margin-bottom:10px;">فایل باید ۳ ستون داشته باشد (بدون اهمیت نام ستون): <b>تعداد برنامه‌ریزی‌شده</b>، <b>دما/نوع</b>، <b>نام محصول</b> — دقیقاً مثل فایل «برنامه تولید» که قبلاً می‌فرستادید. با هر بار آپلود، برنامه ماه جاری کامل جایگزین می‌شود.</div>
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
       <input type="file" id="planUploadInput" accept=".xlsx,.xls" style="display:none;">
-      <button class="btn btn-primary btn-sm" id="planUploadBtn">انتخاب فایل اکسل برنامه تولید</button>
+      <button class="btn btn-primary btn-sm" id="planUploadBtn">انتخاب فایل اکسل برنامه ارسال</button>
       <span class="hint">${productNames.length? 'در حال حاضر برنامه‌ای برای '+Object.keys(targets).length+' محصول ثبت شده.' : 'هنوز هیچ برنامه‌ای بارگذاری نشده.'}</span>
     </div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>${editing.productOutput? '✏️ ویرایش ثبت تولید محصول':'➕ ثبت تولید یک محصول'}</h3>
+    <h3>${editing.productOutput? '✏️ ویرایش ثبت ارسال محصول':'➕ ثبت ارسال یک محصول'}</h3>
     <div class="form-grid">
       <div class="field"><label>تاریخ</label>${datePickerHtml('po_date', editing.productOutput?.date)}</div>
       <div class="field span-2"><label>محصول / کد کالا</label>${productSelectHtml('po_product', editing.productOutput?.product||'')}</div>
-      <div class="field"><label>تعداد تولید</label><input id="po_qty" type="text" inputmode="numeric" value="${editing.productOutput?.qty ?? ''}"></div>
+      <div class="field"><label>تعداد ارسال</label><input id="po_qty" type="text" inputmode="numeric" value="${editing.productOutput?.qty ?? ''}"></div>
     </div>
     <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
-      <button class="btn btn-primary" id="savePoBtn">${editing.productOutput?'ذخیره تغییرات':'ثبت تولید'}</button>
+      <button class="btn btn-primary" id="savePoBtn">${editing.productOutput?'ذخیره تغییرات':'ثبت ارسال'}</button>
       ${editing.productOutput?'<button class="btn btn-ghost" id="cancelPoBtn">انصراف</button>':''}
       ${syncButtonHtml('syncBtn_po')}
     </div>
@@ -2284,15 +2285,15 @@ function renderProductOutput(){
 
   <div class="card" style="margin-bottom:16px;">
     <div class="flexbar">
-      <h3 style="margin:0;">📈 پایش تحقق برنامه هر محصول — ${esc(monthLabel(DB.meta.activeMonth))}</h3>
+      <h3 style="margin:0;">📈 پایش تحقق برنامه ارسال هر محصول — ${esc(monthLabel(DB.meta.activeMonth))}</h3>
       <select id="poSortBy" class="pill" style="padding:7px 10px;">
         <option value="name" ${sortBy==='name'?'selected':''}>مرتب‌سازی: نام محصول</option>
         <option value="targetDesc" ${sortBy==='targetDesc'?'selected':''}>هدف — بیشترین اول</option>
         <option value="targetAsc" ${sortBy==='targetAsc'?'selected':''}>هدف — کمترین اول</option>
-        <option value="producedDesc" ${sortBy==='producedDesc'?'selected':''}>تولید — بیشترین اول</option>
-        <option value="producedAsc" ${sortBy==='producedAsc'?'selected':''}>تولید — کمترین اول</option>
-        <option value="remainingDesc" ${sortBy==='remainingDesc'?'selected':''}>مانده تولید — بیشترین اول</option>
-        <option value="remainingAsc" ${sortBy==='remainingAsc'?'selected':''}>مانده تولید — کمترین اول</option>
+        <option value="producedDesc" ${sortBy==='producedDesc'?'selected':''}>ارسال — بیشترین اول</option>
+        <option value="producedAsc" ${sortBy==='producedAsc'?'selected':''}>ارسال — کمترین اول</option>
+        <option value="remainingDesc" ${sortBy==='remainingDesc'?'selected':''}>مانده ارسال — بیشترین اول</option>
+        <option value="remainingAsc" ${sortBy==='remainingAsc'?'selected':''}>مانده ارسال — کمترین اول</option>
         <option value="achievedDesc" ${sortBy==='achievedDesc'?'selected':''}>درصد تحقق — بیشترین اول</option>
         <option value="achievedAsc" ${sortBy==='achievedAsc'?'selected':''}>درصد تحقق — کمترین اول</option>
         <option value="devDesc" ${sortBy==='devDesc'?'selected':''}>درصد انحراف — بیشترین (جلوتر از هدف)</option>
@@ -2300,9 +2301,9 @@ function renderProductOutput(){
       </select>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>محصول / کد کالا</th><th class="num">هدف ماه</th><th class="num">تولید تاکنون</th><th class="num">مانده تولید</th><th class="num">درصد تحقق</th><th class="num">درصد انحراف</th></tr></thead>
+      <thead><tr><th>محصول / کد کالا</th><th class="num">هدف ماه</th><th class="num">ارسال تاکنون</th><th class="num">مانده ارسال</th><th class="num">درصد تحقق</th><th class="num">درصد انحراف</th></tr></thead>
       <tbody>
-      ${sortedReport.length===0? `<tr><td colspan="6"><div class="tbl-empty">هنوز برنامه یا تولیدی برای این ماه ثبت نشده.</div></td></tr>` :
+      ${sortedReport.length===0? `<tr><td colspan="6"><div class="tbl-empty">هنوز برنامه یا ارسالی برای این ماه ثبت نشده.</div></td></tr>` :
       sortedReport.map(r=>`<tr>
         <td>${esc(r.name)}</td>
         <td class="num">${r.target? fmt(r.target,0) : '<span class="muted">—</span>'}</td>
@@ -2316,12 +2317,15 @@ function renderProductOutput(){
   </div>
 
   <div class="card">
-    <div class="flexbar"><h3 style="margin:0;">رویدادنامه ثبت‌های تولید محصول (${list.length})</h3></div>
+    <div class="flexbar">
+      <h3 style="margin:0;">رویدادنامه ثبت‌های ارسال محصول (${list.length})</h3>
+      ${filters.poDateFocus? `<span class="badge" style="display:flex; align-items:center; gap:6px;">فیلتر تاریخ: ${esc(filters.poDateFocus)} <button id="clearPoDateFocus" style="background:none; border:none; color:inherit; cursor:pointer; font-size:13px; line-height:1;">×</button></span>` : ''}
+    </div>
     <div class="table-wrap"><table>
       <thead><tr><th>تاریخ</th><th>محصول / کد کالا</th><th class="num">تعداد</th><th></th></tr></thead>
       <tbody>
-      ${list.length===0?`<tr><td colspan="4"><div class="tbl-empty">موردی ثبت نشده.</div></td></tr>`:
-      list.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.product)}</td><td class="num">${fmt(x.qty,0)}</td>
+      ${filteredList.length===0?`<tr><td colspan="4"><div class="tbl-empty">موردی ثبت نشده.</div></td></tr>`:
+      filteredList.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.product)}</td><td class="num">${fmt(x.qty,0)}</td>
         <td><div style="display:flex; gap:6px;">
           <button class="icon-btn" data-poedit="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
           <button class="icon-btn" data-podel="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
@@ -2334,6 +2338,7 @@ function renderProductOutput(){
   wireSyncBtn('syncBtn_po');
 
   document.getElementById('poSortBy').addEventListener('change', (e)=>{ filters.poSortBy = e.target.value; renderProductOutput(); });
+  { const el = document.getElementById('clearPoDateFocus'); if(el) el.addEventListener('click', ()=>{ filters.poDateFocus=''; renderProductOutput(); }); }
 
   document.getElementById('planUploadBtn').addEventListener('click', ()=> document.getElementById('planUploadInput').click());
   document.getElementById('planUploadInput').addEventListener('change', (e)=>{
@@ -2402,7 +2407,7 @@ function renderShip(){
         <th class="num">L90</th><th class="num">ساینا</th><th class="num">شاهین</th><th class="num">جک</th><th class="num">۲۰۶</th><th class="num">شاهین‌پس</th><th class="num">جمع روز</th></tr></thead>
       <tbody>
       ${rows.length===0?`<tr><td colspan="14"><div class="tbl-empty">داده‌ای برای نمایش وجود ندارد.</div></td></tr>`:
-      rows.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(e.day)}</td>
+      rows.map(e=>`<tr data-shipdate="${esc(e.date)}" style="cursor:pointer;" title="کلیک کنید تا جزئیات ارسال این روز به‌تفکیک محصول را ببینید"><td>${esc(e.date)}</td><td>${esc(e.day)}</td>
         <td class="num">${fmt(e.ship.termostat_koli,0)}</td><td class="num">${fmt(e.ship.benz71,0)}</td>
         <td class="num">${fmt(e.ship.ckd89,0)}</td><td class="num">${fmt(e.ship.ckd76,0)}</td><td class="num">${fmt(e.ship.ckd83,0)}</td>
         <td class="num">${fmt(e.ship.l90,0)}</td><td class="num">${fmt(e.ship.sayna,0)}</td><td class="num">${fmt(e.ship.shahin,0)}</td><td class="num">${fmt(e.ship.jack,0)}</td>
@@ -2414,6 +2419,11 @@ function renderShip(){
     </table></div>
   </div>`;
   bindMonthBar(()=>renderShip());
+
+  document.querySelectorAll('[data-shipdate]').forEach(tr=> tr.addEventListener('click', ()=>{
+    filters.poDateFocus = tr.dataset.shipdate;
+    goTo('productOutput');
+  }));
 
   document.getElementById('expShipCsv').addEventListener('click', ()=>{
     const headers = ['تاریخ','روز','ترموستات کلی','بنز71','CKD89','CKD76','CKD83','L90','ساینا','شاهین','جک','206','شاهین‌پس','جمع'];
@@ -4752,7 +4762,7 @@ function promptSendToManagement(rec, kind){
 }
 
 /* ---------------------------- recycle bin (restore deleted rows) ---------------------------- */
-const TRASH_LABELS = { daily:'ورود داده روزانه', waste:'ضایعات تولید', stop:'توقفات تولید', short:'کسری قطعات', stationHourly:'آمار ایستگاه', productOutput:'تولید به‌تفکیک محصول' };
+const TRASH_LABELS = { daily:'ورود داده روزانه', waste:'ضایعات تولید', stop:'توقفات تولید', short:'کسری قطعات', stationHourly:'آمار ایستگاه', productOutput:'ارسال به‌تفکیک محصول' };
 const TRASH_CAP = 300; // keep at most this many trashed items per line
 function moveToTrash(type, record){
   if(!DB.trash) DB.trash = [];
