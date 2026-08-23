@@ -434,7 +434,7 @@ const ICONS = {
 };
 
 /* ---------------------------- persistent state ---------------------------- */
-let DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], meta: {} };
+let DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], meta: {} };
 let LINES = []; // [{id, name}] — registry of all production lines/units sharing this tool
 let currentLineId = null;
 let ORG = { managerPhone: '' }; // organization-wide settings (shared across all lines)
@@ -443,7 +443,7 @@ let dirty = { daily:false, waste:false, stop:false, short:false, meta:false };
 let currentTab = 'dash';
 let charts = {};
 let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null };
-let filters = { waste:'', stop:'', short:'', wasteCat:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all' };
+let filters = { waste:'', stop:'', short:'', wasteCat:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name' };
 let personnelUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
 
 /* ---------------------------- utils ---------------------------- */
@@ -1242,7 +1242,7 @@ async function switchToLine(lineId){
   await saveAll(true);
   currentLineId = lineId;
   await saveCurrentLinePointer();
-  DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], meta: {} };
+  DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], meta: {} };
   await loadAll();
   renderLineSwitcher();
   goTo('dash');
@@ -2219,30 +2219,40 @@ function renderProductOutput(){
   const list = [...(M.productOutput||[])].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date));
   const targets = DB.meta.productMonthlyTargets || {};
   const productNames = [...new Set([...Object.keys(targets), ...list.map(x=>x.product)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fa'));
-  const totalFactor = totalMonthWorkingFactor_(DB.meta.activeMonth);
 
   const report = productNames.map(name=>{
     const target = targets[name] || 0;
     const entries = list.filter(x=>x.product===name);
     const produced = entries.reduce((s,x)=>s+(x.qty||0),0);
-    const weeks = [0,1,2,3].map(w=>{
-      const [start,end] = weekBoundsOfMonth_(w);
-      const wTarget = target ? target * (weekWorkingFactor_(w, DB.meta.activeMonth)/totalFactor) : 0;
-      const wProduced = entries.filter(x=>{ const d=parseInt((x.date||'').split('/')[2],10); return d>=start && d<=end; }).reduce((s,x)=>s+(x.qty||0),0);
-      return { target: wTarget, produced: wProduced };
-    });
-    return { name, target, produced, pct: target? produced/target : null, weeks };
+    const remaining = target ? (target - produced) : null;
+    const devPct = target ? ((produced - target) / target) : null;
+    return { name, target, produced, remaining, devPct };
   });
   const totalTarget = report.reduce((s,r)=>s+r.target,0);
   const totalProduced = report.reduce((s,r)=>s+r.produced,0);
-  const behindCount = report.filter(r=>r.pct!==null && r.pct<0.9).length;
+  const behindCount = report.filter(r=>r.devPct!==null && r.devPct<-0.1).length;
+
+  const sortBy = filters.poSortBy || 'name';
+  const sortedReport = [...report].sort((a,b)=>{
+    switch(sortBy){
+      case 'targetAsc': return a.target-b.target;
+      case 'targetDesc': return b.target-a.target;
+      case 'producedAsc': return a.produced-b.produced;
+      case 'producedDesc': return b.produced-a.produced;
+      case 'remainingAsc': return (a.remaining??Infinity)-(b.remaining??Infinity);
+      case 'remainingDesc': return (b.remaining??-Infinity)-(a.remaining??-Infinity);
+      case 'devAsc': return (a.devPct??Infinity)-(b.devPct??Infinity);
+      case 'devDesc': return (b.devPct??-Infinity)-(a.devPct??-Infinity);
+      default: return a.name.localeCompare(b.name,'fa');
+    }
+  });
 
   document.getElementById('view').innerHTML = renderMonthBar() + `
   <div class="grid grid-4" style="margin-bottom:16px;">
     ${kpiCard('تعداد محصول/کد کالا با برنامه','محصول', fmt(productNames.length,0), null, '#4c8dff')}
     ${kpiCard('جمع هدف ماه (همه محصولات)','عدد', fmt(totalTarget,0), null, '#93a4c3')}
     ${kpiCard('جمع تولید تا امروز','عدد', fmt(totalProduced,0), null, '#2fd9c4')}
-    ${kpiCard('محصولات عقب‌افتاده از برنامه (زیر ۹۰٪)','محصول', fmt(behindCount,0), null, '#ff5d6c')}
+    ${kpiCard('محصولات عقب‌افتاده از برنامه (بیش از ۱۰٪ کسری)','محصول', fmt(behindCount,0), null, '#ff5d6c')}
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -2270,18 +2280,30 @@ function renderProductOutput(){
   </div>
 
   <div class="card" style="margin-bottom:16px;">
-    <div class="flexbar"><h3 style="margin:0;">📈 پایش تحقق برنامه هر محصول — ${esc(monthLabel(DB.meta.activeMonth))}</h3></div>
+    <div class="flexbar">
+      <h3 style="margin:0;">📈 پایش تحقق برنامه هر محصول — ${esc(monthLabel(DB.meta.activeMonth))}</h3>
+      <select id="poSortBy" class="pill" style="padding:7px 10px;">
+        <option value="name" ${sortBy==='name'?'selected':''}>مرتب‌سازی: نام محصول</option>
+        <option value="targetDesc" ${sortBy==='targetDesc'?'selected':''}>هدف — بیشترین اول</option>
+        <option value="targetAsc" ${sortBy==='targetAsc'?'selected':''}>هدف — کمترین اول</option>
+        <option value="producedDesc" ${sortBy==='producedDesc'?'selected':''}>تولید — بیشترین اول</option>
+        <option value="producedAsc" ${sortBy==='producedAsc'?'selected':''}>تولید — کمترین اول</option>
+        <option value="remainingDesc" ${sortBy==='remainingDesc'?'selected':''}>مانده تولید — بیشترین اول</option>
+        <option value="remainingAsc" ${sortBy==='remainingAsc'?'selected':''}>مانده تولید — کمترین اول</option>
+        <option value="devDesc" ${sortBy==='devDesc'?'selected':''}>درصد انحراف — بیشترین (جلوتر از هدف)</option>
+        <option value="devAsc" ${sortBy==='devAsc'?'selected':''}>درصد انحراف — کمترین (عقب‌تر از هدف)</option>
+      </select>
+    </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>محصول / کد کالا</th><th class="num">هدف ماه</th><th class="num">تولید تاکنون</th><th class="num">درصد تحقق</th>
-        <th class="num">هفته ۱</th><th class="num">هفته ۲</th><th class="num">هفته ۳</th><th class="num">هفته ۴</th></tr></thead>
+      <thead><tr><th>محصول / کد کالا</th><th class="num">هدف ماه</th><th class="num">تولید تاکنون</th><th class="num">مانده تولید</th><th class="num">درصد انحراف</th></tr></thead>
       <tbody>
-      ${report.length===0? `<tr><td colspan="8"><div class="tbl-empty">هنوز برنامه یا تولیدی برای این ماه ثبت نشده.</div></td></tr>` :
-      report.map(r=>`<tr>
+      ${sortedReport.length===0? `<tr><td colspan="5"><div class="tbl-empty">هنوز برنامه یا تولیدی برای این ماه ثبت نشده.</div></td></tr>` :
+      sortedReport.map(r=>`<tr>
         <td>${esc(r.name)}</td>
         <td class="num">${r.target? fmt(r.target,0) : '<span class="muted">—</span>'}</td>
         <td class="num">${fmt(r.produced,0)}</td>
-        <td class="num" style="color:${r.pct===null?'var(--text-mute)':r.pct>=1?'#8ff0c8':r.pct>=0.9?'#ffe08a':'#ffb0b8'}; font-weight:800;">${pct(r.pct,0)}</td>
-        ${r.weeks.map(w=>`<td class="num" title="هدف این هفته: ${fmt(w.target,0)}">${fmt(w.produced,0)}${w.target? ' / '+fmt(w.target,0) : ''}</td>`).join('')}
+        <td class="num" style="color:${r.remaining===null?'var(--text-mute)':r.remaining>0?'#ffb0b8':'#8ff0c8'}; font-weight:800;">${r.remaining===null?'—':fmt(r.remaining,0)}</td>
+        <td class="num" style="color:${r.devPct===null?'var(--text-mute)':r.devPct>=0?'#8ff0c8':r.devPct>=-0.1?'#ffe08a':'#ffb0b8'}; font-weight:800;">${pct(r.devPct,1)}</td>
       </tr>`).join('')}
       </tbody>
     </table></div>
@@ -2304,6 +2326,8 @@ function renderProductOutput(){
 
   bindMonthBar(()=>renderProductOutput());
   wireSyncBtn('syncBtn_po');
+
+  document.getElementById('poSortBy').addEventListener('change', (e)=>{ filters.poSortBy = e.target.value; renderProductOutput(); });
 
   document.getElementById('planUploadBtn').addEventListener('click', ()=> document.getElementById('planUploadInput').click());
   document.getElementById('planUploadInput').addEventListener('change', (e)=>{
@@ -4911,7 +4935,7 @@ function openSettings(){
     root.innerHTML='';
     confirmDeleteModal('پاک‌سازی کامل داده‌های این خط', 'همه ردیف‌های ثبت‌شده (تولید، ارسال، ضایعات، توقفات، کسری) برای خط «' + esc(DB.meta.unitName||'') + '» برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', async ()=>{
       DB.daily.forEach(r=>moveToTrash('daily', r)); DB.waste.forEach(r=>moveToTrash('waste', r)); DB.stop.forEach(r=>moveToTrash('stop', r)); DB.short.forEach(r=>moveToTrash('short', r)); DB.stationHourly.forEach(r=>moveToTrash('stationHourly', r)); (DB.productOutput||[]).forEach(r=>moveToTrash('productOutput', r));
-      DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], productOutput:[], meta: DB.meta };
+      DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], productOutput:[], risks: DB.risks, meta: DB.meta };
       await saveAll(true); toast('همه داده‌های این خط پاک شد.','ok'); goTo(currentTab);
     });
   });
