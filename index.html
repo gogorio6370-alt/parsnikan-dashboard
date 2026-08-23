@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';document.head.appendChild(s);"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js';document.head.appendChild(s);"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="this.onerror=null;var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';document.head.appendChild(s);"></script>
 <style>
 :root{
   --bg:#0c1220;
@@ -404,6 +405,7 @@ const NAV = [
   {id:'stations',label:'آمار روزانه ایستگاه‌ها', group:'ثبت اطلاعات', icon:'clock'},
   {id:'personnel', label:'👥 پرسنل',        group:'ثبت اطلاعات', icon:'users'},
   {id:'prod',    label:'تولید خط تولید',    group:'گزارش‌ها',    icon:'factory'},
+  {id:'productOutput', label:'تولید به‌تفکیک محصول', group:'گزارش‌ها', icon:'box'},
   {id:'ship',    label:'ارسال به انبار',    group:'گزارش‌ها',    icon:'truck'},
   {id:'short',   label:'کسری قطعات',        group:'گزارش‌ها',    icon:'alert'},
   {id:'waste',   label:'ضایعات تولید',      group:'گزارش‌ها',    icon:'trash'},
@@ -419,6 +421,7 @@ const ICONS = {
   factory:'<path d="M2 21V10l6 4v-4l6 4V7l6 4v10H2z"/><path d="M6 21v-4M12 21v-4M18 21v-4"/>',
   truck:'<path d="M1 3h13v13H1z"/><path d="M14 8h4l4 4v4h-8V8z"/><circle cx="5.5" cy="18.5" r="1.7"/><circle cx="17.5" cy="18.5" r="1.7"/>',
   alert:'<path d="M12 2L1 21h22L12 2z"/><path d="M12 9v5"/><path d="M12 17h.01"/>',
+  box:'<path d="M21 8L12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
   trash:'<path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>',
   pause:'<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
   chart:'<path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/>',
@@ -431,7 +434,7 @@ const ICONS = {
 };
 
 /* ---------------------------- persistent state ---------------------------- */
-let DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], meta: {} };
+let DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], meta: {} };
 let LINES = []; // [{id, name}] — registry of all production lines/units sharing this tool
 let currentLineId = null;
 let ORG = { managerPhone: '' }; // organization-wide settings (shared across all lines)
@@ -439,7 +442,7 @@ let cloudOK = true;
 let dirty = { daily:false, waste:false, stop:false, short:false, meta:false };
 let currentTab = 'dash';
 let charts = {};
-let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null };
+let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null };
 let filters = { waste:'', stop:'', short:'', wasteCat:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all' };
 let personnelUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
 
@@ -563,6 +566,7 @@ function monthData(){
     stop: DB.stop.filter(e=>monthKeyOf(e.date)===mk),
     short: DB.short.filter(e=>monthKeyOf(e.date)===mk),
     stationHourly: (DB.stationHourly||[]).filter(e=>monthKeyOf(e.date)===mk),
+    productOutput: (DB.productOutput||[]).filter(e=>monthKeyOf(e.date)===mk),
   };
 }
 
@@ -1084,12 +1088,12 @@ async function loadAll(){
     await loadLinesRegistry();
     // ONE batched round-trip for all 7 collections instead of 7 separate requests
     // (this is what was making Google Sheets sync feel slow/stuck)
-    const keys = ['daily','waste','stop','short','meta','trash','stationHourly'].map(p=>lineKey(currentLineId,p));
+    const keys = ['daily','waste','stop','short','meta','trash','stationHourly','productOutput'].map(p=>lineKey(currentLineId,p));
     const got = await cloudBatchGet(keys);
     const d = got[lineKey(currentLineId,'daily')], w = got[lineKey(currentLineId,'waste')],
           s = got[lineKey(currentLineId,'stop')], sh = got[lineKey(currentLineId,'short')],
           m = got[lineKey(currentLineId,'meta')], tr = got[lineKey(currentLineId,'trash')],
-          sd = got[lineKey(currentLineId,'stationHourly')];
+          sd = got[lineKey(currentLineId,'stationHourly')], po = got[lineKey(currentLineId,'productOutput')];
     const isNewLineFirstLoad = !m && !d;
     const lineName = (LINES.find(l=>l.id===currentLineId)||{}).name || 'خط تولید';
     if(currentLineId==='thermostat' && isNewLineFirstLoad){
@@ -1101,6 +1105,7 @@ async function loadAll(){
       DB.meta  = m || cloneEmbedded('meta');
       DB.trash = tr || cloneEmbedded('trash');
       DB.stationHourly = sd || cloneEmbedded('stationHourly');
+      DB.productOutput = po || [];
       if(!d && !w && !s && !sh && !m) await saveAll(true);
     } else {
       DB.daily = normalizeDailyArray(d || []);
@@ -1110,6 +1115,7 @@ async function loadAll(){
       DB.meta  = m || { lineTarget: LINE_TARGET_DEFAULT, ckdTarget: 2000, se206Target: 0, darpooshTarget: 500, dieselTarget: DIESEL_TARGET_DEFAULT, nominalCapacity: 0, monthlyTarget: 0, workingDaysPerMonth: 23, standardHeadcount: 0, workforceRoster: [], periodLabel: 'تیر ماه ۱۴۰۵', unitName: lineName, persianDigits:false, stations: [] };
       DB.trash = tr || [];
       DB.stationHourly = sd || [];
+      DB.productOutput = po || [];
     }
     if(!DB.meta.stations || !DB.meta.stations.length){ DB.meta.stations = currentLineId==='thermostat' ? seedStations() : []; }
     setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت شما — به‌روز' : 'متصل به فضای ابری Claude — به‌روز'));
@@ -1119,6 +1125,7 @@ async function loadAll(){
     if(!LINES.length){ LINES=[{id:'thermostat',name:'واحد ترموستات'}]; currentLineId='thermostat'; }
     // بدون اتصال ابری — همان پشتیبان ادغام‌شده شما (تیر تا مرداد ۱۴۰۵) به‌صورت پیش‌فرض باز می‌شود
     DB.daily = normalizeDailyArray(cloneEmbedded('daily')); DB.waste = cloneEmbedded('waste'); DB.stop = cloneEmbedded('stop'); DB.short = cloneEmbedded('short'); DB.trash = cloneEmbedded('trash'); DB.stationHourly = cloneEmbedded('stationHourly');
+    DB.productOutput = [];
     DB.meta = cloneEmbedded('meta');
     setSync('off', 'حالت آفلاین — تغییرات فقط در همین نشست ذخیره می‌شود');
   }
@@ -1213,6 +1220,7 @@ async function saveAll(silent){
   pairs[lineKey(currentLineId,'meta')] = DB.meta;
   pairs[lineKey(currentLineId,'trash')] = DB.trash;
   pairs[lineKey(currentLineId,'stationHourly')] = DB.stationHourly;
+  pairs[lineKey(currentLineId,'productOutput')] = DB.productOutput;
   const allOk = await cloudBatchSet(pairs);
   if(allOk){ lastSavedAt = new Date(); setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت — ذخیره شد' : 'متصل به فضای ابری — ذخیره شد')); if(!silent) toast('اطلاعات با موفقیت ذخیره شد.','ok'); }
   else{
@@ -1234,7 +1242,7 @@ async function switchToLine(lineId){
   await saveAll(true);
   currentLineId = lineId;
   await saveCurrentLinePointer();
-  DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], meta: {} };
+  DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], meta: {} };
   await loadAll();
   renderLineSwitcher();
   goTo('dash');
@@ -1318,7 +1326,7 @@ function goTo(tab){
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
-  const titles = {cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', prod:'گزارش تولید خط تولید', ship:'ارسال به انبار', short:'کسری قطعات',
+  const titles = {cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', prod:'گزارش تولید خط تولید', productOutput:'تولید به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
     waste:'ضایعات تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', dash:'داشبورد مدیریتی'};
   const subs = {
     cover:'نمای کلی زنده برای مدیریت ارشد و مشتری — تاریخ، ساعت و شاخص‌های کلیدی',
@@ -1326,6 +1334,7 @@ function goTo(tab){
     stations:'ثبت تولید روزانه هر ایستگاه و مقایسه با استاندارد',
     personnel:'فهرست پرسنل، سابقه و مهارت‌ها — شماره تماس محرمانه و رمزدار',
     prod:'عملکرد روزانه خطوط اصلی در مقابل هدف تولید',
+    productOutput:'ثبت تولید به‌تفکیک هر محصول/کد کالا و پایش تحقق برنامه ماهانه هر محصول',
     ship:'گزارش تجمیعی قطعات ارسالی به انبار',
     short:'رویدادنامه کسری قطعات موردی خط تولید',
     waste:'ثبت و تحلیل پارتو ضایعات به تفکیک ایستگاه',
@@ -1338,7 +1347,7 @@ function goTo(tab){
   document.getElementById('pageTitle').textContent = titles[tab];
   document.getElementById('pageSub').textContent = subs[tab] + ' — ماه فعال: ' + monthLabel(DB.meta.activeMonth);
   destroyCharts();
-  const renderers = {cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, prod:renderProd, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, dash:renderDash};
+  const renderers = {cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, dash:renderDash};
   renderers[tab]();
   document.getElementById('view').dataset.hadContent = '1';
   document.getElementById('view').scrollTop = 0;
@@ -2149,6 +2158,185 @@ function renderProd(){
           toast('توقفات ثبت‌شده در '+row.date+' نمایش داده شد.','ok');
         } } });
   });
+}
+
+
+/* =========================================================================
+   TAB: تولید به‌تفکیک محصول (productOutput) — مکمل «ورود داده» است، نه جایگزین آن:
+   «ورود داده» همچنان مرجع تولید هر خط/OEE/هدف کل باقی می‌ماند؛ این تب یک لایه جدید
+   و مستقل است که همان اعداد تولید را به‌تفکیک هر محصول/کد کالا هم ثبت می‌کند، تا
+   بشود «درصد تحقق برنامه» را برای هر محصول به‌طور جداگانه و هفتگی پایش کرد.
+   ========================================================================= */
+function weekBoundsOfMonth_(weekIdx){
+  const start = weekIdx*7 + 1;
+  const end = weekIdx===3 ? 31 : start + 6;
+  return [start, end];
+}
+function weekWorkingFactor_(weekIdx, monthKey){
+  const parts = String(monthKey||'').split('/');
+  const y = parts[0], m = parts[1];
+  if(!y || !m) return 7;
+  const [start, end] = weekBoundsOfMonth_(weekIdx);
+  let sum = 0;
+  for(let d=start; d<=end; d++){
+    const dateStr = y + '/' + m + '/' + String(d).padStart(2,'0');
+    const entry = DB.daily.find(x=>x.date===dateStr);
+    sum += entry ? dayShiftFactor(entry) : 1; // روز بدون ثبت هنوز = یک روز کاری عادی فرض می‌شود
+  }
+  return sum;
+}
+function totalMonthWorkingFactor_(monthKey){
+  let sum = 0; for(let w=0; w<4; w++) sum += weekWorkingFactor_(w, monthKey); return sum || 1;
+}
+function handleProductPlanUpload_(file){
+  if(typeof XLSX === 'undefined'){ toast('کتابخانه خواندن اکسل هنوز بارگذاری نشده — چند ثانیه صبر کنید و دوباره امتحان کنید.','err'); return; }
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+      const targets = {};
+      rows.forEach(r=>{
+        const qty = r[0], temp = r[1], name = r[2];
+        if(typeof qty !== 'number' || !name) return; // ردیف عنوان/سرستون/خالی را رد کن
+        const label = (temp!==null && temp!==undefined && String(temp).trim()!=='') ? (String(name).trim()+' — '+String(temp).trim()) : String(name).trim();
+        targets[label] = qty;
+      });
+      const n = Object.keys(targets).length;
+      if(!n){ toast('هیچ ردیف معتبری در فایل پیدا نشد — ساختار فایل باید ۳ ستون باشد: تعداد برنامه، دما/نوع، نام محصول.','err'); return; }
+      DB.meta.productMonthlyTargets = targets;
+      scheduleSave();
+      toast('برنامه تولید (' + n + ' محصول) با موفقیت بارگذاری شد.','ok');
+      renderProductOutput();
+    }catch(err){ toast('خواندن فایل اکسل ناموفق بود.','err'); console.error(err); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function renderProductOutput(){
+  const M = monthData();
+  const list = [...(M.productOutput||[])].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date));
+  const targets = DB.meta.productMonthlyTargets || {};
+  const productNames = [...new Set([...Object.keys(targets), ...list.map(x=>x.product)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fa'));
+  const totalFactor = totalMonthWorkingFactor_(DB.meta.activeMonth);
+
+  const report = productNames.map(name=>{
+    const target = targets[name] || 0;
+    const entries = list.filter(x=>x.product===name);
+    const produced = entries.reduce((s,x)=>s+(x.qty||0),0);
+    const weeks = [0,1,2,3].map(w=>{
+      const [start,end] = weekBoundsOfMonth_(w);
+      const wTarget = target ? target * (weekWorkingFactor_(w, DB.meta.activeMonth)/totalFactor) : 0;
+      const wProduced = entries.filter(x=>{ const d=parseInt((x.date||'').split('/')[2],10); return d>=start && d<=end; }).reduce((s,x)=>s+(x.qty||0),0);
+      return { target: wTarget, produced: wProduced };
+    });
+    return { name, target, produced, pct: target? produced/target : null, weeks };
+  });
+  const totalTarget = report.reduce((s,r)=>s+r.target,0);
+  const totalProduced = report.reduce((s,r)=>s+r.produced,0);
+  const behindCount = report.filter(r=>r.pct!==null && r.pct<0.9).length;
+
+  document.getElementById('view').innerHTML = renderMonthBar() + `
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${kpiCard('تعداد محصول/کد کالا با برنامه','محصول', fmt(productNames.length,0), null, '#4c8dff')}
+    ${kpiCard('جمع هدف ماه (همه محصولات)','عدد', fmt(totalTarget,0), null, '#93a4c3')}
+    ${kpiCard('جمع تولید تا امروز','عدد', fmt(totalProduced,0), null, '#2fd9c4')}
+    ${kpiCard('محصولات عقب‌افتاده از برنامه (زیر ۹۰٪)','محصول', fmt(behindCount,0), null, '#ff5d6c')}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>📤 آپلود برنامه تولید ماهانه (اکسل)</h3>
+    <div class="hint" style="margin-bottom:10px;">فایل باید ۳ ستون داشته باشد (بدون اهمیت نام ستون): <b>تعداد برنامه‌ریزی‌شده</b>، <b>دما/نوع</b>، <b>نام محصول</b> — دقیقاً مثل فایل «برنامه تولید» که قبلاً می‌فرستادید. با هر بار آپلود، برنامه ماه جاری کامل جایگزین می‌شود.</div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <input type="file" id="planUploadInput" accept=".xlsx,.xls" style="display:none;">
+      <button class="btn btn-primary btn-sm" id="planUploadBtn">انتخاب فایل اکسل برنامه تولید</button>
+      <span class="hint">${productNames.length? 'در حال حاضر برنامه‌ای برای '+Object.keys(targets).length+' محصول ثبت شده.' : 'هنوز هیچ برنامه‌ای بارگذاری نشده.'}</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>${editing.productOutput? '✏️ ویرایش ثبت تولید محصول':'➕ ثبت تولید یک محصول'}</h3>
+    <div class="form-grid">
+      <div class="field"><label>تاریخ</label>${datePickerHtml('po_date', editing.productOutput?.date)}</div>
+      <div class="field span-2"><label>محصول / کد کالا</label>${productSelectHtml('po_product', editing.productOutput?.product||'')}</div>
+      <div class="field"><label>تعداد تولید</label><input id="po_qty" type="text" inputmode="numeric" value="${editing.productOutput?.qty ?? ''}"></div>
+    </div>
+    <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
+      <button class="btn btn-primary" id="savePoBtn">${editing.productOutput?'ذخیره تغییرات':'ثبت تولید'}</button>
+      ${editing.productOutput?'<button class="btn btn-ghost" id="cancelPoBtn">انصراف</button>':''}
+      ${syncButtonHtml('syncBtn_po')}
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="flexbar"><h3 style="margin:0;">📈 پایش تحقق برنامه هر محصول — ${esc(monthLabel(DB.meta.activeMonth))}</h3></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>محصول / کد کالا</th><th class="num">هدف ماه</th><th class="num">تولید تاکنون</th><th class="num">درصد تحقق</th>
+        <th class="num">هفته ۱</th><th class="num">هفته ۲</th><th class="num">هفته ۳</th><th class="num">هفته ۴</th></tr></thead>
+      <tbody>
+      ${report.length===0? `<tr><td colspan="8"><div class="tbl-empty">هنوز برنامه یا تولیدی برای این ماه ثبت نشده.</div></td></tr>` :
+      report.map(r=>`<tr>
+        <td>${esc(r.name)}</td>
+        <td class="num">${r.target? fmt(r.target,0) : '<span class="muted">—</span>'}</td>
+        <td class="num">${fmt(r.produced,0)}</td>
+        <td class="num" style="color:${r.pct===null?'var(--text-mute)':r.pct>=1?'#8ff0c8':r.pct>=0.9?'#ffe08a':'#ffb0b8'}; font-weight:800;">${pct(r.pct,0)}</td>
+        ${r.weeks.map(w=>`<td class="num" title="هدف این هفته: ${fmt(w.target,0)}">${fmt(w.produced,0)}${w.target? ' / '+fmt(w.target,0) : ''}</td>`).join('')}
+      </tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card">
+    <div class="flexbar"><h3 style="margin:0;">رویدادنامه ثبت‌های تولید محصول (${list.length})</h3></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>تاریخ</th><th>محصول / کد کالا</th><th class="num">تعداد</th><th></th></tr></thead>
+      <tbody>
+      ${list.length===0?`<tr><td colspan="4"><div class="tbl-empty">موردی ثبت نشده.</div></td></tr>`:
+      list.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.product)}</td><td class="num">${fmt(x.qty,0)}</td>
+        <td><div style="display:flex; gap:6px;">
+          <button class="icon-btn" data-poedit="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+          <button class="icon-btn" data-podel="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
+        </div></td></tr>`).join('')}
+      </tbody>
+    </table></div>
+  </div>`;
+
+  bindMonthBar(()=>renderProductOutput());
+  wireSyncBtn('syncBtn_po');
+
+  document.getElementById('planUploadBtn').addEventListener('click', ()=> document.getElementById('planUploadInput').click());
+  document.getElementById('planUploadInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(file) handleProductPlanUpload_(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('savePoBtn').addEventListener('click', ()=>{
+    const date = readDatePicker('po_date');
+    const product = document.getElementById('po_product').value;
+    const qty = num(document.getElementById('po_qty').value);
+    if(!date || !product || qty===null){ toast('تاریخ، محصول و تعداد الزامی است.','err'); return; }
+    const rec = { id: editing.productOutput?.id || uid(), date, product, qty };
+    const isNew = !editing.productOutput;
+    if(editing.productOutput){ DB.productOutput = DB.productOutput.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
+    else{ DB.productOutput.push(rec); toast('تولید محصول ثبت شد.','ok'); }
+    editing.productOutput = null; scheduleSave(); renderProductOutput();
+  });
+  const cancelPoBtn = document.getElementById('cancelPoBtn');
+  if(cancelPoBtn) cancelPoBtn.addEventListener('click', ()=>{ editing.productOutput = null; renderProductOutput(); });
+  document.querySelectorAll('[data-poedit]').forEach(b=> b.addEventListener('click', ()=>{
+    editing.productOutput = JSON.parse(JSON.stringify(DB.productOutput.find(x=>x.id===b.dataset.poedit)));
+    renderProductOutput(); window.scrollTo({top:0, behavior:'smooth'});
+  }));
+  document.querySelectorAll('[data-podel]').forEach(b=> b.addEventListener('click', ()=>{
+    confirmDeleteModal('حذف ثبت تولید محصول', 'این ردیف حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» برش گردانید.', ()=>{
+      const rec = DB.productOutput.find(x=>x.id===b.dataset.podel);
+      DB.productOutput = DB.productOutput.filter(x=>x.id!==b.dataset.podel);
+      if(rec) moveToTrash('productOutput', rec);
+      scheduleSave(); renderProductOutput(); toast('حذف شد — از سطل بازیابی قابل بازگشت است.','ok');
+    });
+  }));
 }
 
 /* =========================================================================
@@ -4253,6 +4441,13 @@ function partSelectHtml(id, currentVal){
   if(currentVal && !names.includes(currentVal)) opts.push(`<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`);
   return `<select id="${id}">${opts.join('')}</select>`;
 }
+// همان الگو، ولی از فهرست محصول/قطعهٔ رسمی برنامه تولید (LINE_PRODUCT_LIST_DEFAULT) — برای «تولید به‌تفکیک محصول»
+function productSelectHtml(id, currentVal){
+  const names = LINE_PRODUCT_LIST_DEFAULT;
+  let opts = ['<option value="">— انتخاب —</option>'].concat(names.map(n=>`<option value="${esc(n)}" ${currentVal===n?'selected':''}>${esc(n)}</option>`));
+  if(currentVal && !names.includes(currentVal)) opts.push(`<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`);
+  return `<select id="${id}">${opts.join('')}</select>`;
+}
 // تاریخ کشویی یک‌فیلدی — یک select با مقدار کامل «۱۴۰۵/۰۵/۲۰»؛ برای انتخاب راحت، روزهای سه ماه
 // (ماه قبل، ماه فعال، ماه بعد) به‌صورت گروه‌بندی‌شده لیست می‌شود. اگر مقدار فعلی رکورد
 // (مثلاً هنگام ویرایش یک رکورد قدیمی‌تر) خارج از این بازه بود، همان مقدار هم به‌عنوان گزینه اضافه می‌شود.
@@ -4527,7 +4722,7 @@ function promptSendToManagement(rec, kind){
 }
 
 /* ---------------------------- recycle bin (restore deleted rows) ---------------------------- */
-const TRASH_LABELS = { daily:'ورود داده روزانه', waste:'ضایعات تولید', stop:'توقفات تولید', short:'کسری قطعات', stationHourly:'آمار ایستگاه' };
+const TRASH_LABELS = { daily:'ورود داده روزانه', waste:'ضایعات تولید', stop:'توقفات تولید', short:'کسری قطعات', stationHourly:'آمار ایستگاه', productOutput:'تولید به‌تفکیک محصول' };
 const TRASH_CAP = 300; // keep at most this many trashed items per line
 function moveToTrash(type, record){
   if(!DB.trash) DB.trash = [];
@@ -4541,6 +4736,7 @@ function trashSummary(item){
   if(item.type==='stop') return `${d.date} — ${d.station||''} (${fmt(d.hours,1)} ساعت، ${d.reason||''})`;
   if(item.type==='short') return `${d.date} — ${d.part||''}`;
   if(item.type==='stationHourly') return `${d.date} — ${(stationById(d.stationId)||{}).name||''} (جمع: ${fmt(d.total,0)})`;
+  if(item.type==='productOutput') return `${d.date} — ${d.product||''} (${fmt(d.qty,0)} عدد)`;
   return d.date || '';
 }
 function restoreFromTrash(trashId){
@@ -4714,8 +4910,8 @@ function openSettings(){
   document.getElementById('clearAllBtn').addEventListener('click', ()=>{
     root.innerHTML='';
     confirmDeleteModal('پاک‌سازی کامل داده‌های این خط', 'همه ردیف‌های ثبت‌شده (تولید، ارسال، ضایعات، توقفات، کسری) برای خط «' + esc(DB.meta.unitName||'') + '» برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', async ()=>{
-      DB.daily.forEach(r=>moveToTrash('daily', r)); DB.waste.forEach(r=>moveToTrash('waste', r)); DB.stop.forEach(r=>moveToTrash('stop', r)); DB.short.forEach(r=>moveToTrash('short', r)); DB.stationHourly.forEach(r=>moveToTrash('stationHourly', r));
-      DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], meta: DB.meta };
+      DB.daily.forEach(r=>moveToTrash('daily', r)); DB.waste.forEach(r=>moveToTrash('waste', r)); DB.stop.forEach(r=>moveToTrash('stop', r)); DB.short.forEach(r=>moveToTrash('short', r)); DB.stationHourly.forEach(r=>moveToTrash('stationHourly', r)); (DB.productOutput||[]).forEach(r=>moveToTrash('productOutput', r));
+      DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], productOutput:[], meta: DB.meta };
       await saveAll(true); toast('همه داده‌های این خط پاک شد.','ok'); goTo(currentTab);
     });
   });
@@ -4925,6 +5121,7 @@ document.getElementById('importJsonInput').addEventListener('change', (e)=>{
           daily: normalizeDailyArray(parsed.daily || []), waste: parsed.waste || [], stop: parsed.stop || [],
           short: parsed.short || [], trash: parsed.trash && parsed.trash.length ? parsed.trash : keepTrash,
           stationHourly: parsed.stationHourly || [],
+          productOutput: parsed.productOutput || [],
           meta: parsed.meta || DB.meta
         };
         scheduleSave(); updateTrashBadge(); toast('بازیابی از فایل پشتیبان انجام شد.','ok'); goTo(currentTab);
