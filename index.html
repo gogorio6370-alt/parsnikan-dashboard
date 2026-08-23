@@ -2225,8 +2225,9 @@ function renderProductOutput(){
     const entries = list.filter(x=>x.product===name);
     const produced = entries.reduce((s,x)=>s+(x.qty||0),0);
     const remaining = target ? (target - produced) : null;
+    const achievedPct = target ? (produced / target) : null;
     const devPct = target ? ((produced - target) / target) : null;
-    return { name, target, produced, remaining, devPct };
+    return { name, target, produced, remaining, achievedPct, devPct };
   });
   const totalTarget = report.reduce((s,r)=>s+r.target,0);
   const totalProduced = report.reduce((s,r)=>s+r.produced,0);
@@ -2241,6 +2242,8 @@ function renderProductOutput(){
       case 'producedDesc': return b.produced-a.produced;
       case 'remainingAsc': return (a.remaining??Infinity)-(b.remaining??Infinity);
       case 'remainingDesc': return (b.remaining??-Infinity)-(a.remaining??-Infinity);
+      case 'achievedAsc': return (a.achievedPct??Infinity)-(b.achievedPct??Infinity);
+      case 'achievedDesc': return (b.achievedPct??-Infinity)-(a.achievedPct??-Infinity);
       case 'devAsc': return (a.devPct??Infinity)-(b.devPct??Infinity);
       case 'devDesc': return (b.devPct??-Infinity)-(a.devPct??-Infinity);
       default: return a.name.localeCompare(b.name,'fa');
@@ -2290,19 +2293,22 @@ function renderProductOutput(){
         <option value="producedAsc" ${sortBy==='producedAsc'?'selected':''}>تولید — کمترین اول</option>
         <option value="remainingDesc" ${sortBy==='remainingDesc'?'selected':''}>مانده تولید — بیشترین اول</option>
         <option value="remainingAsc" ${sortBy==='remainingAsc'?'selected':''}>مانده تولید — کمترین اول</option>
+        <option value="achievedDesc" ${sortBy==='achievedDesc'?'selected':''}>درصد تحقق — بیشترین اول</option>
+        <option value="achievedAsc" ${sortBy==='achievedAsc'?'selected':''}>درصد تحقق — کمترین اول</option>
         <option value="devDesc" ${sortBy==='devDesc'?'selected':''}>درصد انحراف — بیشترین (جلوتر از هدف)</option>
         <option value="devAsc" ${sortBy==='devAsc'?'selected':''}>درصد انحراف — کمترین (عقب‌تر از هدف)</option>
       </select>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>محصول / کد کالا</th><th class="num">هدف ماه</th><th class="num">تولید تاکنون</th><th class="num">مانده تولید</th><th class="num">درصد انحراف</th></tr></thead>
+      <thead><tr><th>محصول / کد کالا</th><th class="num">هدف ماه</th><th class="num">تولید تاکنون</th><th class="num">مانده تولید</th><th class="num">درصد تحقق</th><th class="num">درصد انحراف</th></tr></thead>
       <tbody>
-      ${sortedReport.length===0? `<tr><td colspan="5"><div class="tbl-empty">هنوز برنامه یا تولیدی برای این ماه ثبت نشده.</div></td></tr>` :
+      ${sortedReport.length===0? `<tr><td colspan="6"><div class="tbl-empty">هنوز برنامه یا تولیدی برای این ماه ثبت نشده.</div></td></tr>` :
       sortedReport.map(r=>`<tr>
         <td>${esc(r.name)}</td>
         <td class="num">${r.target? fmt(r.target,0) : '<span class="muted">—</span>'}</td>
         <td class="num">${fmt(r.produced,0)}</td>
         <td class="num" style="color:${r.remaining===null?'var(--text-mute)':r.remaining>0?'#ffb0b8':'#8ff0c8'}; font-weight:800;">${r.remaining===null?'—':fmt(r.remaining,0)}</td>
+        <td class="num" style="color:${r.achievedPct===null?'var(--text-mute)':r.achievedPct>=1?'#8ff0c8':r.achievedPct>=0.9?'#ffe08a':'#ffb0b8'}; font-weight:800;">${pct(r.achievedPct,0)}</td>
         <td class="num" style="color:${r.devPct===null?'var(--text-mute)':r.devPct>=0?'#8ff0c8':r.devPct>=-0.1?'#ffe08a':'#ffb0b8'}; font-weight:800;">${pct(r.devPct,1)}</td>
       </tr>`).join('')}
       </tbody>
