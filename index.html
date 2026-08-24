@@ -1138,6 +1138,19 @@ async function loadAll(){
   // رمز مدیر برای تأیید حذف — اگر قبلاً تنظیم نشده، مقدار پیش‌فرض گذاشته می‌شود (از تنظیمات قابل تغییر است)
   if(!DB.meta.adminPin) DB.meta.adminPin = '1234';
   enrichPersonnelCodes();
+  reclassifyMislabeledReworkRecords_();
+}
+// اصلاح یک‌باره داده‌های قدیمی: اگر رکوردی در «نوع ضایعات» متن «دوباره‌کاری» دارد ولی «تیپ ضایعات»‌اش
+// روی دوباره‌کاری تنظیم نشده، تیپ را اصلاح می‌کند تا در گزارش‌ها/شمارش نرخ ضایعات جداگانه دیده شود
+// (نه اینکه به‌اشتباه «ضایعات» حساب شود). هر رکورد فقط یک‌بار در این فرآیند دست می‌خورد.
+function reclassifyMislabeledReworkRecords_(){
+  let changed = false;
+  (DB.waste||[]).forEach(x=>{
+    const txt = normalizeForGrouping((x.wasteType||'') + (x.description||''));
+    const looksLikeRework = txt.indexOf('دوبارهکاری') !== -1 || txt.indexOf('دوبارهکار') !== -1;
+    if(looksLikeRework && x.category !== 'دوباره‌کاری'){ x.category = 'دوباره‌کاری'; changed = true; }
+  });
+  if(changed) scheduleSave();
 }
 
 // نگاشت نام‌های پرسنل فعلی به «کد پرسنلی» و «نوع نیرو» — از آخرین لیست رسمی که شرکت فرستاده (کارت‌های پرسنلی).
@@ -2234,6 +2247,17 @@ function renderProductOutput(){
   const totalProduced = report.reduce((s,r)=>s+r.produced,0);
   const behindCount = report.filter(r=>r.devPct!==null && r.devPct<-0.1).length;
 
+  // تطبیق با «ارسال به انبار» — چون این دو تب مکمل هم‌اند، جمع کل باید همیشه یکی باشد
+  const officialMonthShipTotal = M.daily.reduce((s,e)=> s+shipTotal(e), 0);
+  const reconcileDiff = officialMonthShipTotal - totalProduced;
+  let dayReconcile = null;
+  if(filters.poDateFocus){
+    const dayEntry = M.daily.find(e=>e.date===filters.poDateFocus);
+    const dayOfficial = dayEntry ? shipTotal(dayEntry) : 0;
+    const dayDetailed = filteredList.reduce((s,x)=>s+(x.qty||0),0);
+    dayReconcile = { official: dayOfficial, detailed: dayDetailed, diff: dayOfficial - dayDetailed };
+  }
+
   const sortBy = filters.poSortBy || 'name';
   const sortedReport = [...report].sort((a,b)=>{
     switch(sortBy){
@@ -2257,6 +2281,14 @@ function renderProductOutput(){
     ${kpiCard('جمع هدف ماه (همه محصولات)','عدد', fmt(totalTarget,0), null, '#93a4c3')}
     ${kpiCard('جمع ارسال تا امروز','عدد', fmt(totalProduced,0), null, '#2fd9c4')}
     ${kpiCard('محصولات عقب‌افتاده از برنامه (بیش از ۱۰٪ کسری)','محصول', fmt(behindCount,0), null, '#ff5d6c')}
+  </div>
+
+  <div class="card" style="margin-bottom:16px; border:1px solid ${reconcileDiff===0?'rgba(47,217,196,.35)':'rgba(255,93,108,.35)'};">
+    <div class="flexbar">
+      <h3 style="margin:0;">${reconcileDiff===0?'✅':'⚠️'} تطبیق با «ارسال به انبار» (این ماه)</h3>
+      <span class="badge ${reconcileDiff===0?'badge-run':'badge-warn'}">${reconcileDiff===0?'مطابقت کامل':'اختلاف: '+fmt(Math.abs(reconcileDiff),0)+' عدد'}</span>
+    </div>
+    <div class="hint">این دو تب مکمل هم‌اند و جمع‌شان باید همیشه برابر باشد — جمع کل ارسال (انبار): <b>${fmt(officialMonthShipTotal,0)}</b> | جمع ثبت‌شده به‌تفکیک محصول: <b>${fmt(totalProduced,0)}</b>${reconcileDiff!==0? (reconcileDiff>0? ' — هنوز '+fmt(reconcileDiff,0)+' عدد در «ارسال به‌تفکیک محصول» ثبت نشده.' : ' — '+fmt(Math.abs(reconcileDiff),0)+' عدد بیشتر از «ارسال به انبار» ثبت شده، ورودی‌ها را چک کنید.') : ''}</div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -2321,6 +2353,7 @@ function renderProductOutput(){
       <h3 style="margin:0;">رویدادنامه ثبت‌های ارسال محصول (${list.length})</h3>
       ${filters.poDateFocus? `<span class="badge" style="display:flex; align-items:center; gap:6px;">فیلتر تاریخ: ${esc(filters.poDateFocus)} <button id="clearPoDateFocus" style="background:none; border:none; color:inherit; cursor:pointer; font-size:13px; line-height:1;">×</button></span>` : ''}
     </div>
+    ${dayReconcile? `<div class="hint" style="margin-bottom:8px; color:${dayReconcile.diff===0?'#8ff0c8':'#ffb0b8'};">${dayReconcile.diff===0?'✅ جمع ثبت‌شده به‌تفکیک محصول با جمع کل ارسال همان روز (انبار) برابر است.':'⚠️ جمع کل ارسال همان روز در «ارسال به انبار»: '+fmt(dayReconcile.official,0)+' | جمع ثبت‌شده به‌تفکیک محصول: '+fmt(dayReconcile.detailed,0)+' — مانده برای تکمیل: '+fmt(dayReconcile.diff,0)}</div>` : ''}
     <div class="table-wrap"><table>
       <thead><tr><th>تاریخ</th><th>محصول / کد کالا</th><th class="num">تعداد</th><th></th></tr></thead>
       <tbody>
@@ -2555,10 +2588,14 @@ function renderWaste(){
   const list = [...M.waste].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
     .filter(x=> (!filters.waste || (x.station+x.part+x.operator+x.wasteType).toLowerCase().includes(filters.waste.toLowerCase()))
              && (filters.wasteCat==='all' || x.category===filters.wasteCat));
-  const totalWaste = M.waste.reduce((s,x)=>s+(x.wasteCount||0),0);
+  // «دوباره‌کاری» (Rework) از نظر کیفیتی با «ضایعات» (Scrap) فرق دارد: در دوباره‌کاری قطعه در نهایت سالم و
+  // قابل‌مصرف می‌شود (فقط وقت اضافه گرفته)، ولی در ضایعات قطعه کاملاً دورریز می‌شود. برای همین KPIها و
+  // پارتوهای اصلی این تب فقط «ضایعات واقعی» را حساب می‌کنند؛ دوباره‌کاری در بخش اختصاصی خودش (پایین‌تر) دیده می‌شود.
+  const scrapOnly = M.waste.filter(x=>x.category!=='دوباره‌کاری');
+  const totalWaste = scrapOnly.reduce((s,x)=>s+(x.wasteCount||0),0);
   const totalProduced = (()=>{
     const seen = new Set(); let s=0;
-    M.waste.forEach(x=>{ const key = x.date+'|'+x.station+'|'+x.part; if(x.produced && !seen.has(key)){ s+=x.produced; seen.add(key);} });
+    scrapOnly.forEach(x=>{ const key = x.date+'|'+x.station+'|'+x.part; if(x.produced && !seen.has(key)){ s+=x.produced; seen.add(key);} });
     return s;
   })();
   const wasteRate = totalProduced? totalWaste/totalProduced : 0;
@@ -2566,9 +2603,9 @@ function renderWaste(){
   const reworkRecords = M.waste.filter(x=>x.reworkMinutes>0 || x.category==='دوباره‌کاری');
   const totalReworkQty = reworkRecords.reduce((s,x)=>s+(x.wasteCount||0),0);
   const reworkLostQtyEst = M.waste.reduce((s,x)=> s + (x.reworkMinutes? (x.reworkMinutes/60)*resolveStationRate(x.station) : 0), 0);
-  const stationPareto = paretoFrom(M.waste, x=>x.station, x=>x.wasteCount).slice(0,10);
-  const typePareto = paretoFrom(M.waste, x=>x.wasteType, x=>x.wasteCount).slice(0,10);
-  const productPareto = paretoFrom(M.waste.filter(x=>x.finalProduct), x=>x.finalProduct, x=>x.wasteCount).slice(0,10);
+  const stationPareto = paretoFrom(scrapOnly, x=>x.station, x=>x.wasteCount).slice(0,10);
+  const typePareto = paretoFrom(scrapOnly, x=>x.wasteType, x=>x.wasteCount).slice(0,10);
+  const productPareto = paretoFrom(scrapOnly.filter(x=>x.finalProduct), x=>x.finalProduct, x=>x.wasteCount).slice(0,10);
   const catTotals = paretoFrom(M.waste, x=>x.category, x=>x.wasteCount);
   // تیپ‌ها و انواع ضایعات دیگر ثابت نیستند — خودتان از همین تب می‌توانید گزینه اضافه/حذف کنید
   // (مثلاً «ورودی مشروط» برای قطعاتی که سالم می‌رسند ولی باید قبل از مصرف جدا/غربال شوند).
@@ -2597,15 +2634,19 @@ function renderWaste(){
     <div class="form-grid">
       <div class="field"><label>تاریخ</label>${datePickerHtml('w_date', editing.waste?.date)}</div>
       <div class="field"><label>ایستگاه</label>${stationSelectHtml('w_station', editing.waste?.station||'')}</div>
+      <div class="field span-2" style="background:rgba(76,141,255,.08); border:1px solid rgba(76,141,255,.3); border-radius:10px; padding:10px 12px;">
+        <label style="font-weight:800;">🔀 نوع رویداد — این مهم است: ضایعات یا دوباره‌کاری؟</label>
+        <select id="w_cat">${wasteCategories.map(c=>`<option ${editing.waste?.category===c?'selected':''}>${c}</option>`).join('')}</select>
+        <div class="hint" style="margin-top:6px;">اگر قطعه در نهایت با کمی وقت اضافه <b>سالم و قابل‌مصرف</b> شد، «دوباره‌کاری» را انتخاب کنید — نه «ضایعات». این انتخاب روی نرخ ضایعات و گزارش‌های مدیریتی اثر مستقیم دارد.</div>
+      </div>
       <div class="field"><label>قطعه / محصول</label>${partSelectHtml('w_part', editing.waste?.part||'')}</div>
       <div class="field"><label>محصول نهایی <span class="muted">(مدل خودرو)</span></label><select id="w_finalProduct"><option value="">— انتخاب —</option>${FINAL_PRODUCT_LIST_DEFAULT.map(o=>`<option value="${esc(o)}" ${editing.waste?.finalProduct===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
       <div style="grid-column: span 2;"><label style="display:block; margin-bottom:6px;">اپراتور(ها) <span class="muted">(اگر چند نفر هم‌زمان بودند، هرکدام را جدا انتخاب کنید)</span></label>
         ${operatorPickerHtml('w_operatorPicker', (editing.waste?.operator||'').split(/[،,]/).map(s=>s.trim()).filter(Boolean))}
       </div>
       <div class="field"><label>تعداد تولید</label><input id="w_produced" type="text" inputmode="numeric" value="${editing.waste?.produced ?? ''}"></div>
-      <div class="field"><label>نوع ضایعات</label><select id="w_type"><option value="">— انتخاب —</option>${wasteTypeOptions.map(o=>`<option value="${esc(o)}" ${editing.waste?.wasteType===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
-      <div class="field"><label>تعداد ضایعات <span class="muted">(یا تعداد قطعه دوباره‌کاری‌شده)</span></label><input id="w_count" type="text" inputmode="numeric" value="${editing.waste?.wasteCount ?? ''}"></div>
-      <div class="field"><label>تیپ ضایعات</label><select id="w_cat">${wasteCategories.map(c=>`<option ${editing.waste?.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="field"><label>علت (نوع ضایعات/دوباره‌کاری)</label><select id="w_type"><option value="">— انتخاب —</option>${wasteTypeOptions.map(o=>`<option value="${esc(o)}" ${editing.waste?.wasteType===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
+      <div class="field"><label>تعداد <span class="muted">(ضایعات یا دوباره‌کاری‌شده، بر اساس نوع رویداد بالا)</span></label><input id="w_count" type="text" inputmode="numeric" value="${editing.waste?.wasteCount ?? ''}"></div>
       <div class="field"><label>زمان دوباره‌کاری / جداسازی <span class="muted">(دقیقه — اگر این ردیف نیاز به وقت اضافه اپراتور داشت، چه دوباره‌کاری چه جداسازی ورودی مشروط)</span></label><input id="w_reworkMin" type="text" inputmode="numeric" placeholder="مثلاً 30" value="${editing.waste?.reworkMinutes ?? ''}"></div>
     </div>
     <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
@@ -2938,8 +2979,11 @@ function computeOEE(rows, M){
   const availability = plannedHours? uptimeHours/plannedHours : null;
   const mttr = stopEvents? totalStopHours/stopEvents : null;
   const mtbf = stopEvents? uptimeHours/stopEvents : null;
-  const totalWaste = M.waste.reduce((s,x)=>s+(x.wasteCount||0),0);
-  const totalProduced = (()=>{ const seen=new Set(); let s=0; M.waste.forEach(x=>{ const key=x.date+'|'+x.station+'|'+x.part; if(x.produced&&!seen.has(key)){s+=x.produced; seen.add(key);} }); return s; })();
+  // «دوباره‌کاری» با «ضایعات واقعی» فرق دارد (قطعه دوباره‌کاری‌شده در نهایت سالم و قابل‌مصرف است)،
+  // پس در محاسبهٔ نرخ کیفیت/OEE فقط ضایعات واقعی حساب می‌شود، نه دوباره‌کاری‌ها.
+  const scrapOnlyM = M.waste.filter(x=>x.category!=='دوباره‌کاری');
+  const totalWaste = scrapOnlyM.reduce((s,x)=>s+(x.wasteCount||0),0);
+  const totalProduced = (()=>{ const seen=new Set(); let s=0; scrapOnlyM.forEach(x=>{ const key=x.date+'|'+x.station+'|'+x.part; if(x.produced&&!seen.has(key)){s+=x.produced; seen.add(key);} }); return s; })();
   const quality = totalProduced? (totalProduced-totalWaste)/totalProduced : null;
   const clamp01 = v=> v===null? 1 : Math.min(1, Math.max(0, v));
   const oee = clamp01(availability) * clamp01(performance) * clamp01(quality);
@@ -3194,7 +3238,7 @@ function renderCover(){
   const totalShipped = rows.reduce((s,e)=> s + shipTotal(e), 0);
 
   const stopReasons = paretoFrom(M.stop, x=>x.reason, x=>x.hours);
-  const wasteReasons = paretoFrom(M.waste, x=>x.wasteType, x=>x.wasteCount);
+  const wasteReasons = paretoFrom(M.waste.filter(x=>x.category!=='دوباره‌کاری'), x=>x.wasteType, x=>x.wasteCount);
 
   document.getElementById('view').innerHTML = `
   <div style="margin:-4px -4px 0; padding:28px 26px 34px; border-radius:22px;
@@ -3305,7 +3349,7 @@ function renderLean(){
 
   const stationParetoS = paretoFrom(M.stop, x=>x.station, x=>x.hours).slice(0,6);
   const reasonParetoS = paretoFrom(M.stop, x=>x.reason, x=>x.hours).slice(0,6);
-  const stationParetoW = paretoFrom(M.waste, x=>x.station, x=>x.wasteCount).slice(0,6);
+  const stationParetoW = paretoFrom(M.waste.filter(x=>x.category!=='دوباره‌کاری'), x=>x.station, x=>x.wasteCount).slice(0,6);
 
   // ---- شاخص‌های تولید و بهره‌وری: تفکیک هر خط + نرخ استفاده از ظرفیت + بهره‌وری نیروی انسانی ----
   const lineLabels = {line1:'خط ۱', line2:'خط ۲', line3:'خط ۳', line4:'خط ۴'};
@@ -3744,7 +3788,7 @@ function renderDash(){
   const negDays = rows.filter(e=>mainFourTotal(e)>0 && mainFourTotal(e)-dayTarget4Lines(e)<0).length;
   const shortDays = new Set(M.short.map(x=>x.date)).size;
 
-  const stationParetoW = paretoFrom(M.waste, x=>x.station, x=>x.wasteCount).slice(0,6);
+  const stationParetoW = paretoFrom(M.waste.filter(x=>x.category!=='دوباره‌کاری'), x=>x.station, x=>x.wasteCount).slice(0,6);
   const stationParetoS = paretoFrom(M.stop, x=>x.station, x=>x.hours).slice(0,6);
   const problemPareto = (()=>{
     // مشکلات ثبت‌شده متن آزادند؛ تفاوت‌های جزئی نوشتاری (فاصله «درپوش» در برابر «در پوش»، نیم‌فاصله،
@@ -3799,9 +3843,11 @@ function renderDash(){
       action: suggestedAction(x.reason) });
   });
   todayWasteArr.forEach(x=>{
-    todayEvents.push({ icon:'🗑', color:'#ffcf5c', title:'ضایعات '+x.station, detail:fmt(x.wasteCount||0,0)+' عدد ضایعات', reason:x.wasteType,
+    const isRework = x.category==='دوباره‌کاری';
+    todayEvents.push({ icon: isRework?'🔧':'🗑', color: isRework?'#4c8dff':'#ffcf5c', title: (isRework?'دوباره‌کاری ':'ضایعات ')+x.station,
+      detail: fmt(x.wasteCount||0,0)+(isRework?' عدد دوباره‌کاری':' عدد ضایعات'), reason:x.wasteType,
       impact: unitCost? (x.wasteCount||0)*unitCost : (x.wasteCount||0), impactLabel: unitCost? fmt((x.wasteCount||0)*unitCost,0)+' ریال' : fmt(x.wasteCount||0,0)+' عدد',
-      action:'بررسی ریشه‌ای با کنترل کیفیت و ایستگاه مربوطه' });
+      action: isRework? 'بررسی ریشه‌ای علت دوباره‌کاری و آموزش/تنظیم ایستگاه مربوطه' : 'بررسی ریشه‌ای با کنترل کیفیت و ایستگاه مربوطه' });
   });
   todayShortArr.forEach(x=>{
     todayEvents.push({ icon:'🧩', color:'#4c8dff', title:'کسری '+x.part, detail:x.status, reason:x.description||'کسری قطعه',
