@@ -393,7 +393,7 @@ const FINAL_PRODUCT_LIST_DEFAULT = ['پژو 83','درپوش ساینا','درپ�
 // فهرست محصول/قطعه برای «خطوط اصلی تولید» در تب ورود داده — دقیقاً مطابق اسم برنامه تولید (اکسل برنامه‌ریزی)
 const LINE_PRODUCT_LIST_DEFAULT = ['ترموستات  EF‏7 — 83 درجه','ترموستات  EF‏7 — 88 درجه','ترموستات  EF‏7 — 75 درجه','ترموستات 206 — 89 درجه','ترموستات 206 — 83 درجه','ترموستات 206 — 76 درجه','ترموستات 206 CKD — 89 درجه','ترموستات 206 CKD — 83 درجه','ترموستات 206 CKD — 76 درجه','ترموستات ال 90 — 89 درجه','ترموستات ال 90 — 83 درجه','ترموستات ال 90 — 76 درجه','ترموستات ایسوزو — 85 درجه','ترموستات ایسوزو — 82 درجه','ترموستات ايویکو — 82 درجه','ترموستات ايویکو — 75 درجه','ترموستات ايویکو — 65 درجه','ترموستات بسترن','ترموستات پراید — 71 درجه','ترموستات پراید — 76 درجه','ترموستات پراید — 82 درجه','ترموستات پژو — 83 درجه','ترموستات پژو — 75 درجه','ترموستات پژو-سوپاپ دار — 75 درجه','ترموستات پیکان — 78 درجه','ترموستات پیکان — 82 درجه','ترموستات پیکان — 74 درجه','ترموستات پیکان — 71 درجه','ترموستات چري — 87 درجه','ترموستات چري — 83 درجه','ترموستات ديزل بنز — 71 درجه','ترموستات ديزل بنز — 65 درجه','ترموستات ریو — 88 درجه','ترموستات زانتیا — 83 درجه','ترموستات زانتیا — 89 درجه','ترموستات فوتون — 82 درجه','ترموستات فوتون — 75 درجه','ترموستات فوتون — 65 درجه','ترموستات نیسان — 82 درجه','ترموستات نیسان — درجه‎ 76.5','ترموستات نیسان ديزل — 82 درجه','ترموستات نیسان ديزل — درجه‎ 76.5','ترموستات ولوو FH‏12 — 75 درجه','ترموستات کاپرا — 82 درجه','ترموستات کاپرا — 76 درجه','درپوش ترموستات — L90','درپوش ترموستات — ساینا','درپوش ترموستات — شاهین','درپوش ترموستات — جک','سه راه آب بغل — 206','سه راه آب بغل — شاهین پلاس'];
 const WASTE_TYPE_LIST_DEFAULT = ['پایه ورودی','پایه حین تولید','برنجی','واشرتفلون','میله فرمان 29','میله فرمان 30','میله فرمان 31','میله فرمان 32','میله فرمان 33','میله فرمان 34','سیلندر ورودی','کلاهی ورودی','کلاهی حین تولید','درپوش ترموستات ورودی','پایه ckd','واشر ckd','درپوش ترموستات حین تولید','پین ساینا','پین جک','پین شاهین','فنر ترموستات','فنر ckd','قفل شدگی','پین','دریچه پاره حین تولید','خطای اپراتور','دریچه پاره کنترل','نک نخورده','ترکیدگی سیلندر','نشتی سیلندر','قیچی کردن','آنیل','منگوله ورودی','سوختگی منگوله','دریچه ورودی','پارگی دیافراگم','دفرمگی سیلندر','عدم عملکرد','بدنه','گیرکرده','کوتاهی تاج','مشکلات سیلندر','دیافراگم','میله','ایرادات بدنه','خرابی پایه','درپوش L90','پین l90','دمونتاژckd','پین شاهین پلاس','تست','پین405','درپوش 405','ضایعات سیلندر','درپوش','ضایعات بدنه','شکستگی','دفرمگی','سوختگی','ضایعات دریچه','سوراخ در بدنه','ترک دربدنه','ترک','پارگی واشر','پارگی سیلندر','سیلندر ورودی تیپ B — عدم قابلیت اطمینان (۱۰۰٪ جداسازی)','سیلندر ورودی تیپ A — رد پرسکاری','ورودی منگوله — نیاز به منگوله‌زن','واشر CKD — پارگی (جداسازی در خط)','درپوش‌ها — مشکلات کیفی (جداسازی در خط)','سه‌راهی ۲۰۶ — مشکلات کیفی (جداسازی در خط)','کلاهی مشهد — مشکلات کیفی (جداسازی در خط)','دریچه لاستیکی — مشکلات کیفی (جداسازی در خط)','دریچه پراید مشهد — مشکلات کیفی (جداسازی در خط)','سایر'];
-const WASTE_CATEGORIES = ['ورودی نادرست','ورودی مشروط','حین فرآیند','کنترل نهایی','سایر'];
+const WASTE_CATEGORIES = ['ورودی','ورودی مشروط','حین فرآیند','کنترل نهایی','سایر'];
 const WASTE_EVENT_TYPES = ['ضایعات','دوباره‌کاری'];
 const SHORTAGE_STATUS = ['در انتظار تامین','تامین شده','پیگیری فوری'];
 // فهرست قطعات/محصولات — از فایل پیوست شرکت استخراج شده؛ در فرم «ضایعات تولید» (قطعه/محصول)
@@ -444,7 +444,7 @@ let dirty = { daily:false, waste:false, stop:false, short:false, meta:false };
 let currentTab = 'dash';
 let charts = {};
 let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null };
-let filters = { waste:'', stop:'', short:'', wasteCat:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'' };
+let filters = { waste:'', stop:'', short:'', wasteCat:'all', wasteEventType:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'' };
 let personnelUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
 
 /* ---------------------------- utils ---------------------------- */
@@ -1152,7 +1152,7 @@ async function loadAll(){
 // ۴) نام‌گذاری قدیمی «تیپ ضایعات» به نام‌گذاری جدید نگاشت می‌شود (ورودی→ورودی نادرست، حین فرایند→حین فرآیند).
 function reclassifyMislabeledReworkRecords_(){
   let changed = false;
-  const oldCategoryMap = { 'ورودی':'ورودی نادرست', 'حین فرایند':'حین فرآیند' };
+  const oldCategoryMap = { 'ورودی نادرست':'ورودی', 'حین فرایند':'حین فرآیند' };
   (DB.waste||[]).forEach(x=>{
     const txt = normalizeForGrouping((x.wasteType||'') + (x.description||''));
     const looksLikeRework = txt.indexOf('دوبارهکاری') !== -1 || txt.indexOf('دوبارهکار') !== -1;
@@ -2602,7 +2602,8 @@ function renderWaste(){
   const M = monthData();
   const list = [...M.waste].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
     .filter(x=> (!filters.waste || (x.station+x.part+x.operator+x.wasteType).toLowerCase().includes(filters.waste.toLowerCase()))
-             && (filters.wasteCat==='all' || x.category===filters.wasteCat));
+             && (filters.wasteCat==='all' || x.category===filters.wasteCat)
+             && (filters.wasteEventType==='all' || (x.eventType||'ضایعات')===filters.wasteEventType));
   // «دوباره‌کاری» (Rework) از نظر کیفیتی با «ضایعات» (Scrap) فرق دارد: در دوباره‌کاری قطعه در نهایت سالم و
   // قابل‌مصرف می‌شود (فقط وقت اضافه گرفته)، ولی در ضایعات قطعه کاملاً دورریز می‌شود. برای همین KPIها و
   // پارتوهای اصلی این تب فقط «ضایعات واقعی» را حساب می‌کنند؛ دوباره‌کاری در بخش اختصاصی خودش (پایین‌تر) دیده می‌شود.
@@ -2657,7 +2658,7 @@ function renderWaste(){
       <div class="field span-2" style="background:rgba(255,207,92,.08); border:1px solid rgba(255,207,92,.3); border-radius:10px; padding:10px 12px;">
         <label style="font-weight:800;">۲) این ضایعات/دوباره‌کاری کجا بروز کرد؟</label>
         <select id="w_cat">${wasteCategories.map(c=>`<option ${editing.waste?.category===c?'selected':''}>${c}</option>`).join('')}</select>
-        <div class="hint" style="margin-top:6px;">ورودی نادرست = قطعه از همان اول معیوب بوده؛ ورودی مشروط = سالم بود ولی نیاز به جداسازی/غربال داشت؛ حین فرآیند = در همین ایستگاه ایجاد شد؛ کنترل نهایی = در بازرسی پایانی کشف شد.</div>
+        <div class="hint" style="margin-top:6px;">ورودی = قطعه از همان اول معیوب بوده؛ ورودی مشروط = سالم بود ولی نیاز به جداسازی/غربال داشت؛ حین فرآیند = در همین ایستگاه ایجاد شد؛ کنترل نهایی = در بازرسی پایانی کشف شد.</div>
       </div>
       <div class="field"><label>قطعه / محصول</label>${partSelectHtml('w_part', editing.waste?.part||'')}</div>
       <div class="field"><label>محصول نهایی <span class="muted">(مدل خودرو)</span></label><select id="w_finalProduct"><option value="">— انتخاب —</option>${FINAL_PRODUCT_LIST_DEFAULT.map(o=>`<option value="${esc(o)}" ${editing.waste?.finalProduct===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
@@ -2726,10 +2727,15 @@ function renderWaste(){
 
   <div class="card">
     <div class="flexbar">
-      <h3 style="margin:0;">ثبت ضایعات روزانه — ${monthLabel(DB.meta.activeMonth)} (${list.length} از ${M.waste.length})</h3>
+      <h3 style="margin:0;">ثبت ضایعات/دوباره‌کاری روزانه — ${monthLabel(DB.meta.activeMonth)} (${list.length} از ${M.waste.length})</h3>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <div class="pills">
-          <button class="pill ${filters.wasteCat==='all'?'active':''}" data-wc="all">همه</button>
+          <button class="pill ${filters.wasteEventType==='all'?'active':''}" data-wet="all">همه</button>
+          <button class="pill ${filters.wasteEventType==='ضایعات'?'active':''}" data-wet="ضایعات">فقط ضایعات</button>
+          <button class="pill ${filters.wasteEventType==='دوباره‌کاری'?'active':''}" data-wet="دوباره‌کاری">فقط دوباره‌کاری</button>
+        </div>
+        <div class="pills">
+          <button class="pill ${filters.wasteCat==='all'?'active':''}" data-wc="all">همه منشأها</button>
           ${wasteCategories.map(c=>`<button class="pill ${filters.wasteCat===c?'active':''}" data-wc="${c}">${c}</button>`).join('')}
         </div>
         <div class="search"><input id="wasteSearch" placeholder="جستجوی ایستگاه/قطعه…" value="${esc(filters.waste)}"></div>
@@ -2737,12 +2743,14 @@ function renderWaste(){
       </div>
     </div>
     <div class="table-wrap" style="max-height:460px; overflow:auto;"><table>
-      <thead><tr><th>تاریخ</th><th>ایستگاه</th><th>قطعه</th><th>محصول نهایی</th><th>اپراتور</th><th class="num">تولید</th><th>نوع ضایعات</th><th class="num">تعداد</th><th>تیپ</th><th class="num">دوباره‌کاری/جداسازی (دقیقه)</th><th></th></tr></thead>
+      <thead><tr><th>تاریخ</th><th>ایستگاه</th><th>نوع رویداد</th><th>قطعه</th><th>محصول نهایی</th><th>اپراتور</th><th class="num">تولید</th><th>علت دقیق</th><th class="num">تعداد</th><th>منشأ</th><th class="num">دوباره‌کاری/جداسازی (دقیقه)</th><th></th></tr></thead>
       <tbody>
-      ${list.length===0?`<tr><td colspan="11"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
-      list.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.station)}</td><td>${esc(x.part)}</td><td>${esc(x.finalProduct)||'—'}</td><td>${esc(x.operator)||'—'}</td>
+      ${list.length===0?`<tr><td colspan="12"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
+      list.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.station)}</td>
+        <td><span class="badge ${(x.eventType||'ضایعات')==='دوباره‌کاری'?'badge-blue':'badge-stop'}">${(x.eventType||'ضایعات')==='دوباره‌کاری'?'🔧 دوباره‌کاری':'🗑 ضایعات'}</span></td>
+        <td>${esc(x.part)}</td><td>${esc(x.finalProduct)||'—'}</td><td>${esc(x.operator)||'—'}</td>
         <td class="num">${fmt(x.produced,0)}</td><td>${esc(x.wasteType)}</td><td class="num">${fmt(x.wasteCount,0)}</td>
-        <td><span class="badge ${x.category==='ورودی'?'badge-blue':x.category==='حین فرایند'?'badge-warn':'badge-mute'}">${esc(x.category)}</span></td>
+        <td><span class="badge ${x.category==='ورودی'?'badge-blue':x.category==='حین فرآیند'?'badge-warn':'badge-mute'}">${esc(x.category)}</span></td>
         <td class="num">${x.reworkMinutes?('<b style="color:#ff9d42;">'+fmt(x.reworkMinutes,0)+'</b>'):'—'}</td>
         <td><div style="display:flex; gap:6px;">
           <button class="icon-btn" data-wedit="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
@@ -2782,6 +2790,7 @@ function renderWaste(){
   }));
   document.getElementById('wasteSearch').addEventListener('input', e=>{ filters.waste = e.target.value; renderWaste(); });
   document.querySelectorAll('[data-wc]').forEach(b=>b.addEventListener('click', ()=>{ filters.wasteCat = b.dataset.wc; renderWaste(); }));
+  document.querySelectorAll('[data-wet]').forEach(b=>b.addEventListener('click', ()=>{ filters.wasteEventType = b.dataset.wet; renderWaste(); }));
   document.getElementById('expWasteCsv').addEventListener('click', ()=>{
     const headers = ['تاریخ','ایستگاه','قطعه','محصول نهایی','اپراتور','تعداد تولید','نوع ضایعات','تعداد ضایعات','تیپ','دوباره‌کاری/جداسازی (دقیقه)'];
     const rr = M.waste.map(x=>[x.date,x.station,x.part,x.finalProduct,x.operator,x.produced,x.wasteType,x.wasteCount,x.category,x.reworkMinutes||'']);
