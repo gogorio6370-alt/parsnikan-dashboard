@@ -393,7 +393,8 @@ const FINAL_PRODUCT_LIST_DEFAULT = ['پژو 83','درپوش ساینا','درپ�
 // فهرست محصول/قطعه برای «خطوط اصلی تولید» در تب ورود داده — دقیقاً مطابق اسم برنامه تولید (اکسل برنامه‌ریزی)
 const LINE_PRODUCT_LIST_DEFAULT = ['ترموستات  EF‏7 — 83 درجه','ترموستات  EF‏7 — 88 درجه','ترموستات  EF‏7 — 75 درجه','ترموستات 206 — 89 درجه','ترموستات 206 — 83 درجه','ترموستات 206 — 76 درجه','ترموستات 206 CKD — 89 درجه','ترموستات 206 CKD — 83 درجه','ترموستات 206 CKD — 76 درجه','ترموستات ال 90 — 89 درجه','ترموستات ال 90 — 83 درجه','ترموستات ال 90 — 76 درجه','ترموستات ایسوزو — 85 درجه','ترموستات ایسوزو — 82 درجه','ترموستات ايویکو — 82 درجه','ترموستات ايویکو — 75 درجه','ترموستات ايویکو — 65 درجه','ترموستات بسترن','ترموستات پراید — 71 درجه','ترموستات پراید — 76 درجه','ترموستات پراید — 82 درجه','ترموستات پژو — 83 درجه','ترموستات پژو — 75 درجه','ترموستات پژو-سوپاپ دار — 75 درجه','ترموستات پیکان — 78 درجه','ترموستات پیکان — 82 درجه','ترموستات پیکان — 74 درجه','ترموستات پیکان — 71 درجه','ترموستات چري — 87 درجه','ترموستات چري — 83 درجه','ترموستات ديزل بنز — 71 درجه','ترموستات ديزل بنز — 65 درجه','ترموستات ریو — 88 درجه','ترموستات زانتیا — 83 درجه','ترموستات زانتیا — 89 درجه','ترموستات فوتون — 82 درجه','ترموستات فوتون — 75 درجه','ترموستات فوتون — 65 درجه','ترموستات نیسان — 82 درجه','ترموستات نیسان — درجه‎ 76.5','ترموستات نیسان ديزل — 82 درجه','ترموستات نیسان ديزل — درجه‎ 76.5','ترموستات ولوو FH‏12 — 75 درجه','ترموستات کاپرا — 82 درجه','ترموستات کاپرا — 76 درجه','درپوش ترموستات — L90','درپوش ترموستات — ساینا','درپوش ترموستات — شاهین','درپوش ترموستات — جک','سه راه آب بغل — 206','سه راه آب بغل — شاهین پلاس'];
 const WASTE_TYPE_LIST_DEFAULT = ['پایه ورودی','پایه حین تولید','برنجی','واشرتفلون','میله فرمان 29','میله فرمان 30','میله فرمان 31','میله فرمان 32','میله فرمان 33','میله فرمان 34','سیلندر ورودی','کلاهی ورودی','کلاهی حین تولید','درپوش ترموستات ورودی','پایه ckd','واشر ckd','درپوش ترموستات حین تولید','پین ساینا','پین جک','پین شاهین','فنر ترموستات','فنر ckd','قفل شدگی','پین','دریچه پاره حین تولید','خطای اپراتور','دریچه پاره کنترل','نک نخورده','ترکیدگی سیلندر','نشتی سیلندر','قیچی کردن','آنیل','منگوله ورودی','سوختگی منگوله','دریچه ورودی','پارگی دیافراگم','دفرمگی سیلندر','عدم عملکرد','بدنه','گیرکرده','کوتاهی تاج','مشکلات سیلندر','دیافراگم','میله','ایرادات بدنه','خرابی پایه','درپوش L90','پین l90','دمونتاژckd','پین شاهین پلاس','تست','پین405','درپوش 405','ضایعات سیلندر','درپوش','ضایعات بدنه','شکستگی','دفرمگی','سوختگی','ضایعات دریچه','سوراخ در بدنه','ترک دربدنه','ترک','پارگی واشر','پارگی سیلندر','سیلندر ورودی تیپ B — عدم قابلیت اطمینان (۱۰۰٪ جداسازی)','سیلندر ورودی تیپ A — رد پرسکاری','ورودی منگوله — نیاز به منگوله‌زن','واشر CKD — پارگی (جداسازی در خط)','درپوش‌ها — مشکلات کیفی (جداسازی در خط)','سه‌راهی ۲۰۶ — مشکلات کیفی (جداسازی در خط)','کلاهی مشهد — مشکلات کیفی (جداسازی در خط)','دریچه لاستیکی — مشکلات کیفی (جداسازی در خط)','دریچه پراید مشهد — مشکلات کیفی (جداسازی در خط)','سایر'];
-const WASTE_CATEGORIES = ['ورودی','حین فرایند','ورودی مشروط','دوباره‌کاری','سایر'];
+const WASTE_CATEGORIES = ['ورودی نادرست','ورودی مشروط','حین فرآیند','کنترل نهایی','سایر'];
+const WASTE_EVENT_TYPES = ['ضایعات','دوباره‌کاری'];
 const SHORTAGE_STATUS = ['در انتظار تامین','تامین شده','پیگیری فوری'];
 // فهرست قطعات/محصولات — از فایل پیوست شرکت استخراج شده؛ در فرم «ضایعات تولید» (قطعه/محصول)
 // و «کسری قطعه» (نام قطعه/شرح کسری) به‌صورت کشویی استفاده می‌شود.
@@ -408,7 +409,7 @@ const NAV = [
   {id:'ship',    label:'ارسال به انبار',    group:'گزارش‌ها',    icon:'truck'},
   {id:'productOutput', label:'ارسال به‌تفکیک محصول', group:'گزارش‌ها', icon:'box'},
   {id:'short',   label:'کسری قطعات',        group:'گزارش‌ها',    icon:'alert'},
-  {id:'waste',   label:'ضایعات تولید',      group:'گزارش‌ها',    icon:'trash'},
+  {id:'waste',   label:'ضایعات/دوباره‌کاری تولید', group:'گزارش‌ها', icon:'trash'},
   {id:'stop',    label:'توقفات تولید',      group:'گزارش‌ها',    icon:'pause'},
   {id:'lean',    label:'شاخص‌های ناب (OEE)', group:'تحلیل',       icon:'gauge'},
   {id:'flowmap', label:'نقشه خط و گلوگاه‌ها', group:'تحلیل',       icon:'map'},
@@ -1143,12 +1144,26 @@ async function loadAll(){
 // اصلاح یک‌باره داده‌های قدیمی: اگر رکوردی در «نوع ضایعات» متن «دوباره‌کاری» دارد ولی «تیپ ضایعات»‌اش
 // روی دوباره‌کاری تنظیم نشده، تیپ را اصلاح می‌کند تا در گزارش‌ها/شمارش نرخ ضایعات جداگانه دیده شود
 // (نه اینکه به‌اشتباه «ضایعات» حساب شود). هر رکورد فقط یک‌بار در این فرآیند دست می‌خورد.
+// اصلاح یک‌باره داده‌های قدیمی برای مدل جدید «نوع رویداد (ضایعات/دوباره‌کاری)» + «منشأ بروز» که جدا از هم شدند:
+// ۱) اگر متن ثبت‌شده نشان می‌دهد دوباره‌کاری بوده ولی eventType ثبت نشده، آن را دوباره‌کاری علامت می‌زند.
+// ۲) رکوردهایی که قبلاً (در یک نسخهٔ قبلی‌تر) «تیپ ضایعات»‌شان روی «دوباره‌کاری» تنظیم شده بود را به مدل جدید
+//    منتقل می‌کند: eventType=دوباره‌کاری، و چون منشأ دقیق را نمی‌دانیم، «سایر» گذاشته می‌شود (قابل ویرایش دستی).
+// ۳) بقیهٔ رکوردهای بدون eventType، به‌صورت پیش‌فرض «ضایعات» در نظر گرفته می‌شوند (رفتار تاریخی).
+// ۴) نام‌گذاری قدیمی «تیپ ضایعات» به نام‌گذاری جدید نگاشت می‌شود (ورودی→ورودی نادرست، حین فرایند→حین فرآیند).
 function reclassifyMislabeledReworkRecords_(){
   let changed = false;
+  const oldCategoryMap = { 'ورودی':'ورودی نادرست', 'حین فرایند':'حین فرآیند' };
   (DB.waste||[]).forEach(x=>{
     const txt = normalizeForGrouping((x.wasteType||'') + (x.description||''));
     const looksLikeRework = txt.indexOf('دوبارهکاری') !== -1 || txt.indexOf('دوبارهکار') !== -1;
-    if(looksLikeRework && x.category !== 'دوباره‌کاری'){ x.category = 'دوباره‌کاری'; changed = true; }
+    if(x.category === 'دوباره‌کاری'){
+      if(x.eventType !== 'دوباره‌کاری'){ x.eventType = 'دوباره‌کاری'; changed = true; }
+      x.category = 'سایر'; changed = true;
+    } else if(looksLikeRework && x.eventType !== 'دوباره‌کاری'){
+      x.eventType = 'دوباره‌کاری'; changed = true;
+    }
+    if(!x.eventType){ x.eventType = 'ضایعات'; changed = true; }
+    if(oldCategoryMap[x.category]){ x.category = oldCategoryMap[x.category]; changed = true; }
   });
   if(changed) scheduleSave();
 }
@@ -1340,7 +1355,7 @@ function goTo(tab){
   currentTab = tab;
   renderNav();
   const titles = {cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
-    waste:'ضایعات تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', dash:'داشبورد مدیریتی'};
+    waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', dash:'داشبورد مدیریتی'};
   const subs = {
     cover:'نمای کلی زنده برای مدیریت ارشد و مشتری — تاریخ، ساعت و شاخص‌های کلیدی',
     entry:'تنها فرمی که باید هر روز تکمیل شود — سایر گزارش‌ها به‌صورت خودکار محاسبه می‌شوند',
@@ -1350,7 +1365,7 @@ function goTo(tab){
     productOutput:'ثبت ارسال به‌تفکیک هر محصول/کد کالا و پایش تحقق برنامه ماهانه — زیرمجموعه «ارسال به انبار»',
     ship:'گزارش تجمیعی قطعات ارسالی به انبار',
     short:'رویدادنامه کسری قطعات موردی خط تولید',
-    waste:'ثبت و تحلیل پارتو ضایعات به تفکیک ایستگاه',
+    waste:'ثبت ضایعات/دوباره‌کاری و تحلیل پارتو به تفکیک ایستگاه',
     stop:'ثبت و تحلیل پارتو توقفات خط تولید',
     lean:'اثربخشی کلی تجهیزات — برآمده از داده‌های تولید، ضایعات و توقفات همین خط',
     flowmap:'ثبت ظرفیت روزانه هر ایستگاه و شناسایی خودکار گلوگاه(های) خط تولید',
@@ -2591,7 +2606,7 @@ function renderWaste(){
   // «دوباره‌کاری» (Rework) از نظر کیفیتی با «ضایعات» (Scrap) فرق دارد: در دوباره‌کاری قطعه در نهایت سالم و
   // قابل‌مصرف می‌شود (فقط وقت اضافه گرفته)، ولی در ضایعات قطعه کاملاً دورریز می‌شود. برای همین KPIها و
   // پارتوهای اصلی این تب فقط «ضایعات واقعی» را حساب می‌کنند؛ دوباره‌کاری در بخش اختصاصی خودش (پایین‌تر) دیده می‌شود.
-  const scrapOnly = M.waste.filter(x=>x.category!=='دوباره‌کاری');
+  const scrapOnly = M.waste.filter(x=>x.eventType!=='دوباره‌کاری');
   const totalWaste = scrapOnly.reduce((s,x)=>s+(x.wasteCount||0),0);
   const totalProduced = (()=>{
     const seen = new Set(); let s=0;
@@ -2600,7 +2615,7 @@ function renderWaste(){
   })();
   const wasteRate = totalProduced? totalWaste/totalProduced : 0;
   const totalReworkMin = M.waste.reduce((s,x)=>s+(x.reworkMinutes||0),0);
-  const reworkRecords = M.waste.filter(x=>x.reworkMinutes>0 || x.category==='دوباره‌کاری');
+  const reworkRecords = M.waste.filter(x=>x.reworkMinutes>0 || x.eventType==='دوباره‌کاری');
   const totalReworkQty = reworkRecords.reduce((s,x)=>s+(x.wasteCount||0),0);
   const reworkLostQtyEst = M.waste.reduce((s,x)=> s + (x.reworkMinutes? (x.reworkMinutes/60)*resolveStationRate(x.station) : 0), 0);
   const stationPareto = paretoFrom(scrapOnly, x=>x.station, x=>x.wasteCount).slice(0,10);
@@ -2630,14 +2645,19 @@ function renderWaste(){
   ${totalReworkMin>0? `<div class="hint" style="margin:-8px 0 16px;">این ${fmt(totalReworkMin,0)} دقیقه (دوباره‌کاری + جداسازی ورودی مشروط)، معادل برآوردیِ <b>~${fmt(reworkLostQtyEst,0)} عدد</b> ظرفیت تولید ازدست‌رفته است (بر مبنای نرخ استاندارد ساعتی همان ایستگاه) — این عدد قبلاً هیچ‌جای دیگری از داشبورد دیده نمی‌شد. برای ثبت این زمان، کافی است در هر ردیف ضایعات (چه «ورودی مشروط» چه «دوباره‌کاری») فیلد «زمان دوباره‌کاری/جداسازی» را پر کنید.</div>` : ''}
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>${editing.waste? '✏️ ویرایش ردیف ضایعات':'➕ ثبت ضایعات جدید'}</h3>
+    <h3>${editing.waste? '✏️ ویرایش ردیف ضایعات/دوباره‌کاری':'➕ ثبت ضایعات/دوباره‌کاری جدید'}</h3>
     <div class="form-grid">
       <div class="field"><label>تاریخ</label>${datePickerHtml('w_date', editing.waste?.date)}</div>
       <div class="field"><label>ایستگاه</label>${stationSelectHtml('w_station', editing.waste?.station||'')}</div>
       <div class="field span-2" style="background:rgba(76,141,255,.08); border:1px solid rgba(76,141,255,.3); border-radius:10px; padding:10px 12px;">
-        <label style="font-weight:800;">🔀 نوع رویداد — این مهم است: ضایعات یا دوباره‌کاری؟</label>
-        <select id="w_cat">${wasteCategories.map(c=>`<option ${editing.waste?.category===c?'selected':''}>${c}</option>`).join('')}</select>
+        <label style="font-weight:800;">۱) نوع رویداد — ضایعات یا دوباره‌کاری؟</label>
+        <select id="w_eventType">${WASTE_EVENT_TYPES.map(t=>`<option ${(editing.waste?.eventType||'ضایعات')===t?'selected':''}>${t}</option>`).join('')}</select>
         <div class="hint" style="margin-top:6px;">اگر قطعه در نهایت با کمی وقت اضافه <b>سالم و قابل‌مصرف</b> شد، «دوباره‌کاری» را انتخاب کنید — نه «ضایعات». این انتخاب روی نرخ ضایعات و گزارش‌های مدیریتی اثر مستقیم دارد.</div>
+      </div>
+      <div class="field span-2" style="background:rgba(255,207,92,.08); border:1px solid rgba(255,207,92,.3); border-radius:10px; padding:10px 12px;">
+        <label style="font-weight:800;">۲) این ضایعات/دوباره‌کاری کجا بروز کرد؟</label>
+        <select id="w_cat">${wasteCategories.map(c=>`<option ${editing.waste?.category===c?'selected':''}>${c}</option>`).join('')}</select>
+        <div class="hint" style="margin-top:6px;">ورودی نادرست = قطعه از همان اول معیوب بوده؛ ورودی مشروط = سالم بود ولی نیاز به جداسازی/غربال داشت؛ حین فرآیند = در همین ایستگاه ایجاد شد؛ کنترل نهایی = در بازرسی پایانی کشف شد.</div>
       </div>
       <div class="field"><label>قطعه / محصول</label>${partSelectHtml('w_part', editing.waste?.part||'')}</div>
       <div class="field"><label>محصول نهایی <span class="muted">(مدل خودرو)</span></label><select id="w_finalProduct"><option value="">— انتخاب —</option>${FINAL_PRODUCT_LIST_DEFAULT.map(o=>`<option value="${esc(o)}" ${editing.waste?.finalProduct===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
@@ -2645,7 +2665,7 @@ function renderWaste(){
         ${operatorPickerHtml('w_operatorPicker', (editing.waste?.operator||'').split(/[،,]/).map(s=>s.trim()).filter(Boolean))}
       </div>
       <div class="field"><label>تعداد تولید</label><input id="w_produced" type="text" inputmode="numeric" value="${editing.waste?.produced ?? ''}"></div>
-      <div class="field"><label>علت (نوع ضایعات/دوباره‌کاری)</label><select id="w_type"><option value="">— انتخاب —</option>${wasteTypeOptions.map(o=>`<option value="${esc(o)}" ${editing.waste?.wasteType===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
+      <div class="field"><label>علت دقیق</label><select id="w_type"><option value="">— انتخاب —</option>${wasteTypeOptions.map(o=>`<option value="${esc(o)}" ${editing.waste?.wasteType===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
       <div class="field"><label>تعداد <span class="muted">(ضایعات یا دوباره‌کاری‌شده، بر اساس نوع رویداد بالا)</span></label><input id="w_count" type="text" inputmode="numeric" value="${editing.waste?.wasteCount ?? ''}"></div>
       <div class="field"><label>زمان دوباره‌کاری / جداسازی <span class="muted">(دقیقه — اگر این ردیف نیاز به وقت اضافه اپراتور داشت، چه دوباره‌کاری چه جداسازی ورودی مشروط)</span></label><input id="w_reworkMin" type="text" inputmode="numeric" placeholder="مثلاً 30" value="${editing.waste?.reworkMinutes ?? ''}"></div>
     </div>
@@ -2657,20 +2677,20 @@ function renderWaste(){
   </div>
 
   <details class="card" style="margin-bottom:16px;">
-    <summary style="cursor:pointer; font-weight:800; font-size:14px; list-style:none;">🏷️ مدیریت گزینه‌های ضایعات <span class="hint" style="font-weight:400;">(برای افزودن/حذف گزینه کلیک کنید)</span></summary>
+    <summary style="cursor:pointer; font-weight:800; font-size:14px; list-style:none;">🏷️ مدیریت گزینه‌های ضایعات/دوباره‌کاری <span class="hint" style="font-weight:400;">(برای افزودن/حذف گزینه کلیک کنید)</span></summary>
     <div class="grid grid-2" style="margin-top:10px; gap:16px;">
       <div>
-        <div style="font-size:12px; color:#93a4c3; margin-bottom:6px;">تیپ‌های ضایعات</div>
+        <div style="font-size:12px; color:#93a4c3; margin-bottom:6px;">منشأ بروز (فیلد ۲ در فرم بالا)</div>
         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
           ${wasteCategories.map(c=>`<span style="background:#1c2a44;color:#8fb2ff;padding:4px 6px 4px 10px;border-radius:10px;font-size:11px; display:inline-flex; align-items:center; gap:6px;">${esc(c)}${wasteCategories.length>1?`<button data-delcat="${esc(c)}" style="background:none;border:none;color:#ff5d6c;cursor:pointer;font-size:13px;padding:0 2px;" title="حذف">✕</button>`:''}</span>`).join('')}
         </div>
         <div style="display:flex; gap:6px;">
-          <input id="newCatInput" placeholder="تیپ جدید… مثلاً «ورودی مشروط»" style="flex:1;">
+          <input id="newCatInput" placeholder="منشأ جدید… مثلاً «ورودی مشروط»" style="flex:1;">
           <button class="btn btn-teal btn-sm" id="addCatBtn">افزودن</button>
         </div>
       </div>
       <div>
-        <div style="font-size:12px; color:#93a4c3; margin-bottom:6px;">انواع ضایعات (پیشنهادها)</div>
+        <div style="font-size:12px; color:#93a4c3; margin-bottom:6px;">علت دقیق (پیشنهادها — فیلد «علت دقیق» در فرم بالا)</div>
         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; max-height:130px; overflow:auto;">
           ${wasteTypeOptions.map(t=>`<span style="background:#3a3220;color:#ffcf5c;padding:4px 6px 4px 10px;border-radius:10px;font-size:11px; display:inline-flex; align-items:center; gap:6px;">${esc(t)}<button data-deltype="${esc(t)}" style="background:none;border:none;color:#ff5d6c;cursor:pointer;font-size:13px;padding:0 2px;" title="حذف">✕</button></span>`).join('')}
         </div>
@@ -2744,10 +2764,10 @@ function renderWaste(){
     const rec = { id: editing.waste?.id || uid(), date, station, part: document.getElementById('w_part').value,
       finalProduct: document.getElementById('w_finalProduct').value,
       operator: readOperatorPicker('w_operatorPicker'), produced: num(document.getElementById('w_produced').value),
-      wasteType: wtype, wasteCount: count, category: document.getElementById('w_cat').value,
+      wasteType: wtype, wasteCount: count, eventType: document.getElementById('w_eventType').value, category: document.getElementById('w_cat').value,
       reworkMinutes: num(document.getElementById('w_reworkMin').value) };
     if(editing.waste){ DB.waste = DB.waste.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
-    else{ DB.waste.push(rec); toast('ضایعات ثبت شد.','ok'); }
+    else{ DB.waste.push(rec); toast(rec.eventType==='دوباره‌کاری'?'دوباره‌کاری ثبت شد.':'ضایعات ثبت شد.','ok'); }
     editing.waste = null; scheduleSave(); renderWaste();
   });
   const cw = document.getElementById('cancelWasteBtn'); if(cw) cw.addEventListener('click', ()=>{ editing.waste=null; renderWaste(); });
@@ -2981,7 +3001,7 @@ function computeOEE(rows, M){
   const mtbf = stopEvents? uptimeHours/stopEvents : null;
   // «دوباره‌کاری» با «ضایعات واقعی» فرق دارد (قطعه دوباره‌کاری‌شده در نهایت سالم و قابل‌مصرف است)،
   // پس در محاسبهٔ نرخ کیفیت/OEE فقط ضایعات واقعی حساب می‌شود، نه دوباره‌کاری‌ها.
-  const scrapOnlyM = M.waste.filter(x=>x.category!=='دوباره‌کاری');
+  const scrapOnlyM = M.waste.filter(x=>x.eventType!=='دوباره‌کاری');
   const totalWaste = scrapOnlyM.reduce((s,x)=>s+(x.wasteCount||0),0);
   const totalProduced = (()=>{ const seen=new Set(); let s=0; scrapOnlyM.forEach(x=>{ const key=x.date+'|'+x.station+'|'+x.part; if(x.produced&&!seen.has(key)){s+=x.produced; seen.add(key);} }); return s; })();
   const quality = totalProduced? (totalProduced-totalWaste)/totalProduced : null;
@@ -3238,7 +3258,7 @@ function renderCover(){
   const totalShipped = rows.reduce((s,e)=> s + shipTotal(e), 0);
 
   const stopReasons = paretoFrom(M.stop, x=>x.reason, x=>x.hours);
-  const wasteReasons = paretoFrom(M.waste.filter(x=>x.category!=='دوباره‌کاری'), x=>x.wasteType, x=>x.wasteCount);
+  const wasteReasons = paretoFrom(M.waste.filter(x=>x.eventType!=='دوباره‌کاری'), x=>x.wasteType, x=>x.wasteCount);
 
   document.getElementById('view').innerHTML = `
   <div style="margin:-4px -4px 0; padding:28px 26px 34px; border-radius:22px;
@@ -3349,7 +3369,7 @@ function renderLean(){
 
   const stationParetoS = paretoFrom(M.stop, x=>x.station, x=>x.hours).slice(0,6);
   const reasonParetoS = paretoFrom(M.stop, x=>x.reason, x=>x.hours).slice(0,6);
-  const stationParetoW = paretoFrom(M.waste.filter(x=>x.category!=='دوباره‌کاری'), x=>x.station, x=>x.wasteCount).slice(0,6);
+  const stationParetoW = paretoFrom(M.waste.filter(x=>x.eventType!=='دوباره‌کاری'), x=>x.station, x=>x.wasteCount).slice(0,6);
 
   // ---- شاخص‌های تولید و بهره‌وری: تفکیک هر خط + نرخ استفاده از ظرفیت + بهره‌وری نیروی انسانی ----
   const lineLabels = {line1:'خط ۱', line2:'خط ۲', line3:'خط ۳', line4:'خط ۴'};
@@ -3788,7 +3808,7 @@ function renderDash(){
   const negDays = rows.filter(e=>mainFourTotal(e)>0 && mainFourTotal(e)-dayTarget4Lines(e)<0).length;
   const shortDays = new Set(M.short.map(x=>x.date)).size;
 
-  const stationParetoW = paretoFrom(M.waste.filter(x=>x.category!=='دوباره‌کاری'), x=>x.station, x=>x.wasteCount).slice(0,6);
+  const stationParetoW = paretoFrom(M.waste.filter(x=>x.eventType!=='دوباره‌کاری'), x=>x.station, x=>x.wasteCount).slice(0,6);
   const stationParetoS = paretoFrom(M.stop, x=>x.station, x=>x.hours).slice(0,6);
   const problemPareto = (()=>{
     // مشکلات ثبت‌شده متن آزادند؛ تفاوت‌های جزئی نوشتاری (فاصله «درپوش» در برابر «در پوش»، نیم‌فاصله،
@@ -3843,7 +3863,7 @@ function renderDash(){
       action: suggestedAction(x.reason) });
   });
   todayWasteArr.forEach(x=>{
-    const isRework = x.category==='دوباره‌کاری';
+    const isRework = x.eventType==='دوباره‌کاری';
     todayEvents.push({ icon: isRework?'🔧':'🗑', color: isRework?'#4c8dff':'#ffcf5c', title: (isRework?'دوباره‌کاری ':'ضایعات ')+x.station,
       detail: fmt(x.wasteCount||0,0)+(isRework?' عدد دوباره‌کاری':' عدد ضایعات'), reason:x.wasteType,
       impact: unitCost? (x.wasteCount||0)*unitCost : (x.wasteCount||0), impactLabel: unitCost? fmt((x.wasteCount||0)*unitCost,0)+' ریال' : fmt(x.wasteCount||0,0)+' عدد',
@@ -4543,50 +4563,40 @@ function shiftJalaliMonth_(y, m, delta){
   while(mm > 12){ mm -= 12; yy++; }
   return [yy, mm];
 }
-// تاریخ کشویی یک‌فیلدی — یک select با مقدار کامل «۱۴۰۵/۰۵/۲۰».
-// نکته مهم (رفع محدودیت قبلی): بازهٔ نمایش‌داده‌شده فقط به «ماه فعال» گره نمی‌خورد (چون اگر ماه فعال قدیمی
-// می‌ماند، کشویی هم عملاً قفل می‌شد و نمی‌شد تاریخ آینده انتخاب کرد). به‌جایش دو بازه با هم ترکیب می‌شوند:
-// ۱) یک ماه قبل تا یک ماه بعد از «ماه فعال» (برای هماهنگی با جایی که کاربر الان در حال کار روی آن است)
-// ۲) دو ماه قبل تا چهار ماه بعد از «تاریخ واقعی امروز» (تا کشویی همیشه خودش را با گذر زمان جلو می‌کشد
-//    و هیچ‌وقت متوقف نمی‌ماند، چه کسی ماه فعال را عوض کند چه نکند)
-// اگر مقدار فعلی رکورد بازهم بیرون این بازه بود (مثلاً ویرایش یک رکورد خیلی قدیمی)، همان مقدار به‌عنوان
-// یک گزینهٔ اضافه نگه داشته می‌شود تا چیزی گم نشود.
+// تاریخ کشویی — سه فیلد جدا (روز / ماه / سال)، به‌جای یک کشویی ترکیبی. سال‌ها حول سال واقعی امروز
+// ساخته می‌شوند (یک سال قبل تا یک سال بعد) تا همیشه به‌روز بماند؛ اگر مقدار فعلی رکورد (هنگام ویرایش
+// یک رکورد قدیمی‌تر) در این بازه نبود، همان سال هم به‌عنوان گزینه اضافه نگه داشته می‌شود.
 function datePickerHtml(idPrefix, currentDateStr){
   const cur = normDate(currentDateStr||'');
-  const activeParts = (DB.meta.activeMonth||'').split('/');
-  const curParts = cur.split('/');
-  const y = parseInt(curParts[0] || activeParts[0] || '1405', 10);
-  const m = curParts[1] ? parseInt(curParts[1],10) : (parseInt(activeParts[1],10) || 1);
+  const parts = cur.split('/');
   const todayParts = todayJalaliStr().split('/').map(x=>parseInt(x,10));
+  const curD = parts[2] ? parseInt(parts[2],10) : '';
+  const curM = parts[1] ? parseInt(parts[1],10) : '';
+  const curY = parts[0] ? parseInt(parts[0],10) : '';
 
-  const monthKeySet = new Map(); // "yyyy/mm" -> [yy,mm]  — برای حذف تکراری‌ها با حفظ ترتیب
-  const addRange = (baseY, baseM, fromOffset, toOffset)=>{
-    for(let off=fromOffset; off<=toOffset; off++){
-      const [yy,mm] = shiftJalaliMonth_(baseY, baseM, off);
-      monthKeySet.set(yy+'/'+String(mm).padStart(2,'0'), [yy,mm]);
-    }
-  };
-  addRange(y, m, -1, 1);                          // اطراف ماه فعال/مقدار فعلی
-  addRange(todayParts[0], todayParts[1], -2, 4);   // اطراف تاریخ واقعی امروز (همیشه به‌روز می‌ماند)
-
-  const months = [...monthKeySet.values()].sort((a,b)=> (a[0]*100+a[1]) - (b[0]*100+b[1]));
   const days = Array.from({length:31}, (_,i)=>i+1);
-  let optHtml = '<option value="">— انتخاب —</option>';
-  months.forEach(([yy,mm])=>{
-    optHtml += `<optgroup label="${FA_MONTH_NAMES[mm]} ${yy}">`;
-    days.forEach(d=>{
-      const val = yy + '/' + String(mm).padStart(2,'0') + '/' + String(d).padStart(2,'0');
-      optHtml += `<option value="${val}" ${cur===val?'selected':''}>${val}</option>`;
-    });
-    optHtml += '</optgroup>';
-  });
-  const inWindow = months.some(([yy,mm]) => cur.startsWith(yy+'/'+String(mm).padStart(2,'0')+'/'));
-  if(cur && !inWindow) optHtml += `<option value="${cur}" selected>${cur}</option>`;
-  return `<select id="${idPrefix}">${optHtml}</select>`;
+  const dayOpts = '<option value="">روز</option>' + days.map(d=>`<option value="${d}" ${curD===d?'selected':''}>${d}</option>`).join('');
+
+  const monthOpts = '<option value="">ماه</option>' + FA_MONTH_NAMES.slice(1).map((name,i)=>{
+    const mm = i+1;
+    return `<option value="${mm}" ${curM===mm?'selected':''}>${name}</option>`;
+  }).join('');
+
+  const yearsSet = new Set([todayParts[0]-1, todayParts[0], todayParts[0]+1]);
+  if(curY) yearsSet.add(curY);
+  const years = [...yearsSet].sort((a,b)=>a-b);
+  const yearOpts = '<option value="">سال</option>' + years.map(y=>`<option value="${y}" ${curY===y?'selected':''}>${y}</option>`).join('');
+
+  return `<div id="${idPrefix}" class="date-picker-3col" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;">
+    <select id="${idPrefix}_d">${dayOpts}</select>
+    <select id="${idPrefix}_m">${monthOpts}</select>
+    <select id="${idPrefix}_y">${yearOpts}</select>
+  </div>`;
 }
 function readDatePicker(idPrefix){
-  const el = document.getElementById(idPrefix);
-  return el ? normDate(el.value) : '';
+  const d = document.getElementById(idPrefix+'_d'), m = document.getElementById(idPrefix+'_m'), y = document.getElementById(idPrefix+'_y');
+  if(!d || !m || !y || !d.value || !m.value || !y.value) return '';
+  return y.value + '/' + String(m.value).padStart(2,'0') + '/' + String(d.value).padStart(2,'0');
 }
 // ساعت کشویی (ساعت/دقیقه، گام ۱۵ دقیقه‌ای) — به‌جای تایپ دستی؛ اختیاری (می‌تواند خالی بماند)
 // اختلاف زمانی بین دو ساعت «HH:MM» به ساعت اعشاری (اگر پایان از شروع کوچک‌تر بود یعنی از نیمه‌شب رد شده)
