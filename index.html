@@ -3873,7 +3873,9 @@ function renderDash(){
   });
   todayWasteArr.forEach(x=>{
     const isRework = x.eventType==='دوباره‌کاری';
-    todayEvents.push({ icon: isRework?'🔧':'🗑', color: isRework?'#4c8dff':'#ffcf5c', title: (isRework?'دوباره‌کاری ':'ضایعات ')+x.station,
+    const stationAlreadySaysRework = normalizeForGrouping(x.station||'').indexOf('دوبارهکاری') !== -1;
+    const titlePrefix = isRework ? (stationAlreadySaysRework ? '' : 'دوباره‌کاری ') : 'ضایعات ';
+    todayEvents.push({ icon: isRework?'🔧':'🗑', color: isRework?'#4c8dff':'#ffcf5c', title: titlePrefix+x.station,
       detail: fmt(x.wasteCount||0,0)+(isRework?' عدد دوباره‌کاری':' عدد ضایعات'), reason:x.wasteType,
       impact: unitCost? (x.wasteCount||0)*unitCost : (x.wasteCount||0), impactLabel: unitCost? fmt((x.wasteCount||0)*unitCost,0)+' ریال' : fmt(x.wasteCount||0,0)+' عدد',
       action: isRework? 'بررسی ریشه‌ای علت دوباره‌کاری و آموزش/تنظیم ایستگاه مربوطه' : 'بررسی ریشه‌ای با کنترل کیفیت و ایستگاه مربوطه' });
