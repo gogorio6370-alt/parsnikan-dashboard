@@ -274,6 +274,10 @@ td.num, th.num{ text-align:left; font-variant-numeric:tabular-nums; direction:lt
   .sidebar, .topbar-actions, .hamburger{ display:none !important; }
   body{ background:#fff; color:#000; }
   .card{ break-inside:avoid; border-color:#ccc; background:#fff; box-shadow:none;}
+  .no-print{ display:none !important; }
+  .print-only{ display:block !important; }
+  table, th, td{ color:#000 !important; border-color:#999 !important; }
+  select, input{ border:none !important; background:none !important; color:#000 !important; -webkit-appearance:none; appearance:none; }
 }
 </style>
 </head>
@@ -405,6 +409,7 @@ const NAV = [
   {id:'entry',   label:'ورود داده',        group:'ثبت اطلاعات', icon:'edit'},
   {id:'stations',label:'آمار روزانه ایستگاه‌ها', group:'ثبت اطلاعات', icon:'clock'},
   {id:'personnel', label:'👥 پرسنل',        group:'ثبت اطلاعات', icon:'users'},
+  {id:'dailyProgram', label:'📋 برنامه تولید روزانه', group:'ثبت اطلاعات', icon:'clipboard'},
   {id:'prod',    label:'تولید خط تولید',    group:'گزارش‌ها',    icon:'factory'},
   {id:'ship',    label:'ارسال به انبار',    group:'گزارش‌ها',    icon:'truck'},
   {id:'productOutput', label:'ارسال به‌تفکیک محصول', group:'گزارش‌ها', icon:'box'},
@@ -423,6 +428,7 @@ const ICONS = {
   truck:'<path d="M1 3h13v13H1z"/><path d="M14 8h4l4 4v4h-8V8z"/><circle cx="5.5" cy="18.5" r="1.7"/><circle cx="17.5" cy="18.5" r="1.7"/>',
   alert:'<path d="M12 2L1 21h22L12 2z"/><path d="M12 9v5"/><path d="M12 17h.01"/>',
   box:'<path d="M21 8L12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
+  clipboard:'<path d="M9 2h6a1 1 0 011 1v1H8V3a1 1 0 011-1z"/><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 11h6M9 15h6"/>',
   trash:'<path d="M3 6h18"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>',
   pause:'<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
   chart:'<path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/>',
@@ -435,7 +441,7 @@ const ICONS = {
 };
 
 /* ---------------------------- persistent state ---------------------------- */
-let DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], meta: {} };
+let DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], dailyProgram: [], meta: {} };
 let LINES = []; // [{id, name}] — registry of all production lines/units sharing this tool
 let currentLineId = null;
 let ORG = { managerPhone: '' }; // organization-wide settings (shared across all lines)
@@ -444,7 +450,7 @@ let dirty = { daily:false, waste:false, stop:false, short:false, meta:false };
 let currentTab = 'dash';
 let charts = {};
 let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null };
-let filters = { waste:'', stop:'', short:'', wasteCat:'all', wasteEventType:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'' };
+let filters = { waste:'', stop:'', short:'', wasteCat:'all', wasteEventType:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'', dpDate:'' };
 let personnelUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
 
 /* ---------------------------- utils ---------------------------- */
@@ -568,6 +574,7 @@ function monthData(){
     short: DB.short.filter(e=>monthKeyOf(e.date)===mk),
     stationHourly: (DB.stationHourly||[]).filter(e=>monthKeyOf(e.date)===mk),
     productOutput: (DB.productOutput||[]).filter(e=>monthKeyOf(e.date)===mk),
+    dailyProgram: (DB.dailyProgram||[]).filter(e=>monthKeyOf(e.date)===mk),
   };
 }
 
@@ -1089,12 +1096,13 @@ async function loadAll(){
     await loadLinesRegistry();
     // ONE batched round-trip for all 7 collections instead of 7 separate requests
     // (this is what was making Google Sheets sync feel slow/stuck)
-    const keys = ['daily','waste','stop','short','meta','trash','stationHourly','productOutput'].map(p=>lineKey(currentLineId,p));
+    const keys = ['daily','waste','stop','short','meta','trash','stationHourly','productOutput','dailyProgram'].map(p=>lineKey(currentLineId,p));
     const got = await cloudBatchGet(keys);
     const d = got[lineKey(currentLineId,'daily')], w = got[lineKey(currentLineId,'waste')],
           s = got[lineKey(currentLineId,'stop')], sh = got[lineKey(currentLineId,'short')],
           m = got[lineKey(currentLineId,'meta')], tr = got[lineKey(currentLineId,'trash')],
-          sd = got[lineKey(currentLineId,'stationHourly')], po = got[lineKey(currentLineId,'productOutput')];
+          sd = got[lineKey(currentLineId,'stationHourly')], po = got[lineKey(currentLineId,'productOutput')],
+          dp = got[lineKey(currentLineId,'dailyProgram')];
     const isNewLineFirstLoad = !m && !d;
     const lineName = (LINES.find(l=>l.id===currentLineId)||{}).name || 'خط تولید';
     if(currentLineId==='thermostat' && isNewLineFirstLoad){
@@ -1107,6 +1115,7 @@ async function loadAll(){
       DB.trash = tr || cloneEmbedded('trash');
       DB.stationHourly = sd || cloneEmbedded('stationHourly');
       DB.productOutput = po || [];
+      DB.dailyProgram = dp || [];
       if(!d && !w && !s && !sh && !m) await saveAll(true);
     } else {
       DB.daily = normalizeDailyArray(d || []);
@@ -1117,6 +1126,7 @@ async function loadAll(){
       DB.trash = tr || [];
       DB.stationHourly = sd || [];
       DB.productOutput = po || [];
+      DB.dailyProgram = dp || [];
     }
     if(!DB.meta.stations || !DB.meta.stations.length){ DB.meta.stations = currentLineId==='thermostat' ? seedStations() : []; }
     setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت شما — به‌روز' : 'متصل به فضای ابری Claude — به‌روز'));
@@ -1127,6 +1137,7 @@ async function loadAll(){
     // بدون اتصال ابری — همان پشتیبان ادغام‌شده شما (تیر تا مرداد ۱۴۰۵) به‌صورت پیش‌فرض باز می‌شود
     DB.daily = normalizeDailyArray(cloneEmbedded('daily')); DB.waste = cloneEmbedded('waste'); DB.stop = cloneEmbedded('stop'); DB.short = cloneEmbedded('short'); DB.trash = cloneEmbedded('trash'); DB.stationHourly = cloneEmbedded('stationHourly');
     DB.productOutput = [];
+    DB.dailyProgram = [];
     DB.meta = cloneEmbedded('meta');
     setSync('off', 'حالت آفلاین — تغییرات فقط در همین نشست ذخیره می‌شود');
   }
@@ -1249,6 +1260,7 @@ async function saveAll(silent){
   pairs[lineKey(currentLineId,'trash')] = DB.trash;
   pairs[lineKey(currentLineId,'stationHourly')] = DB.stationHourly;
   pairs[lineKey(currentLineId,'productOutput')] = DB.productOutput;
+  pairs[lineKey(currentLineId,'dailyProgram')] = DB.dailyProgram;
   const allOk = await cloudBatchSet(pairs);
   if(allOk){ lastSavedAt = new Date(); setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت — ذخیره شد' : 'متصل به فضای ابری — ذخیره شد')); if(!silent) toast('اطلاعات با موفقیت ذخیره شد.','ok'); }
   else{
@@ -1270,7 +1282,7 @@ async function switchToLine(lineId){
   await saveAll(true);
   currentLineId = lineId;
   await saveCurrentLinePointer();
-  DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], meta: {} };
+  DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], dailyProgram: [], meta: {} };
   await loadAll();
   renderLineSwitcher();
   goTo('dash');
@@ -1331,7 +1343,7 @@ window.addEventListener('pagehide', function(){ flushPendingSave(); });
 
 /* ---------------------------- nav / routing ---------------------------- */
 // تب‌هایی که اپراتور (نیروی تولیدی) اجازه دارد ببیند — بقیه فقط برای مدیر (admin) نمایش داده می‌شود
-const STAFF_ALLOWED_TABS = ['entry','stations'];
+const STAFF_ALLOWED_TABS = ['entry','stations','dailyProgram'];
 function visibleNavForRole(){
   if(currentSessionRole()==='admin') return NAV;
   return NAV.filter(item=> STAFF_ALLOWED_TABS.includes(item.id));
@@ -1354,13 +1366,14 @@ function goTo(tab){
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
-  const titles = {cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
+  const titles = {cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
     waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', dash:'داشبورد مدیریتی'};
   const subs = {
     cover:'نمای کلی زنده برای مدیریت ارشد و مشتری — تاریخ، ساعت و شاخص‌های کلیدی',
     entry:'تنها فرمی که باید هر روز تکمیل شود — سایر گزارش‌ها به‌صورت خودکار محاسبه می‌شوند',
     stations:'ثبت تولید روزانه هر ایستگاه و مقایسه با استاندارد',
     personnel:'فهرست پرسنل، سابقه و مهارت‌ها — شماره تماس محرمانه و رمزدار',
+    dailyProgram:'تخصیص روزانه پرسنل به ایستگاه‌ها — قابل چاپ، مطابق فرم رسمی برنامه تولید روزانه',
     prod:'عملکرد روزانه خطوط اصلی در مقابل هدف تولید',
     productOutput:'ثبت ارسال به‌تفکیک هر محصول/کد کالا و پایش تحقق برنامه ماهانه — زیرمجموعه «ارسال به انبار»',
     ship:'گزارش تجمیعی قطعات ارسالی به انبار',
@@ -1375,7 +1388,7 @@ function goTo(tab){
   document.getElementById('pageTitle').textContent = titles[tab];
   document.getElementById('pageSub').textContent = subs[tab] + ' — ماه فعال: ' + monthLabel(DB.meta.activeMonth);
   destroyCharts();
-  const renderers = {cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, dash:renderDash};
+  const renderers = {cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, dash:renderDash};
   renderers[tab]();
   document.getElementById('view').dataset.hadContent = '1';
   document.getElementById('view').scrollTop = 0;
@@ -3035,8 +3048,15 @@ function renderPersonnel(){
   const filtered = list.filter(p=> (!q || (p.name+(p.skills||'')+(p.mainStation||'')).toLowerCase().includes(q))
     && (wtFilter==='all' || (p.workType||'production')===wtFilter));
   const avgExp = list.length? list.reduce((s,p)=>s+(p.experienceYears||0),0)/list.length : null;
+  const agesKnown = list.filter(p=>p.age);
+  const avgAge = agesKnown.length? agesKnown.reduce((s,p)=>s+(p.age||0),0)/agesKnown.length : null;
   const productionCount = list.filter(p=>(p.workType||'production')==='production').length;
   const adminCount = list.filter(p=>p.workType==='admin').length;
+  // کسری نفرات، مطابق «نقشه نیروی استاندارد» که در تب «برنامه تولید روزانه» طبق آمار واقعی خط تعریف شده
+  // (نه حدس از روی هدف تولید) — همان نیازی که برنامه‌ریزی تولید اعلام کرده، با نیروی صف فعلی مقایسه می‌شود.
+  const manningPlan = getManningPlan_();
+  const totalRequiredHC = manningPlan.reduce((s,r)=>s+r.required,0);
+  const headcountGap = totalRequiredHC - productionCount;
 
   document.getElementById('view').innerHTML = `
   <div class="grid grid-4" style="margin-bottom:16px;">
@@ -3045,6 +3065,13 @@ function renderPersonnel(){
     ${kpiCard('نیروی ستادی (اداری)','نفر', fmt(adminCount,0), null, '#a78bfa')}
     ${kpiCard('میانگین سابقه فعالیت','سال', avgExp===null?'—':fmt(avgExp,1), null, '#ff9d42')}
   </div>
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${kpiCard('میانگین سن پرسنل','سال', avgAge===null?'—':fmt(avgAge,1), null, '#93a4c3')}
+    ${kpiCard('نیاز نیروی صف طبق برنامه‌ریزی','نفر', fmt(totalRequiredHC,1)+(isDarpooshActiveThisMonth_()?'':' (بدون درپوش)'), null, '#93a4c3')}
+    ${kpiCard('کسری نفرات صف', 'نفر', headcountGap>0? '−'+fmt(headcountGap,1) : 'بدون کسری', null, headcountGap>0?'#ff5d6c':'#2fd9c4')}
+    ${kpiCard('پرسنل بدون سن ثبت‌شده','نفر', fmt(list.length-agesKnown.length,0), null, '#ffcf5c')}
+  </div>
+  <div class="hint" style="margin:-8px 0 16px;">جزئیات نقش‌به‌نقش این کسری (کدام فرآیند دقیقاً کم‌نیرو است) را در تب «برنامه تولید روزانه» → جدول «نقشه نیروی استاندارد» ببینید.</div>
 
   <div class="card">
     <div class="flexbar">
@@ -3156,6 +3183,353 @@ function openPersonnelEditModal(person){
     scheduleSave(); toast(isEdit?'ویرایش شد.':'اضافه شد.','ok'); close(); renderPersonnel();
   });
 }
+
+/* =========================================================================
+   TAB: برنامه تولید روزانه (dailyProgram) — نسخهٔ آزمایشی
+   ----------------------------------------------------------------------
+   الگوریتم چینش:
+   ۱) ایستگاه‌ها بر اساس «فاصلهٔ بحرانی تا هدف موردنیاز» مرتب می‌شوند (دقیقاً همان محاسبهٔ
+      گلوگاه در تب «نقشه خط و گلوگاه‌ها») — گلوگاه‌ترین ایستگاه بالای فرم می‌افتد تا سرپرست
+      اول به آن توجه کند. ایستگاه‌های بدون هدف مشخص (تست/متفرقه) پایین فرم می‌آیند.
+   ۲) هر پرسنل تولیدی (غیر ستادی) که «ایستگاه اصلی»‌اش با یکی از ایستگاه‌ها یکی باشد
+      (با چشم‌پوشی از فاصله/نیم‌فاصله)، خودکار سر همان ردیف می‌نشیند.
+   ۳) ایستگاه‌های بدون نیروی منطبق، با نام خالی نگه داشته می‌شوند (نیاز به تخصیص دستی).
+   ۴) پرسنلی که ایستگاه اصلی‌شان با هیچ ایستگاهی جور درنیامد، ته فهرست با ستون خالی می‌آیند.
+   ۵) ظرفیت هر ردیف = استاندارد ساعتی همان ایستگاه (از «ستاپ ایستگاه‌ها»).
+   ۶) پایین فرم، ظرفیت مجموع ایستگاه‌های «دارای حداقل یک نفر» با هدف روزانهٔ هرکدام از
+      ۴خط اصلی/CKD/سه‌راهی۲۰۶/درپوش/دیزل مقایسه می‌شود — همان اهدافی که در «تولید خط تولید»
+      → «ستاپ اهداف» تعریف کرده‌اید — تا معلوم شود آرایش امروز اصلاً می‌تواند هدف را پاس کند یا نه.
+   این تب برای پرسنل (غیر مدیر) هم قابل‌مشاهده است، ولی فقط در حالت خواندنی (چاپ‌پذیر)،
+   چون این برگه معمولاً روی تابلوی خط نصب می‌شود و باید همه بتوانند برنامهٔ خودشان را ببینند.
+   ========================================================================= */
+// نقشهٔ نیروی استاندارد — دقیقاً طبق الزامات واقعی خط که مدیر تولید اعلام کرده (نه حدس بر مبنای هدف تولید).
+// ترتیب این آرایه، ترتیب اولویت پرکردن نیرو هم هست: ابتدا فرآیندهای پشتیبان که چهار خط اصلی + CKD به آن‌ها
+// وابسته‌اند (سیلندر پرچ‌خورده/دریچه‌خورده/تنظیم‌شده)، سپس مونتاژ نهایی، سپس CKD، سپس کوره، سپس کنترل نهایی.
+const STANDARD_MANNING_PLAN = [
+  { role:'تولید قرص', required:1, stations:['تولید قرص'] },
+  { role:'توزین قرص', required:1, stations:['توزین قرص'] },
+  { role:'مونتاژ دیافراگم', required:3.5, stations:['مونتاژ برنجی و دیافراگم'] },
+  { role:'چیدمان سیلندر', required:1.5, stations:['چیدمان سیلندر','کمک چیدمان سیلندر'] },
+  { role:'پرچ سیلندر', required:2, stations:['پرچ سیلندر'] },
+  { role:'مونتاژ دریچه', required:1.5, stations:['دریچه','دریچه 2'] },
+  { role:'تنظیم سیلندر — خط ۱', required:1, stations:['تنظیم 1'], lineNo:1 },
+  { role:'تنظیم سیلندر — خط ۲', required:1, stations:['تنظیم 2'], lineNo:2 },
+  { role:'تنظیم سیلندر — خط ۳', required:1, stations:['تنظیم 3'], lineNo:3 },
+  { role:'مونتاژ نهایی خط ۱', required:2, stations:['مونتاژ نهایی 1'], lineNo:1 },
+  { role:'مونتاژ نهایی خط ۲', required:2, stations:['مونتاژ نهایی 2'], lineNo:2 },
+  { role:'مونتاژ نهایی خط ۳', required:2, stations:['مونتاژ نهایی 3'], lineNo:3 },
+  { role:'مونتاژ نهایی خط ۴', required:2, stations:['مونتاژ نهایی 4'], lineNo:4 },
+  { role:'مونتاژ CKD', required:2, stations:['مونتاژ CKD'] },
+  { role:'پلیسه‌گیری CKD (پشتیبانی)', required:3, stations:['پلیسه‌گیری CKD'] },
+  { role:'باد و واشر CKD (پشتیبانی)', required:1, stations:['بادوواشر CKD'] },
+  { role:'خم پایه CKD و چرخاندن', required:1.5, stations:['خم پایه CKD'], note:'یک نفر از این گروه فقط نیم‌روز و به‌عنوان میان‌کار کار می‌کند.' },
+  { role:'کوره', required:2, stations:['کوره دستی','کوره ثابت'], note:'قبل از کوره: پراید ۸۲ درجه، نیسان ۷۶.۵ و پژو سوپاپ‌دار باید مونتاژ منگوله شوند. بعد از کوره: قطعات کلاهی مشهد باید خم کله شوند (قبل از کنترل نهایی).' },
+  { role:'کنترل نهایی — خط ۱', required:2, stations:['کنترل نهایی 1'] },
+  { role:'کنترل نهایی — خط ۲', required:2, stations:['کنترل نهایی 2'] },
+];
+// این دو ردیف فقط وقتی به آرایش روز اضافه می‌شوند که در برنامهٔ ماهانهٔ محصول (تب «ارسال به‌تفکیک محصول»)
+// محصولی از خانوادهٔ سه‌راهی/درپوش تعریف شده باشد — طبق تأکید شما که این کار «شرطی» است.
+const CONDITIONAL_MANNING_PLAN = [
+  { role:'پلیسه‌گیری سه‌راهی آب‌بغل ۲۰۶', required:1, stations:['پلیسه‌گیری سه‌راهی ۲۰۶'] },
+  { role:'پلیسه‌گیری درپوش‌ها', required:1, stations:['پلیسه‌گیری ساینا','پلیسه‌گیری L90','پلیسه‌گیری شاهین'], note:'بعد از پلیسه‌گیری باید مونتاژ پین شوند و پیش از ارسال، ۱۰۰٪ کنترل شوند.' },
+];
+function isDarpooshActiveThisMonth_(){
+  const targets = DB.meta.productMonthlyTargets || {};
+  return Object.keys(targets).some(name => /سه.?راهی|درپوش/.test(name));
+}
+function getManningPlan_(){
+  return isDarpooshActiveThisMonth_() ? [...STANDARD_MANNING_PLAN, ...CONDITIONAL_MANNING_PLAN] : STANDARD_MANNING_PLAN;
+}
+// سابقهٔ چالش «ورودی مشروط» در همین ماه — طبق تأکید شما که این منشأ باعث شوک خط/دوباره‌کاری/ضایعات می‌شود
+function conditionalInputRiskThisMonth_(){
+  const M = monthData();
+  const recs = (M.waste||[]).filter(x=>x.category==='ورودی مشروط');
+  const scrapCount = recs.filter(x=>x.eventType!=='دوباره‌کاری').reduce((s,x)=>s+(x.wasteCount||0),0);
+  const reworkCount = recs.filter(x=>x.eventType==='دوباره‌کاری').reduce((s,x)=>s+(x.wasteCount||0),0);
+  return { records: recs.length, scrapCount, reworkCount };
+}
+
+// اولویت خط بر اساس برنامهٔ ماهانهٔ محصول (تب «ارسال به‌تفکیک محصول») — طبق گفتهٔ شما:
+// خط ۱/۲ فقط خانوادهٔ پراید می‌سازند، خط ۳/۴ بقیهٔ ترموستات‌ها (به‌جز بنز و CKD که خط جدای خودشان را دارند).
+// این تابع می‌بیند کدام خانواده بیشتر از برنامهٔ ماه عقب است، تا هنگام چیدن نیرو آن دو خط را در اولویت بگذاریم.
+function computeProductFamilyPriority_(){
+  const targets = DB.meta.productMonthlyTargets || {};
+  const entries = (DB.productOutput||[]).filter(e=>monthKeyOf(e.date)===DB.meta.activeMonth);
+  let prideRemaining = 0, otherRemaining = 0;
+  Object.entries(targets).forEach(([name, target])=>{
+    if(/بنز|CKD/i.test(name)) return; // این دو خانواده به خط‌های ۱ تا ۴ مربوط نیستند
+    const produced = entries.filter(x=>x.product===name).reduce((s,x)=>s+(x.qty||0),0);
+    const remaining = Math.max(0, (target||0) - produced);
+    if(/پراید/.test(name)) prideRemaining += remaining; else otherRemaining += remaining;
+  });
+  const priorityLines = prideRemaining >= otherRemaining ? [1,2] : [3,4];
+  return { prideRemaining, otherRemaining, priorityLines };
+}
+// اگر نام ایستگاه صراحتاً به یکی از ۴ خط اشاره کند (مثل «مونتاژ نهایی 2» یا «تنظیم 3»)، شمارهٔ خط را برمی‌گرداند؛
+// برای ایستگاه‌های بالادستی/مشترک (مثل پرچ سیلندر) که مخصوص یک خط نیستند، null برمی‌گرداند — عمداً حدس زده نمی‌شود.
+function dpRequiredForStation_(st){
+  const n = st.name||'';
+  if(/CKD/i.test(n)) return DB.meta.ckdTarget||0;
+  if(/سه.?راهی.?۲۰۶|سه.?راهی.?206|206/.test(n)) return DB.meta.se206Target||0;
+  if(/درپوش/.test(n)) return DB.meta.darpooshTarget||0;
+  if(/دیزل|بنز/.test(n)) return DB.meta.dieselTarget||DIESEL_TARGET_DEFAULT;
+  return target4Lines();
+}
+function dpLineGroupOf_(st){
+  const n = st.name||'';
+  if(/CKD/i.test(n)) return 'CKD';
+  if(/سه.?راهی.?۲۰۶|سه.?راهی.?206|206/.test(n)) return 'سه‌راهی ۲۰۶';
+  if(/درپوش/.test(n)) return 'درپوش';
+  if(/دیزل|بنز/.test(n)) return 'دیزل/بنز';
+  return '۴ خط اصلی';
+}
+function autoGenerateDailyProgram_(dateStr){
+  const stations = (DB.meta.stations||[]).slice();
+  const personnel = (DB.meta.personnel||[]).filter(p=>p.workType!=='admin');
+  const priority = computeProductFamilyPriority_();
+  const rows = [];
+  const usedPersonIds = new Set();
+  const findStation = (names)=> names.map(n=> stations.find(s=>normalizeForGrouping(s.name)===normalizeForGrouping(n))).find(Boolean);
+
+  // ۱) ابتدا دقیقاً طبق نقشهٔ نیروی استاندارد واقعی (نه حدس از روی هدف تولید) — این‌جا اولویت با
+  //    فرآیندهای پشتیبان چهار خط اصلی + CKD است، بعد مونتاژ نهایی/CKD/کوره/کنترل، طبق ترتیب اعلام‌شده.
+  //    اگر یک «نقش» چند خط دارد (تنظیم سیلندر/مونتاژ نهایی)، خط اولویت‌دار امروز زودتر پر می‌شود.
+  const plan = [...getManningPlan_()].sort((a,b)=>{
+    const aPriority = a.lineNo!==undefined && priority.priorityLines.includes(a.lineNo);
+    const bPriority = b.lineNo!==undefined && priority.priorityLines.includes(b.lineNo);
+    if(aPriority !== bPriority) return aPriority? -1 : 1;
+    return 0; // بقیه، همان ترتیب تعریف‌شده در نقشه را حفظ می‌کنند (stable sort)
+  });
+  plan.forEach(role=>{
+    const candidateStations = role.stations.map(n=>findStation([n])).filter(Boolean);
+    const stationNamesSquashed = role.stations.map(normalizeForGrouping);
+    const matched = personnel.filter(p=> !usedPersonIds.has(p.id) && p.mainStation && stationNamesSquashed.includes(normalizeForGrouping(p.mainStation)));
+    const need = Math.round(role.required); // تعداد سرشمار فیزیکی؛ کسر (مثل ۳٫۵) در جدول «نقشهٔ نیرو» پایین صفحه با یادداشت نشان داده می‌شود
+    const take = matched.slice(0, need);
+    const primaryStation = candidateStations[0];
+    if(take.length){
+      take.forEach(p=>{
+        // اگر چند ایستگاه هم‌نام نقش دارند (مثلاً چند نوع درپوش)، ایستگاهی که با «ایستگاه اصلی» خودش می‌خواند انتخاب می‌شود
+        const st = candidateStations.find(s=>normalizeForGrouping(s.name)===normalizeForGrouping(p.mainStation)) || primaryStation;
+        rows.push({ id: uid(), date: dateStr, personId:p.id, stationId: st? st.id : '', capacity: st? (st.hourlyStandard||0) : 0, operation: role.role + (role.note? ' — '+role.note : '') });
+        usedPersonIds.add(p.id);
+      });
+    }
+    // اگر کسی برای این نقش پیدا نشد یا کمتر از نیاز بود، یک ردیف خالی برای هر جای‌خالی نگه می‌داریم تا کسری دیده شود
+    for(let i=take.length; i<need; i++){
+      rows.push({ id: uid(), date: dateStr, personId:'', stationId: primaryStation? primaryStation.id : '', capacity: primaryStation? (primaryStation.hourlyStandard||0) : 0, operation: role.role + ' (نیاز به تخصیص)' });
+    }
+  });
+
+  // ۲) ایستگاه‌هایی که در نقشهٔ نیروی استاندارد نبودند (مثل ایستگاه‌های پین که هدف/نرخ خودشان را دارند)
+  //    طبق همان منطق قبلی (گلوگاه) پر می‌شوند — تا چیزی از قلم نیفتد.
+  const planStationNames = new Set(getManningPlan_().flatMap(r=>r.stations.map(normalizeForGrouping)));
+  const leftoverStations = stations.filter(s=> s.dailyTarget>0 && !planStationNames.has(normalizeForGrouping(s.name)));
+  const rankedLeftover = leftoverStations.map(s=>{
+    const req = dpRequiredForStation_(s);
+    return { s, gap: req? (s.dailyTarget-req)/req : null };
+  }).sort((a,b)=>(a.gap??0)-(b.gap??0)).map(x=>x.s);
+  rankedLeftover.forEach(st=>{
+    const matched = personnel.filter(p=> !usedPersonIds.has(p.id) && p.mainStation && normalizeForGrouping(p.mainStation)===normalizeForGrouping(st.name));
+    if(matched.length){
+      matched.forEach(p=>{
+        rows.push({ id: uid(), date: dateStr, personId:p.id, stationId:st.id, capacity: st.hourlyStandard||0, operation: st.stage||st.name });
+        usedPersonIds.add(p.id);
+      });
+    } else {
+      rows.push({ id: uid(), date: dateStr, personId:'', stationId:st.id, capacity: st.hourlyStandard||0, operation: st.stage||st.name });
+    }
+  });
+
+  // ۳) پرسنلی که هنوز جایی تخصیص نگرفتند (ایستگاه اصلی خالی/نامنطبق) — ته فهرست، برای تخصیص دستی
+  personnel.filter(p=>!usedPersonIds.has(p.id)).forEach(p=>{
+    rows.push({ id: uid(), date: dateStr, personId:p.id, stationId:'', capacity:0, operation:'' });
+  });
+  return rows;
+}
+function dpReconcile_(rows){
+  const groups = {
+    '۴ خط اصلی': { required: target4Lines(), staffed: 0 },
+    'CKD': { required: DB.meta.ckdTarget||0, staffed: 0 },
+    'سه‌راهی ۲۰۶': { required: DB.meta.se206Target||0, staffed: 0 },
+    'درپوش': { required: DB.meta.darpooshTarget||0, staffed: 0 },
+    'دیزل/بنز': { required: DB.meta.dieselTarget||DIESEL_TARGET_DEFAULT, staffed: 0 },
+  };
+  const staffedStationIds = new Set(rows.filter(r=>r.personId && r.stationId).map(r=>r.stationId));
+  (DB.meta.stations||[]).forEach(st=>{
+    if(!staffedStationIds.has(st.id)) return;
+    const key = dpLineGroupOf_(st);
+    if(groups[key]) groups[key].staffed += (st.dailyTarget||0);
+  });
+  return groups;
+}
+function renderDailyProgram(){
+  const isAdmin = currentSessionRole()==='admin';
+  const dateStr = filters.dpDate || todayJalaliStr();
+  const rows = (DB.dailyProgram||[]).filter(r=>r.date===dateStr).sort((a,b)=> (a.order??0)-(b.order??0));
+  const personnelAll = (DB.meta.personnel||[]).filter(p=>p.workType!=='admin').sort((a,b)=>(a.name||'').localeCompare(b.name||'','fa'));
+  const stations = (DB.meta.stations||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'','fa'));
+  const reconcile = dpReconcile_(rows);
+  const famPriority = computeProductFamilyPriority_();
+  const priorityLabel = famPriority.priorityLines[0]===1 ? 'خط ۱ و ۲ (پراید)' : 'خط ۳ و ۴ (سایر ترموستات‌ها)';
+  const laggingQty = famPriority.priorityLines[0]===1 ? famPriority.prideRemaining : famPriority.otherRemaining;
+  const otherQty = famPriority.priorityLines[0]===1 ? famPriority.otherRemaining : famPriority.prideRemaining;
+  const inputRisk = conditionalInputRiskThisMonth_();
+  const darpooshActive = isDarpooshActiveThisMonth_();
+  const manningPlan = getManningPlan_();
+  const totalRequired = manningPlan.reduce((s,r)=>s+r.required,0);
+  const totalHeadcount = (DB.meta.personnel||[]).filter(p=>p.workType!=='admin').length;
+  const manningStatus = manningPlan.map(role=>{
+    const stationNamesSquashed = role.stations.map(normalizeForGrouping);
+    const assigned = rows.filter(r=>{
+      if(!r.personId) return false;
+      const st = stationById(r.stationId);
+      return st && stationNamesSquashed.includes(normalizeForGrouping(st.name)) && r.operation && r.operation.startsWith(role.role);
+    }).length;
+    return { ...role, assigned };
+  });
+
+  const personOptions = (curId)=> '<option value="">— تخصیص نشده —</option>' + personnelAll.map(p=>`<option value="${p.id}" ${curId===p.id?'selected':''}>${esc(p.name)}</option>`).join('');
+  const stationOptions = (curId)=> '<option value="">— بدون ایستگاه —</option>' + stations.map(s=>`<option value="${s.id}" ${curId===s.id?'selected':''}>${esc(s.name)}</option>`).join('');
+
+  document.getElementById('view').innerHTML = `
+  <div class="card no-print" style="margin-bottom:16px; border:1px solid rgba(76,141,255,.35); background:rgba(76,141,255,.06);">
+    <div style="font-size:13.5px; font-weight:800; margin-bottom:4px;">🎯 اولویت امروز طبق برنامه ماهانه محصول: ${priorityLabel}</div>
+    <div class="hint">مانده پراید تا هدف ماه: <b style="color:#e8edf7;">${fmt(famPriority.prideRemaining,0)}</b> عدد — مانده سایر ترموستات‌ها (بدون بنز/CKD): <b style="color:#e8edf7;">${fmt(famPriority.otherRemaining,0)}</b> عدد. چون ${laggingQty>=otherQty?'این خانواده عقب‌تر است':'مانده هر دو نزدیک هم است'}، ایستگاه‌های ${priorityLabel} در چینش خودکار بالاتر قرار می‌گیرند. (منبع اعداد: تب «ارسال به‌تفکیک محصول».)</div>
+  </div>
+
+  ${inputRisk.records>0 ? `<div class="card no-print" style="margin-bottom:16px; border:1px solid rgba(255,93,108,.35); background:rgba(255,93,108,.06);">
+    <div style="font-size:13.5px; font-weight:800; margin-bottom:4px;">⚠️ هشدار «ورودی مشروط» این ماه</div>
+    <div class="hint">${fmt(inputRisk.records,0)} رویداد با منشأ «ورودی مشروط» ثبت شده — ${fmt(inputRisk.scrapCount,0)} عدد ضایعات و ${fmt(inputRisk.reworkCount,0)} عدد دوباره‌کاری. این منشأ سابقهٔ شوک‌زدن به خط را دارد؛ اگر امروز هم قطعهٔ ورودی مشروط دارید، برای ایستگاه‌های مربوطه نیروی پشتیبان یا زمان بازرسی اضافه در نظر بگیرید (تاریخچهٔ کامل: تب «ضایعات/دوباره‌کاری تولید»).</div>
+  </div>` : ''}
+
+  <div class="grid grid-4 no-print" style="margin-bottom:16px;">
+    ${kpiCard('نیروی صف موجود','نفر', fmt(totalHeadcount,0), null, '#4c8dff')}
+    ${kpiCard('نیاز آرایش کامل ایده‌آل','نفر', fmt(totalRequired,0)+(darpooshActive?'':' (بدون درپوش)'), null, '#93a4c3')}
+    ${kpiCard('کسری ساختاری','نفر', totalRequired>totalHeadcount? '−'+fmt(totalRequired-totalHeadcount,1) : 'بدون کسری', null, totalRequired>totalHeadcount?'#ff5d6c':'#2fd9c4')}
+    ${kpiCard('نقش‌های شرطی درپوش','', darpooshActive?'فعال این ماه':'غیرفعال این ماه', null, darpooshActive?'#ffcf5c':'#93a4c3')}
+  </div>
+
+  <div class="card no-print" style="margin-bottom:16px;">
+    <div class="flexbar"><h3 style="margin:0;">🧭 نقشه نیروی استاندارد (طبق الزامات واقعی خط)</h3></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>نقش / فرآیند</th><th class="num">نیروی موردنیاز</th><th class="num">تخصیص‌یافته امروز</th><th>وضعیت</th><th>یادداشت</th></tr></thead>
+      <tbody>
+      ${manningStatus.map(r=>{
+        const ok = r.assigned >= Math.round(r.required);
+        return `<tr><td>${esc(r.role)}</td><td class="num">${fmt(r.required,1)}</td><td class="num">${fmt(r.assigned,0)}</td>
+          <td><span class="badge ${ok?'badge-run':'badge-warn'}">${ok?'✅ تکمیل':'⚠️ کسری'}</span></td>
+          <td class="hint" style="white-space:normal; max-width:260px;">${esc(r.note)||'—'}</td></tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="flexbar">
+      <h3 style="margin:0;">📋 برنامه تولید روزانه <span class="hint" style="font-weight:400;">— نسخه آزمایشی</span></h3>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <label class="hint" style="margin:0;">تاریخ:</label>${datePickerHtml('dp_date', dateStr)}
+        <button class="btn btn-primary btn-sm" id="printDpBtn">🖨️ چاپ</button>
+      </div>
+    </div>
+    ${isAdmin? `<div class="btn-row" style="margin-top:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <button class="btn btn-teal btn-sm" id="genDpBtn">🔄 تولید خودکار برنامه این روز</button>
+      <button class="btn btn-ghost btn-sm" id="addDpRowBtn">➕ افزودن ردیف خالی</button>
+      ${syncButtonHtml('syncBtn_dp')}
+      <span class="hint" style="margin:0;">تولید خودکار، پرسنل تولیدی را بر اساس «ایستگاه اصلی»‌شان با ایستگاه‌ها جفت می‌کند و بر اساس گلوگاه مرتب می‌کند؛ ردیف‌های فعلی این روز جایگزین می‌شوند.</span>
+    </div>` : ''}
+  </div>
+
+  <div class="card print-form" style="margin-bottom:16px;">
+    <div class="print-only" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:14px;">
+        <div style="font-size:11px;">کد سند: PDFR08/02</div>
+        <div style="font-size:20px; font-weight:900;">برنامه تولید روزانه</div>
+        <div style="width:90px; height:40px;"><img src="${COMPANY_LOGO_URI}" style="width:100%; height:100%; object-fit:contain;"></div>
+      </div>
+      <div style="font-size:13px; margin-bottom:10px;">تاریخ: ${esc(dateStr)} — خط: ${esc(currentLineName())}</div>
+    </div>
+    <table>
+      <thead><tr><th style="width:40px;">ردیف</th><th>نام و نام خانوادگی</th><th>کد/نام ایستگاه</th><th class="num">ظرفیت در ساعت</th><th>شرح عملیات</th>${isAdmin?'<th></th>':''}</tr></thead>
+      <tbody>
+      ${rows.length===0? `<tr><td colspan="${isAdmin?6:5}"><div class="tbl-empty">برای این تاریخ هنوز برنامه‌ای ثبت نشده.${isAdmin?' روی «تولید خودکار» بزنید.':''}</div></td></tr>` :
+      rows.map((r,i)=>{
+        const st = stationById(r.stationId);
+        const cap = st? st.hourlyStandard : r.capacity;
+        return `<tr data-dprow="${r.id}">
+          <td>${i+1}</td>
+          <td>${isAdmin? `<select data-dpfield="personId" style="width:100%;">${personOptions(r.personId)}</select>` : esc((personnelAll.find(p=>p.id===r.personId)||{}).name || '—')}</td>
+          <td>${isAdmin? `<select data-dpfield="stationId" style="width:100%;">${stationOptions(r.stationId)}</select>` : esc(st?.name || '—')}</td>
+          <td class="num">${fmt(cap,0)}</td>
+          <td>${isAdmin? `<input data-dpfield="operation" value="${esc(r.operation||'')}" style="width:100%;">` : esc(r.operation)||'—'}</td>
+          ${isAdmin? `<td><button class="icon-btn" data-dpdel="${r.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button></td>`:''}
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+    <div class="print-only" style="display:none; margin-top:24px; font-size:13px;">تایید سرپرست: ______________________</div>
+  </div>
+
+  <div class="card no-print">
+    <div class="flexbar"><h3 style="margin:0;">📐 تطبیق با ستاپ اهداف تولید روزانه خطوط</h3></div>
+    <div class="hint" style="margin-bottom:10px;">ظرفیت «ایستگاه‌های دارای حداقل یک نفر تخصیص‌یافته در همین برنامه» نسبت به هدف روزانهٔ همان خط — یعنی آیا آرایش امروز اصلاً می‌تواند هدف را پاس کند.</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>خط</th><th class="num">هدف روزانه</th><th class="num">ظرفیت پرسنل‌دار امروز</th><th class="num">وضعیت</th></tr></thead>
+      <tbody>
+      ${Object.entries(reconcile).map(([name,g])=>{
+        const gapPct = g.required? (g.staffed-g.required)/g.required : null;
+        return `<tr><td>${esc(name)}</td><td class="num">${g.required? fmt(g.required,0):'<span class="muted">—</span>'}</td><td class="num">${fmt(g.staffed,0)}</td>
+          <td class="num" style="color:${gapPct===null?'var(--text-mute)':gapPct>=0?'#8ff0c8':'#ffb0b8'}; font-weight:800;">${gapPct===null?'—':(gapPct>=0?'✅ قابل پاس‌شدن':'⚠️ کسری '+pct(Math.abs(gapPct),0))}</td></tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>
+  </div>`;
+
+  { const el = document.getElementById('dp_date'); if(el) el.addEventListener('change', ()=>{ filters.dpDate = readDatePicker('dp_date'); renderDailyProgram(); }); }
+  document.getElementById('printDpBtn').addEventListener('click', ()=> window.print());
+  wireSyncBtn('syncBtn_dp');
+
+  const genBtn = document.getElementById('genDpBtn');
+  if(genBtn) genBtn.addEventListener('click', ()=>{
+    const doGen = ()=>{
+      DB.dailyProgram = (DB.dailyProgram||[]).filter(r=>r.date!==dateStr).concat(
+        autoGenerateDailyProgram_(dateStr).map((r,i)=>({...r, order:i}))
+      );
+      scheduleSave(); toast('برنامه این روز تولید شد.','ok'); renderDailyProgram();
+    };
+    if(rows.length){
+      confirmModal('جایگزینی برنامه امروز', 'ردیف‌های فعلی این تاریخ با یک آرایش جدید جایگزین می‌شوند. ادامه می‌دهید؟', doGen, 'بله، جایگزین کن');
+    } else doGen();
+  });
+
+  const addBtn = document.getElementById('addDpRowBtn');
+  if(addBtn) addBtn.addEventListener('click', ()=>{
+    DB.dailyProgram = DB.dailyProgram||[];
+    DB.dailyProgram.push({ id: uid(), date: dateStr, personId:'', stationId:'', capacity:0, operation:'', order: rows.length });
+    scheduleSave(); renderDailyProgram();
+  });
+
+  document.querySelectorAll('[data-dpfield]').forEach(el=>{
+    el.addEventListener('change', ()=>{
+      const rowId = el.closest('[data-dprow]').dataset.dprow;
+      const rec = DB.dailyProgram.find(r=>r.id===rowId);
+      if(!rec) return;
+      const field = el.dataset.dpfield;
+      rec[field] = el.value;
+      if(field==='stationId'){ const st = stationById(el.value); rec.capacity = st? st.hourlyStandard : 0; if(st && !rec.operation) rec.operation = st.stage||st.name; }
+      scheduleSave();
+      if(field==='stationId') renderDailyProgram();
+    });
+  });
+  document.querySelectorAll('[data-dpdel]').forEach(b=> b.addEventListener('click', ()=>{
+    confirmDeleteModal('حذف ردیف برنامه', 'این ردیف از برنامه امروز حذف می‌شود.', ()=>{
+      DB.dailyProgram = DB.dailyProgram.filter(r=>r.id!==b.dataset.dpdel);
+      scheduleSave(); renderDailyProgram();
+    });
+  }));
+}
+
 function openPersonnelPasswordModal(){
   const root = document.getElementById('modalRoot');
   root.innerHTML = `<div class="modal-bg" id="ppwbg"><div class="modal" style="max-width:380px;">
@@ -4829,7 +5203,7 @@ function promptSendToManagement(rec, kind){
 }
 
 /* ---------------------------- recycle bin (restore deleted rows) ---------------------------- */
-const TRASH_LABELS = { daily:'ورود داده روزانه', waste:'ضایعات تولید', stop:'توقفات تولید', short:'کسری قطعات', stationHourly:'آمار ایستگاه', productOutput:'ارسال به‌تفکیک محصول' };
+const TRASH_LABELS = { daily:'ورود داده روزانه', waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', short:'کسری قطعات', stationHourly:'آمار ایستگاه', productOutput:'ارسال به‌تفکیک محصول', dailyProgram:'برنامه تولید روزانه' };
 const TRASH_CAP = 300; // keep at most this many trashed items per line
 function moveToTrash(type, record){
   if(!DB.trash) DB.trash = [];
@@ -5016,9 +5390,9 @@ function openSettings(){
   });
   document.getElementById('clearAllBtn').addEventListener('click', ()=>{
     root.innerHTML='';
-    confirmDeleteModal('پاک‌سازی کامل داده‌های این خط', 'همه ردیف‌های ثبت‌شده (تولید، ارسال، ضایعات، توقفات، کسری) برای خط «' + esc(DB.meta.unitName||'') + '» برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', async ()=>{
+    confirmDeleteModal('پاک‌سازی کامل داده‌های این خط', 'همه ردیف‌های ثبت‌شده (تولید، ارسال، ضایعات، توقفات، کسری، برنامه تولید روزانه) برای خط «' + esc(DB.meta.unitName||'') + '» برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', async ()=>{
       DB.daily.forEach(r=>moveToTrash('daily', r)); DB.waste.forEach(r=>moveToTrash('waste', r)); DB.stop.forEach(r=>moveToTrash('stop', r)); DB.short.forEach(r=>moveToTrash('short', r)); DB.stationHourly.forEach(r=>moveToTrash('stationHourly', r)); (DB.productOutput||[]).forEach(r=>moveToTrash('productOutput', r));
-      DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], productOutput:[], risks: DB.risks, meta: DB.meta };
+      DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], productOutput:[], risks: DB.risks, dailyProgram: [], meta: DB.meta };
       await saveAll(true); toast('همه داده‌های این خط پاک شد.','ok'); goTo(currentTab);
     });
   });
