@@ -869,18 +869,18 @@ function halfTrend(arr, halves, valueFn){
 // already only count active days). Prevents an unfairly inflated deviation on days
 // when a line was legitimately down.
 function dayTarget4Lines(e){
+  // هدف باید بر اساس ظرفیت کامل نیرو/دستگاه باشد، نه واقعیت امروز — پس توقف یک خط دیگر از شمارش خط‌ها
+  // کم نمی‌شود (قبلاً این‌جا اشتباهاً هدف را کم می‌کرد). فقط شیفت واقعاً کوتاه/تعطیل (dayShiftFactor)
+  // مجاز است هدف را پایین بیاورد؛ توقف باید به‌صورت انحراف منفی نسبت به همین هدف ثابت دیده شود، نه با
+  // پایین‌کشیدن خود هدف.
   const t = DB.meta.lineTarget || LINE_TARGET_DEFAULT;
-  return ['line1','line2','line3','line4'].filter(k=>e.lines[k].status!=='stop').length * t * dayShiftFactor(e);
+  return 4 * t * dayShiftFactor(e);
 }
 function dayCombinedTarget(e){
+  // مشابه بالا: توقف CKD/سه‌راهی/درپوش/دیزل هم هدف کلی روز را کم نمی‌کند.
   const f = dayShiftFactor(e);
   const ckdT = (DB.meta.ckdTarget||0)*f, se206T = (DB.meta.se206Target||0)*f, darpooshT = (DB.meta.darpooshTarget||0)*f, dieselT = (DB.meta.dieselTarget||DIESEL_TARGET_DEFAULT)*f;
-  let t = dayTarget4Lines(e);
-  if(e.lines.ckd.status!=='stop') t += ckdT;
-  if(e.lines.se206.status!=='stop') t += se206T;
-  if(e.lines.darpoosh.status!=='stop') t += darpooshT;
-  if(e.lines.diesel.status!=='stop') t += dieselT;
-  return t;
+  return dayTarget4Lines(e) + ckdT + se206T + darpooshT + dieselT;
 }
 
 /* ---------------------------- storage (cloud) ---------------------------- */
@@ -1505,6 +1505,7 @@ function renderEntry(){
         </select>
         <input id="f_dayTypeCustom" type="text" inputmode="numeric" placeholder="ساعت شیفت این روز" value="${draft.shiftHours&&draft.shiftHours!==8?draft.shiftHours:''}"
           style="margin-top:6px; ${draft.shiftHours&&draft.shiftHours!==8?'':'display:none;'}">
+        <div class="hint" style="margin-top:6px;">⚠️ این فیلد فقط برای تعطیلی رسمی/کوتاه‌شدن برنامه‌ریزی‌شدهٔ شیفت است — با این کار، هدف امروز خودش را متناسب کم می‌کند. توقف دستگاه/خط را این‌جا وارد نکنید؛ آن را در تب «توقفات تولید» ثبت کنید — توقف نباید هدف را پایین بیاورد، فقط باید به‌عنوان انحراف منفی نسبت به همان هدف ثابت دیده شود.</div>
       </div>
       <div class="field"><label>شماره شناسایی ردیابی <span class="muted">(اختیاری)</span></label><input id="f_traceId" placeholder="مثلاً کد بچ/لات" value="${esc(draft.traceId||'')}"></div>
       <div class="field"><label>شماره بازرسی <span class="muted">(اختیاری)</span></label><input id="f_inspectionId" placeholder="مثلاً کد بازرسی کیفیت" value="${esc(draft.inspectionId||'')}"></div>
@@ -3701,18 +3702,29 @@ function renderCover(){
     </div>
   </div>`;
 
-  // نمودار روند روزانه تولید/ارسال در برابر هدف روزانه (هدف با ضریب روزهای کوتاه/تعطیل تنظیم می‌شود)
-  const dailyTargetBase = workingDays ? monthlyTarget/workingDays : 0;
+  // نمودار روند روزانه تولید/ارسال در برابر هدف روزانه — هدف از دقیقاً همان فرمول «هدف کلی روز» گرفته می‌شود
+  // (جمع هدف ۴خط + CKD + سه‌راهی + درپوش + دیزل)، نه از تقسیم ساده هدف ماه بر روزهای کاری؛ این‌طور توقف یک
+  // خط دیگر باعث افت خودِ خط هدف نمی‌شود — فقط شیفت واقعاً کوتاه/تعطیل مجاز است هدف را کم کند.
+  // روی هر نقطه کلیک کنید تا علت افت آن روز (توقفات ثبت‌شده) را در تب «توقفات تولید» ببینید.
   mkChart('chCoverTrend', { type:'line', data:{ labels: rows.map(e=>e.date.slice(5)), datasets:[
       { label:'تولید روزانه', data: rows.map(e=>allLinesTotal(e)), borderColor:'#4c8dff', backgroundColor:'#4c8dff26', fill:true, tension:.35, pointRadius:2 },
       { label:'ارسال روزانه', data: rows.map(e=>shipTotal(e)), borderColor:'#2fd9c4', backgroundColor:'#2fd9c426', fill:true, tension:.35, pointRadius:2 },
-      { label:'هدف روزانه', data: rows.map(e=>Math.round(dailyTargetBase*dayShiftFactor(e))), borderColor:'#93a4c3', borderDash:[5,4], pointRadius:0, tension:0, fill:false },
+      { label:'هدف روزانه', data: rows.map(e=>Math.round(dayCombinedTarget(e))), borderColor:'#93a4c3', borderDash:[5,4], pointRadius:0, tension:0, fill:false },
     ]},
     options:{ responsive:true, maintainAspectRatio:false,
       plugins:{ legend:{display:true, position:'bottom', labels:{color:'#c7d0e3', boxWidth:12, font:{size:10.5}}},
-        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label+': '+fmt(ctx.parsed.y,0) } } },
+        tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label+': '+fmt(ctx.parsed.y,0), afterBody:()=>'برای دیدن علت توقف/کسری این روز کلیک کنید' } } },
       scales:{ x:{grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#8b98b5', font:{size:9.5}, maxRotation:0, autoSkip:true, maxTicksLimit:8}},
-               y:{grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#8b98b5', font:{size:9.5}}} } } });
+               y:{grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#8b98b5', font:{size:9.5}}} },
+      onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length? 'pointer':'default'; },
+      onClick:(evt, els, chart)=>{
+        if(!els.length) return;
+        const row = rows[els[0].index];
+        if(!row) return;
+        filters.stopDate = row.date; filters.stop=''; filters.stopReason='all';
+        goTo('stop');
+        toast('توقفات ثبت‌شده در '+row.date+' نمایش داده شد.','ok');
+      } } });
 
   const updateClock = ()=>{
     const t = document.getElementById('coverClockTime');
@@ -4728,11 +4740,21 @@ function renderTargetProgress(){
         { type:'line', label:'مسیر تجمعی هدف', data: idealCum, borderColor:'#2fd9c4', borderDash:[6,4], pointRadius:0, tension:0, yAxisID:'y1', order:1, noLabel:true },
       ]},
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}},
+      plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}},
+        tooltip:{ callbacks:{ afterBody:()=>'برای دیدن علت توقف/کسری این روز کلیک کنید' } } },
       scales:{
         x:{grid:{display:false}},
         y:{ position:'right', grid:{color:'#182338'}, title:{display:true, text:'روزانه', color:'#7c8aa5', font:{size:10}} },
         y1:{ position:'left', grid:{display:false}, title:{display:true, text:'تجمعی', color:'#7c8aa5', font:{size:10}} },
+      },
+      onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length? 'pointer':'default'; },
+      onClick:(evt, els)=>{
+        if(!els.length) return;
+        const row = rows[els[0].index];
+        if(!row) return;
+        filters.stopDate = row.date; filters.stop=''; filters.stopReason='all';
+        goTo('stop');
+        toast('توقفات ثبت‌شده در '+row.date+' نمایش داده شد.','ok');
       }
     },
     plugins: monthlyTarget>0 ? [{
@@ -4756,8 +4778,18 @@ function renderTargetProgress(){
     options:{ responsive:true, maintainAspectRatio:false,
       layout:{ padding:{ top:28, bottom:28 } },
       plugins:{ legend:{display:false},
-        tooltip:{ callbacks:{ label:(c)=>{ const v=c.parsed.y; const p=devPctArr[c.dataIndex]; return 'انحراف: '+fmt(v,0)+' عدد'+(p===null?'':' ('+pct(p,1)+')'); } } } },
-      scales:{ x:{grid:{display:false}}, y:{grid:{color:'#182338'}} } },
+        tooltip:{ callbacks:{ label:(c)=>{ const v=c.parsed.y; const p=devPctArr[c.dataIndex]; return 'انحراف: '+fmt(v,0)+' عدد'+(p===null?'':' ('+pct(p,1)+')'); }, afterBody:()=>'برای دیدن علت این روز کلیک کنید' } } },
+      scales:{ x:{grid:{display:false}}, y:{grid:{color:'#182338'}} },
+      onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length? 'pointer':'default'; },
+      onClick:(evt, els)=>{
+        if(!els.length) return;
+        const row = rows[els[0].index];
+        if(!row) return;
+        filters.stopDate = row.date; filters.stop=''; filters.stopReason='all';
+        goTo('stop');
+        toast('توقفات ثبت‌شده در '+row.date+' نمایش داده شد.','ok');
+      }
+    },
     plugins:[{
       // چیپ شناور درصد انحراف روی هر میله — واضح، بدون همپوشانی با محور یا عدد میله
       id:'devPctFloater',
