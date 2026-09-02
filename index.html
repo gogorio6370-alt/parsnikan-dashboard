@@ -387,13 +387,13 @@ window.addEventListener('error', function(ev){
 const LINE_TARGET_DEFAULT = 2500; // daily target for each of the 4 main lines
 const DIESEL_TARGET_DEFAULT = 500; // دیزل/بنز — a separate 5th line, not one of the 4 main lines
 const WEEKDAYS_BY_JSDAY = ['یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه'];
-const STOPPAGE_REASONS = ['عدم تامین قطعه','خرابی دستگاه','خرابی سیلندر','تست قرص','تست قطعه','قطعی باد','افت فشار باد','قطع برق','توقف کیفی','عدم تنظیم دستگاه','نداشتن نیروی انسانی','بالانس نبودن خط تولید','سایر'];
+const STOPPAGE_REASONS = ['عدم تامین قطعه','خرابی دستگاه','خرابی سیلندر','تست قرص','تست قطعه','قطعی باد','افت فشار باد','قطع برق','توقف کیفی','عدم تنظیم دستگاه','نداشتن نیروی انسانی','بالانس نبودن خط تولید','تغییر برنامه','سایر'];
 // فهرست اپراتورهای واحد — برای تکمیل خودکار سریع‌تر و یکسان (بدون غلط تایپی) در فرم ثبت ضایعات استفاده می‌شود؛
 // یک نام آزاد که در این فهرست نیست هم قابل ثبت است (فقط پیشنهاد است، نه محدودیت).
 const OPERATOR_LIST_DEFAULT = ['درخشان','فوزی','نادری','سبلان زاده','ایمانی','حمامی','مرادی','گروسی','خ علیپور','محمدی','ملایی','بختیاری','ناصری','تیموری','نجفی','خزایی','پرتو','میرزایی','سهیلی','جودکی','شقاقی','گلی','شاکری','عموزاده','پیری','رحمتی','پیرمحمدی','اسمعیلی','خسروی','حسین پور','آ علیپور','حاج میر','غلامی','دهقان نسب'];
 // «محصول نهایی» (مدل خودرو) و «تیپ ضایعات» (نوع عیب) به‌صورت پیشنهاد آزاد (نه محدودکننده) در فرم ثبت
 // ضایعات استفاده می‌شوند — بر اساس همان مدل‌ها/عیب‌هایی که خودتان قبلاً در داده‌های واقعی ثبت کرده‌اید.
-const FINAL_PRODUCT_LIST_DEFAULT = ['پژو 83','درپوش ساینا','درپوش شاهین','درپوش جک','درپوش شاهین پلاس','نیسان 76','پیکان 74','پیکان 78','پیکان 82','زانتیا','ckd-76','ckd-83','ef7-88','ef7-83','ef7-75','نیسان دیزل82','چری 87','کاپرا 82','کاپرا 76','فوتون 82','فوتون 75','فوتون 65','بسترن','سه راهی آب بغل 206','ایسوزو 82','بنز71','بنز 65','ریو','پراید 71','پراید 82','پراید 76','پژو 75','206-89','206-83','206-76','ال90_76','ال90-83','ال90-89','قرص 75','قرص82','قرص 86','قرص 71','ckd 89','درپوش ckd','درپوش L90','پیکان 71','هوزینگ','درپوش 405','بدنه ckd','چری83','فوتون پیکاپ','سایر'];
+const FINAL_PRODUCT_LIST_DEFAULT = ['پژو 83','درپوش ساینا','درپوش شاهین','درپوش جک','درپوش شاهین پلاس','نیسان 76','پیکان 74','پیکان 78','پیکان 82','زانتیا','ckd-76','ckd-83','ef7-88','ef7-83','ef7-75','نیسان دیزل82','چری 87','کاپرا 82','کاپرا 76','فوتون 82','فوتون 75','فوتون 65','بسترن','سه راهی آب بغل 206','ایسوزو 82','بنز71','بنز 65','ریو','پراید 71','پراید 82','پراید 76','پژو 75','206-89','206-83','206-76','ال90_76','ال90-83','ال90-89','قرص 75','قرص82','قرص 86','قرص 71','قرص 80','قرص 70','قرص بنز','مونتاژ دیافراگم و برنجی میله 30 الی 36','مونتاژ میله دیافراگم (30 الی 36)','ckd 89','درپوش ckd','درپوش L90','پیکان 71','هوزینگ','درپوش 405','بدنه ckd','چری83','فوتون پیکاپ','سایر'];
 // فهرست محصول/قطعه برای «خطوط اصلی تولید» در تب ورود داده — دقیقاً مطابق اسم برنامه تولید (اکسل برنامه‌ریزی)
 const LINE_PRODUCT_LIST_DEFAULT = ['ترموستات  EF‏7 — 83 درجه','ترموستات  EF‏7 — 88 درجه','ترموستات  EF‏7 — 75 درجه','ترموستات 206 — 89 درجه','ترموستات 206 — 83 درجه','ترموستات 206 — 76 درجه','ترموستات 206 CKD — 89 درجه','ترموستات 206 CKD — 83 درجه','ترموستات 206 CKD — 76 درجه','ترموستات ال 90 — 89 درجه','ترموستات ال 90 — 83 درجه','ترموستات ال 90 — 76 درجه','ترموستات ایسوزو — 85 درجه','ترموستات ایسوزو — 82 درجه','ترموستات ايویکو — 82 درجه','ترموستات ايویکو — 75 درجه','ترموستات ايویکو — 65 درجه','ترموستات بسترن','ترموستات پراید — 71 درجه','ترموستات پراید — 76 درجه','ترموستات پراید — 82 درجه','ترموستات پژو — 83 درجه','ترموستات پژو — 75 درجه','ترموستات پژو-سوپاپ دار — 75 درجه','ترموستات پیکان — 78 درجه','ترموستات پیکان — 82 درجه','ترموستات پیکان — 74 درجه','ترموستات پیکان — 71 درجه','ترموستات چري — 87 درجه','ترموستات چري — 83 درجه','ترموستات ديزل بنز — 71 درجه','ترموستات ديزل بنز — 65 درجه','ترموستات ریو — 88 درجه','ترموستات زانتیا — 83 درجه','ترموستات زانتیا — 89 درجه','ترموستات فوتون — 82 درجه','ترموستات فوتون — 75 درجه','ترموستات فوتون — 65 درجه','ترموستات نیسان — 82 درجه','ترموستات نیسان — درجه‎ 76.5','ترموستات نیسان ديزل — 82 درجه','ترموستات نیسان ديزل — درجه‎ 76.5','ترموستات ولوو FH‏12 — 75 درجه','ترموستات کاپرا — 82 درجه','ترموستات کاپرا — 76 درجه','درپوش ترموستات — L90','درپوش ترموستات — ساینا','درپوش ترموستات — شاهین','درپوش ترموستات — جک','سه راه آب بغل — 206','سه راه آب بغل — شاهین پلاس'];
 const WASTE_TYPE_LIST_DEFAULT = ['پایه ورودی','پایه حین تولید','برنجی','واشرتفلون','میله فرمان 29','میله فرمان 30','میله فرمان 31','میله فرمان 32','میله فرمان 33','میله فرمان 34','سیلندر ورودی','کلاهی ورودی','کلاهی حین تولید','درپوش ترموستات ورودی','پایه ckd','واشر ckd','درپوش ترموستات حین تولید','پین ساینا','پین جک','پین شاهین','فنر ترموستات','فنر ckd','قفل شدگی','پین','دریچه پاره حین تولید','خطای اپراتور','دریچه پاره کنترل','نک نخورده','ترکیدگی سیلندر','نشتی سیلندر','قیچی کردن','آنیل','منگوله ورودی','سوختگی منگوله','دریچه ورودی','پارگی دیافراگم','دفرمگی سیلندر','عدم عملکرد','بدنه','گیرکرده','کوتاهی تاج','مشکلات سیلندر','دیافراگم','میله','ایرادات بدنه','خرابی پایه','درپوش L90','پین l90','دمونتاژckd','پین شاهین پلاس','تست','پین405','درپوش 405','ضایعات سیلندر','درپوش','ضایعات بدنه','شکستگی','دفرمگی','سوختگی','ضایعات دریچه','سوراخ در بدنه','ترک دربدنه','ترک','پارگی واشر','پارگی سیلندر','سیلندر ورودی تیپ B — عدم قابلیت اطمینان (۱۰۰٪ جداسازی)','سیلندر ورودی تیپ A — رد پرسکاری','ورودی منگوله — نیاز به منگوله‌زن','واشر CKD — پارگی (جداسازی در خط)','درپوش‌ها — مشکلات کیفی (جداسازی در خط)','سه‌راهی ۲۰۶ — مشکلات کیفی (جداسازی در خط)','کلاهی مشهد — مشکلات کیفی (جداسازی در خط)','دریچه لاستیکی — مشکلات کیفی (جداسازی در خط)','دریچه پراید مشهد — مشکلات کیفی (جداسازی در خط)','سایر'];
@@ -2336,6 +2336,7 @@ function renderProductOutput(){
       <div class="field"><label>تاریخ</label>${datePickerHtml('po_date', editing.productOutput?.date)}</div>
       <div class="field span-2"><label>محصول / کد کالا</label>${productSelectHtml('po_product', editing.productOutput?.product||'')}</div>
       <div class="field"><label>تعداد ارسال</label><input id="po_qty" type="text" inputmode="numeric" value="${editing.productOutput?.qty ?? ''}"></div>
+      <div class="field"><label>شماره ردیابی</label><input id="po_traceId" value="${esc(editing.productOutput?.traceId||'')}"></div>
     </div>
     <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
       <button class="btn btn-primary" id="savePoBtn">${editing.productOutput?'ذخیره تغییرات':'ثبت ارسال'}</button>
@@ -2384,10 +2385,10 @@ function renderProductOutput(){
     </div>
     ${dayReconcile? `<div class="hint" style="margin-bottom:8px; color:${dayReconcile.diff===0?'#8ff0c8':'#ffb0b8'};">${dayReconcile.diff===0?'✅ جمع ثبت‌شده به‌تفکیک محصول با جمع کل ارسال همان روز (انبار) برابر است.':'⚠️ جمع کل ارسال همان روز در «ارسال به انبار»: '+fmt(dayReconcile.official,0)+' | جمع ثبت‌شده به‌تفکیک محصول: '+fmt(dayReconcile.detailed,0)+' — مانده برای تکمیل: '+fmt(dayReconcile.diff,0)}</div>` : ''}
     <div class="table-wrap"><table>
-      <thead><tr><th>تاریخ</th><th>محصول / کد کالا</th><th class="num">تعداد</th><th></th></tr></thead>
+      <thead><tr><th>تاریخ</th><th>محصول / کد کالا</th><th class="num">تعداد</th><th>شماره ردیابی</th><th></th></tr></thead>
       <tbody>
-      ${filteredList.length===0?`<tr><td colspan="4"><div class="tbl-empty">موردی ثبت نشده.</div></td></tr>`:
-      filteredList.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.product)}</td><td class="num">${fmt(x.qty,0)}</td>
+      ${filteredList.length===0?`<tr><td colspan="5"><div class="tbl-empty">موردی ثبت نشده.</div></td></tr>`:
+      filteredList.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.product)}</td><td class="num">${fmt(x.qty,0)}</td><td>${esc(x.traceId)||'—'}</td>
         <td><div style="display:flex; gap:6px;">
           <button class="icon-btn" data-poedit="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
           <button class="icon-btn" data-podel="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
@@ -2414,7 +2415,7 @@ function renderProductOutput(){
     const product = document.getElementById('po_product').value;
     const qty = num(document.getElementById('po_qty').value);
     if(!date || !product || qty===null){ toast('تاریخ، محصول و تعداد الزامی است.','err'); return; }
-    const rec = { id: editing.productOutput?.id || uid(), date, product, qty };
+    const rec = { id: editing.productOutput?.id || uid(), date, product, qty, traceId: document.getElementById('po_traceId').value.trim() };
     const isNew = !editing.productOutput;
     if(editing.productOutput){ DB.productOutput = DB.productOutput.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
     else{ DB.productOutput.push(rec); toast('تولید محصول ثبت شد.','ok'); }
@@ -3238,8 +3239,25 @@ function isDarpooshActiveThisMonth_(){
   const targets = DB.meta.productMonthlyTargets || {};
   return Object.keys(targets).some(name => /سه.?راهی|درپوش/.test(name));
 }
+// تناسب نیروی انسانی با حجم برنامهٔ تولید ماهانه — طبق درخواست صریح مدیریت: وقتی برنامهٔ ماه (تب «ارسال
+// به‌تفکیک محصول») از ظرفیت استاندارد خط بیشتر باشد، نیاز نیرو هم به همان نسبت باید بالا برود. عدد پایه
+// («ظرفیت استاندارد») همان جمع اهداف روزانهٔ ۴خط+CKD+سه‌راهی+درپوش+دیزل ضرب‌در روزهای کاری ماه است — یعنی
+// دقیقاً همان سطحی که ارقام نقشهٔ نیروی استاندارد برایش تعریف شده‌اند. فقط رو به بالا تناسب می‌گیریم؛ هیچ‌وقت
+// نیاز نیرو کمتر از حداقل اعلام‌شده نمی‌شود، چون آن‌ها حداقل نیروی لازم برای صرفاً «روشن نگه‌داشتن» خط‌اند.
+function manningScaleFactor_(){
+  const dailyBaseline = 4*(DB.meta.lineTarget||LINE_TARGET_DEFAULT) + (DB.meta.ckdTarget||0) + (DB.meta.se206Target||0) + (DB.meta.darpooshTarget||0) + (DB.meta.dieselTarget||DIESEL_TARGET_DEFAULT);
+  const workingDays = DB.meta.workingDaysPerMonth || 23;
+  const baselineMonthly = dailyBaseline * workingDays;
+  const targets = DB.meta.productMonthlyTargets || {};
+  const planMonthly = Object.values(targets).reduce((s,v)=>s+(v||0),0);
+  if(!baselineMonthly || !planMonthly) return 1;
+  return Math.max(1, Math.min(2, planMonthly/baselineMonthly)); // سقف ۲× برای جلوگیری از اعداد افراطی
+}
 function getManningPlan_(){
-  return isDarpooshActiveThisMonth_() ? [...STANDARD_MANNING_PLAN, ...CONDITIONAL_MANNING_PLAN] : STANDARD_MANNING_PLAN;
+  const base = isDarpooshActiveThisMonth_() ? [...STANDARD_MANNING_PLAN, ...CONDITIONAL_MANNING_PLAN] : STANDARD_MANNING_PLAN;
+  const factor = manningScaleFactor_();
+  if(factor<=1) return base;
+  return base.map(r=>({...r, required: Math.round(r.required*factor*2)/2})); // گرد به نزدیک‌ترین ۰.۵ نفر
 }
 // سابقهٔ چالش «ورودی مشروط» در همین ماه — طبق تأکید شما که این منشأ باعث شوک خط/دوباره‌کاری/ضایعات می‌شود
 function conditionalInputRiskThisMonth_(){
@@ -3377,6 +3395,7 @@ function renderDailyProgram(){
   const otherQty = famPriority.priorityLines[0]===1 ? famPriority.otherRemaining : famPriority.prideRemaining;
   const inputRisk = conditionalInputRiskThisMonth_();
   const darpooshActive = isDarpooshActiveThisMonth_();
+  const manningFactor = manningScaleFactor_();
   const manningPlan = getManningPlan_();
   const totalRequired = manningPlan.reduce((s,r)=>s+r.required,0);
   const totalHeadcount = (DB.meta.personnel||[]).filter(p=>p.workType!=='admin').length;
@@ -3406,10 +3425,14 @@ function renderDailyProgram(){
 
   <div class="grid grid-4 no-print" style="margin-bottom:16px;">
     ${kpiCard('نیروی صف موجود','نفر', fmt(totalHeadcount,0), null, '#4c8dff')}
-    ${kpiCard('نیاز آرایش کامل ایده‌آل','نفر', fmt(totalRequired,0)+(darpooshActive?'':' (بدون درپوش)'), null, '#93a4c3')}
+    ${kpiCard('نیاز آرایش کامل ایده‌آل','نفر', fmt(totalRequired,1)+(darpooshActive?'':' (بدون درپوش)'), null, '#93a4c3')}
     ${kpiCard('کسری ساختاری','نفر', totalRequired>totalHeadcount? '−'+fmt(totalRequired-totalHeadcount,1) : 'بدون کسری', null, totalRequired>totalHeadcount?'#ff5d6c':'#2fd9c4')}
     ${kpiCard('نقش‌های شرطی درپوش','', darpooshActive?'فعال این ماه':'غیرفعال این ماه', null, darpooshActive?'#ffcf5c':'#93a4c3')}
   </div>
+  ${manningFactor>1 ? `<div class="card no-print" style="margin-bottom:16px; border:1px solid rgba(255,207,92,.35); background:rgba(255,207,92,.06);">
+    <div style="font-size:13.5px; font-weight:800; margin-bottom:4px;">📈 نیاز نیرو متناسب با حجم برنامهٔ تولید ماه بالا رفته (×${fmt(manningFactor,2)})</div>
+    <div class="hint">برنامهٔ ماهانهٔ محصول (تب «ارسال به‌تفکیک محصول») نسبت به ظرفیت استاندارد خط ${fmt((manningFactor-1)*100,0)}٪ بیشتر است؛ عددهای «نیروی موردنیاز» در جدول پایین به همین نسبت افزایش یافته‌اند تا این حجم واقعاً قابل‌پوشش باشد.</div>
+  </div>` : ''}
 
   <div class="card no-print" style="margin-bottom:16px;">
     <div class="flexbar"><h3 style="margin:0;">🧭 نقشه نیروی استاندارد (طبق الزامات واقعی خط)</h3></div>
@@ -5667,7 +5690,7 @@ document.getElementById('addLineBtn').addEventListener('click', ()=>{
 
 /* =========================================================================
    ورود پرسنل — یوزرنیم: انتخاب نام از کشویی پرسنل | پسورد: کد پرسنلی همان فرد
-   ورود مدیر — یوزرنیم: admin | پسورد: 1363
+   ورود مدیر — یوزرنیم: admin | پسورد: 566
    این یک قفل سمت مرورگر است (نه رمزنگاری واقعی)، فقط برای اینکه هرکسی که لینک را
    دارد نتواند بدون انتخاب هویت خودش وارد شود؛ نشست فقط در همین تب/مرورگر معتبر است.
    ========================================================================= */
@@ -5714,7 +5737,7 @@ function renderLoginScreen(){
     if(!userVal) return showErr('لطفاً نام کاربری را انتخاب کنید.');
     let ok = false, displayName = '', role = 'staff';
     if(userVal==='__admin__'){
-      ok = pass==='1363'; displayName = 'مدیر سیستم'; role = 'admin';
+      ok = pass==='566'; displayName = 'مدیر سیستم'; role = 'admin';
     } else {
       const p = (DB.meta.personnel||[]).find(x=>x.id===userVal);
       displayName = p? p.name : '';
