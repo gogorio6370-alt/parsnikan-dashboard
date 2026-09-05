@@ -1958,7 +1958,9 @@ function renderProd(){
   const target = DB.meta.lineTarget || LINE_TARGET_DEFAULT;
   const ckdTarget = DB.meta.ckdTarget || 0;
   const se206Target = DB.meta.se206Target || 0;
-  const darpooshTarget = DB.meta.darpooshTarget || 0;
+  // درپوش/سه‌راهی۲۰۶ حالا یک فیلد واحد در فرم است؛ اگر از قبل مقداری در se206Target مانده (قبل از این تغییر)،
+  // این‌جا با درپوش جمع می‌شود تا چیزی گم نشود — با اولین ذخیره، خودش را در darpooshTarget یکی می‌کند.
+  const darpooshTarget = (DB.meta.darpooshTarget || 0) + (DB.meta.se206Target || 0);
   const dieselTarget = DB.meta.dieselTarget || DIESEL_TARGET_DEFAULT;
   const sum4 = rows.reduce((s,e)=>s+mainFourTotal(e),0);
   const sumAll = rows.reduce((s,e)=>s+allLinesTotal(e),0);
@@ -1970,16 +1972,25 @@ function renderProd(){
   const minDay = rows.length? rows.filter(e=>mainFourTotal(e)>0).reduce((a,b)=>(a&&mainFourTotal(a)<=mainFourTotal(b))?a:b, rows.find(e=>mainFourTotal(e)>0)) : null;
   const negDays = rows.filter(e=>allLinesTotal(e) - dayCombinedTarget(e) < 0 && allLinesTotal(e)>0).length;
   const itemStat = (key, dailyTarget)=>{
-    const activeRows = rows.filter(e=> e.lines[key].status!=='stop');
-    const sum = activeRows.reduce((s,e)=>s+(e.lines[key].qty||0),0);
-    const goal = activeRows.reduce((s,e)=>s+dailyTarget*dayShiftFactor(e),0);
+    // هدف نباید با توقف همان خط کوچک شود (همان اصلی که برای هدف کلی روز اصلاح کردیم) —
+    // فقط شیفت واقعاً کوتاه/تعطیل (dayShiftFactor) مجاز است هدف را کم کند.
+    const sum = rows.reduce((s,e)=> e.lines[key].status!=='stop' ? s+(e.lines[key].qty||0) : s, 0);
+    const goal = rows.reduce((s,e)=>s+dailyTarget*dayShiftFactor(e),0);
     const dev = goal? (sum-goal)/goal : null;
-    return { sum, goal, dev, days: activeRows.length };
+    return { sum, goal, dev, days: rows.length };
   };
   const ckdStat = itemStat('ckd', ckdTarget);
   const se206Stat = itemStat('se206', se206Target);
   const darpooshStat = itemStat('darpoosh', darpooshTarget);
   const dieselStat = itemStat('diesel', dieselTarget);
+  // درپوش و سه‌راهی۲۰۶ در ستاپ اهداف یک فیلد واحد شده‌اند («هدف درپوش/سه‌راهی») — پس برای گزارش هم
+  // تولید واقعی هر دو با هم جمع می‌شود و در برابر همان یک هدف مشترک سنجیده می‌شود.
+  const darpooshSe206Stat = (()=>{
+    const sum = darpooshStat.sum + se206Stat.sum;
+    const goal = darpooshStat.goal; // چون se206Target همیشه ۰ نگه داشته می‌شود، goal واحد از darpooshTarget می‌آید
+    const dev = goal? (sum-goal)/goal : null;
+    return { sum, goal, dev };
+  })();
 
   // per-station average daily production vs. each station's own (variable) target — for the bullet chart below
   const stationRowsAll = monthData().stationHourly || [];
@@ -2017,8 +2028,7 @@ function renderProd(){
       <div class="field"><label>هدف هر یک از ۴ خط اصلی</label><input id="targetInput" type="text" inputmode="numeric" value="${target}"></div>
       <div class="field"><label>حداکثر ظرفیت اسمی هر خط <span class="muted">(برای نرخ استفاده از ظرفیت)</span></label><input id="nominalCapInput" type="text" inputmode="numeric" value="${DB.meta.nominalCapacity || target}"></div>
       <div class="field"><label>هدف CKD (۰ = بدون هدف)</label><input id="ckdTargetInput" type="text" inputmode="numeric" value="${ckdTarget}"></div>
-      <div class="field"><label>هدف سه‌راهی ۲۰۶ (۰ = بدون هدف)</label><input id="se206TargetInput" type="text" inputmode="numeric" value="${se206Target}"></div>
-      <div class="field"><label>هدف درپوش (۰ = بدون هدف)</label><input id="darpooshTargetInput" type="text" inputmode="numeric" value="${darpooshTarget}"></div>
+      <div class="field"><label>هدف درپوش/سه‌راهی ۲۰۶ (۰ = بدون هدف)</label><input id="darpooshTargetInput" type="text" inputmode="numeric" value="${darpooshTarget}"></div>
       <div class="field"><label>هدف دیزل / بنز <span class="muted">— خط پنجم، جدا از ۴ خط اصلی</span></label><input id="dieselTargetInput" type="text" inputmode="numeric" value="${dieselTarget}"></div>
       <div class="field"><label>ساعت شیفت «روز عادی» <span class="muted">(مبنای اهداف بالا)</span></label><input id="normalShiftInput" type="text" inputmode="numeric" value="${DB.meta.normalShiftHours||10}"></div>
       <div class="field"><label>بهای هر عدد ترموستات <span class="muted">(ریال — برای محاسبه ارزش ریالی توقف/ضایعات)</span></label><input id="unitCostInput" type="text" inputmode="numeric" placeholder="مثلاً 2000000" value="${DB.meta.unitCostRial||''}"></div>
@@ -2027,10 +2037,9 @@ function renderProd(){
     <button class="btn btn-teal btn-sm" id="saveTargetBtn" style="margin-top:14px;">ذخیره اهداف</button>
   </div>
 
-  <div class="grid grid-4" style="margin-bottom:16px;">
+  <div class="grid grid-3" style="margin-bottom:16px;">
     ${ckdTarget>0? kpiCard('CKD — انحراف از هدف ماه', '', pct(ckdStat.dev,1), ckdStat.dev>=0?'up':'down', ckdStat.dev>=0?'#2fd9c4':'#ff5d6c') : kpiCard('جمع CKD این ماه','عدد', fmt(ckdStat.sum,0), null, '#4c8dff')}
-    ${se206Target>0? kpiCard('سه‌راهی۲۰۶ — انحراف از هدف ماه', '', pct(se206Stat.dev,1), se206Stat.dev>=0?'up':'down', se206Stat.dev>=0?'#2fd9c4':'#ff5d6c') : kpiCard('جمع سه‌راهی۲۰۶ این ماه','عدد', fmt(se206Stat.sum,0), null, '#b389ff')}
-    ${darpooshTarget>0? kpiCard('درپوش — انحراف از هدف ماه', '', pct(darpooshStat.dev,1), darpooshStat.dev>=0?'up':'down', darpooshStat.dev>=0?'#2fd9c4':'#ff5d6c') : kpiCard('جمع درپوش این ماه','عدد', fmt(darpooshStat.sum,0), null, '#ffcf5c')}
+    ${darpooshTarget>0? kpiCard('درپوش/سه‌راهی۲۰۶ — انحراف از هدف ماه', '', pct(darpooshSe206Stat.dev,1), darpooshSe206Stat.dev>=0?'up':'down', darpooshSe206Stat.dev>=0?'#2fd9c4':'#ff5d6c') : kpiCard('جمع درپوش/سه‌راهی۲۰۶ این ماه','عدد', fmt(darpooshSe206Stat.sum,0), null, '#ffcf5c')}
     ${dieselTarget>0? kpiCard('دیزل/بنز — انحراف از هدف ماه', '', pct(dieselStat.dev,1), dieselStat.dev>=0?'up':'down', dieselStat.dev>=0?'#2fd9c4':'#ff5d6c') : kpiCard('جمع دیزل/بنز این ماه','عدد', fmt(dieselStat.sum,0), null, '#ff9d8a')}
   </div>
 
@@ -2127,7 +2136,6 @@ function renderProd(){
     if(v===null || v<=0){ toast('مقدار هدف ۴ خط اصلی نامعتبر است.','err'); return; }
     const dieselV = num(document.getElementById('dieselTargetInput').value);
     const ckdV = num(document.getElementById('ckdTargetInput').value);
-    const se206V = num(document.getElementById('se206TargetInput').value);
     const darpooshV = num(document.getElementById('darpooshTargetInput').value);
     const nomV = num(document.getElementById('nominalCapInput').value);
     const normalShiftV = num(document.getElementById('normalShiftInput').value);
@@ -2135,8 +2143,10 @@ function renderProd(){
     DB.meta.lineTarget = v;
     DB.meta.dieselTarget = dieselV===null? 0 : Math.max(0, dieselV);
     DB.meta.ckdTarget = ckdV===null? 0 : Math.max(0, ckdV);
-    DB.meta.se206Target = se206V===null? 0 : Math.max(0, se206V);
+    // درپوش و سه‌راهی۲۰۶ حالا یک فیلد واحدند — همه چیز در darpooshTarget می‌رود و se206Target همیشه صفر
+    // نگه داشته می‌شود تا در dayCombinedTarget/dpRequiredForStation_ (که مجموع این دو را جمع می‌زنند) دوبار حساب نشود.
     DB.meta.darpooshTarget = darpooshV===null? 0 : Math.max(0, darpooshV);
+    DB.meta.se206Target = 0;
     DB.meta.nominalCapacity = (nomV===null || nomV<=0)? 0 : Math.max(nomV, v);
     DB.meta.normalShiftHours = (normalShiftV===null || normalShiftV<=0)? 10 : normalShiftV;
     DB.meta.unitCostRial = (unitCostV===null || unitCostV<=0)? 0 : unitCostV;
