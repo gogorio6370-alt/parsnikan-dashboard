@@ -450,7 +450,7 @@ let dirty = { daily:false, waste:false, stop:false, short:false, meta:false };
 let currentTab = 'dash';
 let charts = {};
 let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null };
-let filters = { waste:'', stop:'', short:'', wasteCat:'all', wasteEventType:'all', stopReason:'all', stationFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'', dpDate:'' };
+let filters = { waste:'', stop:'', short:'', wasteCat:'all', wasteEventType:'all', stopReason:'all', stationFilter:'all', stationOperatorFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'', dpDate:'' };
 let personnelUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
 
 /* ---------------------------- utils ---------------------------- */
@@ -1712,8 +1712,10 @@ function renderStations(){
   const stations = DB.meta.stations || [];
   const draft = editing.stationHourly || emptyStationHourlyDraft();
   const filterStation = filters.stationFilter || 'all';
+  const filterOperator = filters.stationOperatorFilter || 'all';
   const list = [...M.stationHourly].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
-    .filter(r=> filterStation==='all' || r.stationId===filterStation);
+    .filter(r=> (filterStation==='all' || r.stationId===filterStation)
+             && (filterOperator==='all' || (r.operator||'').split(/[،,]/).map(s=>s.trim()).includes(filterOperator)));
 
   // KPIs
   const withTarget = M.stationHourly.filter(r=> r.target>0);
@@ -1738,9 +1740,9 @@ function renderStations(){
     ${kpiCard('بهترین ایستگاه (این ماه)', '', bestStation? esc(bestStation.name):'—', null, '#2fd9c4', true)}
   </div>
 
-  <div class="card" style="margin-bottom:16px;">
-    <h3>⚙️ ستاپ ایستگاه‌ها <span class="muted">استاندارد ساعتی (مرجع) و هدف روزانه — مخصوص همین خط تولید</span></h3>
-    <div class="table-wrap" style="margin-bottom:14px;"><table>
+  <details class="card" style="margin-bottom:16px;" ${editing.station?'open':''}>
+    <summary style="cursor:pointer; list-style:none;"><h3 style="display:inline; margin:0;">⚙️ ستاپ ایستگاه‌ها <span class="muted">استاندارد ساعتی (مرجع) و هدف روزانه — مخصوص همین خط تولید (برای باز/بسته‌کردن کلیک کنید)</span></h3></summary>
+    <div class="table-wrap" style="margin-bottom:14px; margin-top:14px;"><table>
       <thead><tr><th>نام ایستگاه</th><th class="num">استاندارد ساعتی</th><th class="num">هدف روزانه</th><th>مرحله جریان</th><th></th></tr></thead>
       <tbody>
       ${stations.length===0? `<tr><td colspan="5"><div class="tbl-empty">هنوز ایستگاهی تعریف نشده — پایین همین کارت یک ایستگاه اضافه کنید.</div></td></tr>` :
@@ -1772,7 +1774,7 @@ function renderStations(){
       <input type="checkbox" id="newStNoQty" ${editing.station?.noQty?'checked':''}> این ایستگاه آمار تعدادی ندارد (مثل تست/متفرقه) — فقط ساعت کاری ثبت می‌شود، بدون هدف/انحراف
     </label>
     <div class="hint" style="margin-top:8px;">اگر چند ایستگاه سریالی با هم یک زیرخط (مثلاً «اتاق قرص») را می‌سازند و مجموعاً باید بیشتر از هدف نهایی خط تولید کنند (مثلاً برای پوشش ضایعات یا تغذیه چند خط)، همه را با یک نام «مرحله جریان» یکسان علامت بزنید — سپس در تب «نقشه خط و گلوگاه‌ها» می‌توانید هدف ورودی موردنیاز همان مرحله را جداگانه تعریف کنید.</div>
-  </div>
+  </details>
 
   <div class="card" style="margin-bottom:18px;">
     <h3>${draft.id? '✏️ ویرایش آمار ایستگاه' : '➕ ثبت تولید روزانه ایستگاه'}</h3>
@@ -1810,6 +1812,10 @@ function renderStations(){
         <select id="stFilterSelect" class="pill" style="padding:7px 10px;">
           <option value="all" ${filterStation==='all'?'selected':''}>همه ایستگاه‌ها</option>
           ${stations.map(st=>`<option value="${st.id}" ${filterStation===st.id?'selected':''}>${esc(st.name)}</option>`).join('')}
+        </select>
+        <select id="stOpFilterSelect" class="pill" style="padding:7px 10px;">
+          <option value="all" ${filterOperator==='all'?'selected':''}>همه اپراتورها</option>
+          ${allOperatorNames().map(n=>`<option value="${esc(n)}" ${filterOperator===n?'selected':''}>${esc(n)}</option>`).join('')}
         </select>
         <button class="btn btn-ghost btn-sm" id="expStCsv">خروجی CSV</button>
       </div>
@@ -1933,6 +1939,7 @@ function renderStations(){
     });
   }));
   document.getElementById('stFilterSelect').addEventListener('change', e=>{ filters.stationFilter = e.target.value; renderStations(); });
+  document.getElementById('stOpFilterSelect').addEventListener('change', e=>{ filters.stationOperatorFilter = e.target.value; renderStations(); });
   document.getElementById('expStCsv').addEventListener('click', ()=>{
     const headers = ['تاریخ','ایستگاه','اپراتور(ها)','ساعت شروع','ساعت پایان','محصول/قطعه','تولید','هدف','انحراف','شماره شناسایی ردیابی','شماره بازرسی'];
     const rr = M.stationHourly.map(r=>[r.date, (stationById(r.stationId)||{}).name||'', r.operator||'', r.shiftStart||'', r.shiftEnd||'', r.product||'', r.total, r.target, r.target? (r.total-r.target):'', r.traceId||'', r.inspectionId||'']);
@@ -3053,7 +3060,30 @@ const INDUSTRY_BENCHMARK = { oeeWorldClass:0.85, oeeAutomotive:0.75, oeeAverage:
    واقعی، این فایل را فقط با افراد مورد اعتماد به اشتراک بگذارید).
    ========================================================================= */
 const PERSONNEL_PASSWORD = 'Yalda@1391';
+// آمار تولید/هدف/انحراف هر نفر از روی «ثبت‌های آمار ایستگاه‌ها» — اگر یک ردیف چند اپراتور هم‌زمان داشته باشد
+// (کار گروهی روی یک ایستگاه)، عدد آن ردیف عادلانه بین همان چند نفر تقسیم می‌شود، نه این‌که به هرکدام کامل داده شود.
+function personEvalStats_(name, records){
+  let production = 0, target = 0;
+  records.forEach(r=>{
+    const ops = (r.operator||'').split(/[،,]/).map(s=>s.trim()).filter(Boolean);
+    if(!ops.includes(name)) return;
+    const share = ops.length || 1;
+    production += (r.total||0)/share;
+    target += (r.target||0)/share;
+  });
+  const dev = target? (production-target)/target : null;
+  return { production, target, dev };
+}
+// امتیاز کل = میانگین چهار مؤلفه: عملکرد تولید (خودکار، از تحقق هدف) + نظم و تردد + 5S + کیفیت (هر سه دستی).
+// اگر مؤلفه‌ای هنوز داده ندارد (مثلاً امتیاز دستی وارد نشده)، در میانگین حساب نمی‌شود، نه این‌که صفر لحاظ شود.
+function personOverallScore_(p, prodStat){
+  const perfScore = prodStat.dev===null? null : Math.max(0, Math.min(120, 100 + prodStat.dev*100));
+  const parts = [perfScore, p.scoreDiscipline, p.score5S, p.scoreQuality].filter(v=>v!==null && v!==undefined && v!=='' && !isNaN(v));
+  if(!parts.length) return null;
+  return parts.reduce((s,v)=>s+Number(v),0)/parts.length;
+}
 function renderPersonnel(){
+  const M = monthData();
   const list = (DB.meta.personnel||[]).slice().sort((a,b)=> (a.name||'').localeCompare(b.name||'','fa'));
   const q = (filters.personnel||'').toLowerCase();
   const wtFilter = filters.personnelWorkType || 'all';
@@ -3077,11 +3107,10 @@ function renderPersonnel(){
     ${kpiCard('نیروی ستادی (اداری)','نفر', fmt(adminCount,0), null, '#a78bfa')}
     ${kpiCard('میانگین سابقه فعالیت','سال', avgExp===null?'—':fmt(avgExp,1), null, '#ff9d42')}
   </div>
-  <div class="grid grid-4" style="margin-bottom:16px;">
+  <div class="grid grid-3" style="margin-bottom:16px;">
     ${kpiCard('میانگین سن پرسنل','سال', avgAge===null?'—':fmt(avgAge,1), null, '#93a4c3')}
     ${kpiCard('نیاز نیروی صف طبق برنامه‌ریزی','نفر', fmt(totalRequiredHC,1)+(isDarpooshActiveThisMonth_()?'':' (بدون درپوش)'), null, '#93a4c3')}
     ${kpiCard('کسری نفرات صف', 'نفر', headcountGap>0? '−'+fmt(headcountGap,1) : 'بدون کسری', null, headcountGap>0?'#ff5d6c':'#2fd9c4')}
-    ${kpiCard('پرسنل بدون سن ثبت‌شده','نفر', fmt(list.length-agesKnown.length,0), null, '#ffcf5c')}
   </div>
   <div class="hint" style="margin:-8px 0 16px;">جزئیات نقش‌به‌نقش این کسری (کدام فرآیند دقیقاً کم‌نیرو است) را در تب «برنامه تولید روزانه» → جدول «نقشه نیروی استاندارد» ببینید.</div>
 
@@ -3119,6 +3148,37 @@ function renderPersonnel(){
       </tr>`).join('')}
       </tbody>
     </table></div>
+  </div>
+
+  <div class="card" style="margin-top:16px;">
+    <div class="flexbar">
+      <h3 style="margin:0;">🏅 امتیاز ارزیابی پرسنل صف — ${esc(monthLabel(DB.meta.activeMonth))}</h3>
+      <span class="hint" style="margin:0;">مبنای پیشنهادی برای پاداش/جریمه — نه محاسبهٔ نهایی حقوق</span>
+    </div>
+    <div class="hint" style="margin-bottom:10px;">«عملکرد تولید» خودکار از «ثبت‌های آمار ایستگاه‌ها» همین ماه محاسبه می‌شود (جمع تولید نسبت به جمع هدف، وقتی چند نفر هم‌زمان یک ایستگاه بودند به‌طور مساوی بین‌شان تقسیم شده)؛ سه ستون دیگر را خودتان دستی وارد کنید (۰ تا ۱۰۰). «امتیاز کل» میانگین همان مؤلفه‌هایی است که مقدار دارند.</div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>نام</th><th class="num">جمع تولید</th><th class="num">جمع هدف</th><th class="num">انحراف٪</th><th class="num">نظم و تردد</th><th class="num">5S</th><th class="num">کیفیت</th><th class="num">امتیاز کل</th></tr></thead>
+      <tbody>
+      ${(()=>{
+        const staff = list.filter(p=>(p.workType||'production')==='production');
+        if(!staff.length) return `<tr><td colspan="8"><div class="tbl-empty">پرسنل صفی برای ارزیابی ثبت نشده.</div></td></tr>`;
+        return staff.map(p=>{
+          const stat = personEvalStats_(p.name, M.stationHourly||[]);
+          const overall = personOverallScore_(p, stat);
+          return `<tr data-evalrow="${p.id}">
+            <td>${esc(p.name)}</td>
+            <td class="num">${fmt(stat.production,0)}</td>
+            <td class="num">${stat.target? fmt(stat.target,0) : '<span class="muted">—</span>'}</td>
+            <td class="num" style="color:${stat.dev===null?'var(--text-mute)':stat.dev>=0?'#8ff0c8':'#ffb0b8'}; font-weight:800;">${pct(stat.dev,1)}</td>
+            <td class="num"><input data-evalfield="scoreDiscipline" type="text" inputmode="numeric" value="${p.scoreDiscipline??''}" style="width:64px; text-align:center;" placeholder="—"></td>
+            <td class="num"><input data-evalfield="score5S" type="text" inputmode="numeric" value="${p.score5S??''}" style="width:64px; text-align:center;" placeholder="—"></td>
+            <td class="num"><input data-evalfield="scoreQuality" type="text" inputmode="numeric" value="${p.scoreQuality??''}" style="width:64px; text-align:center;" placeholder="—"></td>
+            <td class="num" style="font-weight:900; color:${overall===null?'var(--text-mute)':overall>=85?'#8ff0c8':overall>=60?'#ffe08a':'#ffb0b8'};">${overall===null?'—':fmt(overall,1)}</td>
+          </tr>`;
+        }).join('');
+      })()}
+      </tbody>
+    </table></div>
   </div>`;
 
   document.getElementById('personnelSearch').addEventListener('input', e=>{ filters.personnel = e.target.value; renderPersonnel(); });
@@ -3141,6 +3201,18 @@ function renderPersonnel(){
       scheduleSave(); toast('پرسنل حذف شد.','ok'); renderPersonnel();
     });
   }));
+
+  document.querySelectorAll('[data-evalfield]').forEach(inp=>{
+    inp.addEventListener('change', ()=>{
+      const row = inp.closest('[data-evalrow]');
+      const p = DB.meta.personnel.find(x=>x.id===row.dataset.evalrow);
+      if(!p) return;
+      const v = num(inp.value);
+      p[inp.dataset.evalfield] = (v===null)? null : Math.max(0, Math.min(100, v));
+      scheduleSave();
+      renderPersonnel();
+    });
+  });
 }
 // افزودن/ویرایش یک نفر پرسنل — شامل کد پرسنلی (که هم برای گزارش بهره‌وری و هم به‌عنوان رمز ورود پرسنل استفاده می‌شود)
 function openPersonnelEditModal(person){
