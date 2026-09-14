@@ -1713,9 +1713,18 @@ function renderStations(){
   const draft = editing.stationHourly || emptyStationHourlyDraft();
   const filterStation = filters.stationFilter || 'all';
   const filterOperator = filters.stationOperatorFilter || 'all';
+  const filterProduct = filters.stationProductFilter || 'all';
+  const traceQuery = (filters.stationTraceQuery || '').trim();
+  // حفظ فوکوس/موقعیت مکان‌نما در فیلد جستجوی شماره ردیابی هنگام رندر مجدد (تایپ حرف به حرف نباید فوکوس را قطع کند)
+  const _prevFocus = document.activeElement;
+  const _restoreTraceCaret = (_prevFocus && _prevFocus.id === 'stTraceFilterInput') ? _prevFocus.selectionStart : null;
+  const productOptions = [...new Set((DB.stationHourly||[]).map(r=>r.product).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fa'));
   const list = [...M.stationHourly].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
     .filter(r=> (filterStation==='all' || r.stationId===filterStation)
-             && (filterOperator==='all' || (r.operator||'').split(/[،,]/).map(s=>s.trim()).includes(filterOperator)));
+             && (filterOperator==='all' || (r.operator||'').split(/[،,]/).map(s=>s.trim()).includes(filterOperator))
+             && (filterProduct==='all' || r.product===filterProduct)
+             && (!traceQuery || (r.traceId||'').toLowerCase().includes(traceQuery.toLowerCase())));
+  const sumFilteredTotal = list.reduce((s,r)=> s + (r.total||0), 0);
 
   // KPIs
   const withTarget = M.stationHourly.filter(r=> r.target>0);
@@ -1807,7 +1816,7 @@ function renderStations(){
 
   <div class="card">
     <div class="flexbar">
-      <h3 style="margin:0;">ثبت‌های آمار ایستگاه‌ها (${list.length} از ${M.stationHourly.length})</h3>
+      <h3 style="margin:0;">ثبت‌های آمار ایستگاه‌ها (${list.length} از ${M.stationHourly.length}) <span class="muted" style="font-weight:400; font-size:12px;">— جمع تولید فیلترشده: <b style="color:var(--text);">${fmt(sumFilteredTotal,0)}</b></span></h3>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <select id="stFilterSelect" class="pill" style="padding:7px 10px;">
           <option value="all" ${filterStation==='all'?'selected':''}>همه ایستگاه‌ها</option>
@@ -1817,18 +1826,24 @@ function renderStations(){
           <option value="all" ${filterOperator==='all'?'selected':''}>همه اپراتورها</option>
           ${allOperatorNames().map(n=>`<option value="${esc(n)}" ${filterOperator===n?'selected':''}>${esc(n)}</option>`).join('')}
         </select>
+        <select id="stProductFilterSelect" class="pill" style="padding:7px 10px;">
+          <option value="all" ${filterProduct==='all'?'selected':''}>همه محصولات/قطعات</option>
+          ${productOptions.map(p=>`<option value="${esc(p)}" ${filterProduct===p?'selected':''}>${esc(p)}</option>`).join('')}
+        </select>
+        <input id="stTraceFilterInput" class="pill" style="padding:7px 10px; min-width:170px;" placeholder="جستجوی شماره شناسایی ردیابی…" value="${esc(traceQuery)}">
         <button class="btn btn-ghost btn-sm" id="expStCsv">خروجی CSV</button>
       </div>
     </div>
     <div class="table-wrap" style="max-height:460px; overflow:auto;"><table>
-      <thead><tr><th>تاریخ</th><th>ایستگاه</th><th>اپراتور(ها)</th><th>ساعت</th><th>محصول/قطعه</th><th class="num">تولید</th><th class="num">هدف</th><th class="num">انحراف٪</th><th></th></tr></thead>
+      <thead><tr><th>تاریخ</th><th>ایستگاه</th><th>اپراتور(ها)</th><th>ساعت</th><th>محصول/قطعه</th><th>شماره شناسایی ردیابی</th><th class="num">تولید</th><th class="num">هدف</th><th class="num">انحراف٪</th><th></th></tr></thead>
       <tbody>
-      ${list.length===0?`<tr><td colspan="9"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
+      ${list.length===0?`<tr><td colspan="10"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
       list.map(r=>{
         const devp = r.target? (r.total-r.target)/r.target : null;
         const shiftRange = (r.shiftStart||r.shiftEnd) ? `${esc(r.shiftStart)||'—'}–${esc(r.shiftEnd)||'—'}` : '—';
         return `<tr><td>${esc(r.date)}</td><td>${esc((stationById(r.stationId)||{}).name||'—')}</td><td>${esc(r.operator)||'—'}</td>
           <td style="direction:ltr; text-align:center;">${shiftRange}</td><td>${esc(r.product)||'—'}</td>
+          <td style="direction:ltr; text-align:center; font-family:monospace; font-size:12px;">${esc(r.traceId)||'—'}</td>
           <td class="num"><b>${fmt(r.total,0)}</b></td><td class="num">${fmt(r.target,0)}</td>
           <td class="num" style="color:${devp===null?'inherit':devp>=0?'#8ff0c8':'#ffb0b8'}">${devp===null?'—':pct(devp,1)}</td>
           <td><div style="display:flex; gap:6px;">
@@ -1940,6 +1955,12 @@ function renderStations(){
   }));
   document.getElementById('stFilterSelect').addEventListener('change', e=>{ filters.stationFilter = e.target.value; renderStations(); });
   document.getElementById('stOpFilterSelect').addEventListener('change', e=>{ filters.stationOperatorFilter = e.target.value; renderStations(); });
+  document.getElementById('stProductFilterSelect').addEventListener('change', e=>{ filters.stationProductFilter = e.target.value; renderStations(); });
+  document.getElementById('stTraceFilterInput').addEventListener('input', e=>{ filters.stationTraceQuery = e.target.value; renderStations(); });
+  if(_restoreTraceCaret !== null){
+    const _tf = document.getElementById('stTraceFilterInput');
+    if(_tf){ _tf.focus(); try{ _tf.setSelectionRange(_restoreTraceCaret, _restoreTraceCaret); }catch(err){} }
+  }
   document.getElementById('expStCsv').addEventListener('click', ()=>{
     const headers = ['تاریخ','ایستگاه','اپراتور(ها)','ساعت شروع','ساعت پایان','محصول/قطعه','تولید','هدف','انحراف','شماره شناسایی ردیابی','شماره بازرسی'];
     const rr = M.stationHourly.map(r=>[r.date, (stationById(r.stationId)||{}).name||'', r.operator||'', r.shiftStart||'', r.shiftEnd||'', r.product||'', r.total, r.target, r.target? (r.total-r.target):'', r.traceId||'', r.inspectionId||'']);
