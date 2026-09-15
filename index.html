@@ -2707,6 +2707,14 @@ function paretoFrom(items, keyFn, valFn){
   arr.forEach(x=>{ cum += x.value; x.pct = total? x.value/total : 0; x.cumPct = total? cum/total : 0; });
   return arr;
 }
+// یک جملهٔ کوتاه و مدیریتی زیر هر نمودار پارتو — دقیقاً همان چیزی که یک مدیر ارشد نگاهی می‌اندازد و می‌خواهد
+// «روی چند مورد اول تمرکز کنم؟» را بدون خواندن کل جدول بفهمد.
+function paretoInsight80_(arr, noun){
+  if(!arr.length) return '';
+  if(arr.length===1) return `تمام موارد ثبت‌شده مربوط به «${esc(arr[0].label)}» است.`;
+  const n80 = Math.max(1, arr.filter(x=>x.cumPct<=0.8).length);
+  return `طبق قاعده ۸۰/۲۰، رسیدگی به ${fmt(n80,0)} ${esc(noun)} نخست (از ${fmt(arr.length,0)} مورد) — با شروع از «${esc(arr[0].label)}» — حدود ۸۰٪ کل را پوشش می‌دهد.`;
+}
 function renderWaste(){
   const M = monthData();
   const list = [...M.waste].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
@@ -2732,6 +2740,14 @@ function renderWaste(){
   const typePareto = paretoFrom(scrapOnly, x=>x.wasteType, x=>x.wasteCount).slice(0,10);
   const productPareto = paretoFrom(scrapOnly.filter(x=>x.finalProduct), x=>x.finalProduct, x=>x.wasteCount).slice(0,10);
   const catTotals = paretoFrom(M.waste, x=>x.category, x=>x.wasteCount);
+  // «نوع رویداد» (فیلد ۱ در فرم ثبت) — ضایعات واقعی (دورریز) در برابر دوباره‌کاری (قابل‌جبران)؛ چون از نظر
+  // مدیریتی مهم‌ترین تفکیک است (همان چیزی که در فرم با کادر آبی و شماره «۱» مشخص شده)، اولین نموداری است
+  // که مدیریت می‌بیند.
+  const eventTypeTotals = WASTE_EVENT_TYPES.map(t=>{
+    const rows = M.waste.filter(x=>(x.eventType||'ضایعات')===t);
+    return { label:t, qty: rows.reduce((s,x)=>s+(x.wasteCount||0),0), minutes: rows.reduce((s,x)=>s+(x.reworkMinutes||0),0), rows: rows.length };
+  });
+  const eventTypeQtyTotal = eventTypeTotals.reduce((s,x)=>s+x.qty,0);
   // تیپ‌ها و انواع ضایعات دیگر ثابت نیستند — خودتان از همین تب می‌توانید گزینه اضافه/حذف کنید
   // (مثلاً «ورودی مشروط» برای قطعاتی که سالم می‌رسند ولی باید قبل از مصرف جدا/غربال شوند).
   const wasteCategories = (DB.meta.wasteCategories && DB.meta.wasteCategories.length) ? DB.meta.wasteCategories : WASTE_CATEGORIES.slice();
@@ -2812,26 +2828,35 @@ function renderWaste(){
     </div>
   </details>
 
-  <div class="grid grid-2" style="margin-bottom:16px;">
-    <div class="card">
-      <h3>تحلیل پارتو ضایعات به تفکیک ایستگاه</h3>
-      <div class="chart-box"><canvas id="chWasteStation"></canvas></div>
-    </div>
-    <div class="card">
-      <h3>تحلیل پارتو ضایعات به تفکیک نوع</h3>
-      <div class="chart-box"><canvas id="chWasteType"></canvas></div>
-    </div>
+  <div class="card" style="margin-bottom:16px;">
+    <h3>۱) نوع رویداد — ضایعات (دورریز قطعی) در برابر دوباره‌کاری (قابل‌جبران)</h3>
+    <div class="chart-box sm"><canvas id="chWasteEventType"></canvas></div>
+    <div class="hint" style="margin-top:8px;">${eventTypeQtyTotal? `از هر ۱۰۰ واحد مغایرت ثبت‌شده این ماه، <b>${fmt((eventTypeTotals[0].qty/eventTypeQtyTotal)*100,0)} واحد ضایعات قطعی</b> و <b>${fmt((eventTypeTotals[1].qty/eventTypeQtyTotal)*100,0)} واحد دوباره‌کاری</b> بوده است.` : 'هنوز داده‌ای برای این ماه ثبت نشده است.'}</div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>سهم تیپ ضایعات (ورودی / حین فرایند / سایر)</h3>
-    <div class="chart-box sm"><canvas id="chWasteCat"></canvas></div>
+    <h3>۲) منشأ بروز — این ضایعات/دوباره‌کاری کجا ایجاد شد؟</h3>
+    <div class="chart-box"><canvas id="chWasteCat"></canvas></div>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card">
+      <h3>تحلیل پارتو به تفکیک ایستگاه</h3>
+      <div class="chart-box"><canvas id="chWasteStation"></canvas></div>
+      <div class="hint" style="margin-top:8px;">${paretoInsight80_(stationPareto,'ایستگاه')}</div>
+    </div>
+    <div class="card">
+      <h3>تحلیل پارتو به تفکیک علت دقیق</h3>
+      <div class="chart-box"><canvas id="chWasteType"></canvas></div>
+      <div class="hint" style="margin-top:8px;">${paretoInsight80_(typePareto,'علت')}</div>
+    </div>
   </div>
 
   ${productPareto.length? `
   <div class="card" style="margin-bottom:16px;">
-    <h3>تحلیل پارتو ضایعات به تفکیک محصول نهایی (مدل خودرو)</h3>
+    <h3>تحلیل پارتو به تفکیک محصول نهایی (مدل خودرو)</h3>
     <div class="chart-box"><canvas id="chWasteProduct"></canvas></div>
+    <div class="hint" style="margin-top:8px;">${paretoInsight80_(productPareto,'محصول')}</div>
   </div>` : ''}
 
   <div class="card">
@@ -2937,11 +2962,15 @@ function renderWaste(){
     inp.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById(inp.id==='newCatInput'?'addCatBtn':'addTypeBtn').click(); });
   });
 
+  mkChart('chWasteEventType', { type:'bar', data:{ labels: eventTypeTotals.map(x=>x.label),
+      datasets:[{ label:'تعداد', data: eventTypeTotals.map(x=>x.qty), backgroundColor:['#ff5d6c','#2fd9c4'], borderRadius:8 }] },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ x:{grid:{color:'#182338'}}, y:{grid:{display:false}, ticks:{font:{size:12}}} } } });
+  mkChart('chWasteCat', { type:'doughnut', data:{ labels: catTotals.map(x=>x.label), datasets:[{data:catTotals.map(x=>x.value), backgroundColor:catTotals.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#101827', borderWidth:3}]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}} } });
   paretoChart('chWasteStation', stationPareto, '#ff5d6c');
   paretoChart('chWasteType', typePareto, '#ffcf5c');
   if(productPareto.length) paretoChart('chWasteProduct', productPareto, '#b389ff');
-  mkChart('chWasteCat', { type:'doughnut', data:{ labels: catTotals.map(x=>x.label), datasets:[{data:catTotals.map(x=>x.value), backgroundColor:catTotals.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#101827', borderWidth:3}]},
-    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}} } });
 }
 function paretoChart(id, arr, color){
   mkChart(id, { data:{ labels: arr.map(x=>x.label),
