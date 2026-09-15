@@ -140,10 +140,11 @@ button{font-family:inherit;}
 /* ===== cards / grid ===== */
 .grid{ display:grid; gap:14px; }
 .grid-4{ grid-template-columns:repeat(4,1fr); }
+.grid-5{ grid-template-columns:repeat(5,1fr); }
 .grid-3{ grid-template-columns:repeat(3,1fr); }
 .grid-2{ grid-template-columns:repeat(2,1fr); }
-@media(max-width:1200px){ .grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);} }
-@media(max-width:640px){ .grid-4,.grid-3,.grid-2{grid-template-columns:1fr;} .cover-head-grid{grid-template-columns:1fr !important;} }
+@media(max-width:1200px){ .grid-4{grid-template-columns:repeat(2,1fr);} .grid-3{grid-template-columns:repeat(2,1fr);} .grid-5{grid-template-columns:repeat(3,1fr);} }
+@media(max-width:640px){ .grid-4,.grid-3,.grid-2,.grid-5{grid-template-columns:1fr;} .cover-head-grid{grid-template-columns:1fr !important;} }
 
 .card{
   background:linear-gradient(180deg, var(--panel), var(--panel-2));
@@ -2480,21 +2481,25 @@ function renderProductOutput(){
    ========================================================================= */
 function renderShip(){
   const rows = [...monthData().daily].sort((a,b)=>dateSortKey(a.date)-dateSortKey(b.date));
+  // چهار دستهٔ واقعی گزارش ارسال — دقیقاً همان چهار دستهٔ هدف روزانه (۴ خط اصلی/CKD/درپوش+سه‌راهی/دیزل-بنز).
+  // قبلاً «بنز۷۱» به‌اشتباه داخل «ترموستات‌ها» جمع می‌شد (باید دیزل/بنز جدا باشد) و «درپوش‌ها» و «سه‌راهی ۲۰۶»
+  // دو ردیف جدا بودند در حالی‌که در گزارش‌های مدیریتی همیشه یک دسته‌اند.
   const groups = [
-    {key:'termostat', label:'ترموستات‌ها', fields:['termostat_koli','benz71']},
+    {key:'termostat', label:'ترموستات‌ها', fields:['termostat_koli']},
+    {key:'dieselBenz', label:'دیزل/بنز', fields:['benz71']},
     {key:'ckd', label:'CKD', fields:['ckd89','ckd76','ckd83']},
-    {key:'darpoosh', label:'درپوش‌ها', fields:['l90','sayna','shahin','jack']},
-    {key:'se206', label:'سه‌راهی ۲۰۶', fields:['se206','shahinpas']},
+    {key:'darpooshSe206', label:'درپوش‌ها/سه‌راهی', fields:['l90','sayna','shahin','jack','se206','shahinpas']},
   ];
-  const groupTotals = groups.map(g=>({ ...g, total: rows.reduce((s,e)=> s + g.fields.reduce((s2,f)=>s2+(e.ship[f]||0),0), 0) }));
+  const groupSum = (e,g)=> g.fields.reduce((s,f)=>s+(e.ship[f]||0),0);
+  const groupTotals = groups.map(g=>({ ...g, total: rows.reduce((s,e)=> s + groupSum(e,g), 0) }));
   const grand = groupTotals.reduce((s,g)=>s+g.total,0);
   const dailyTotals = rows.map(e=>shipTotal(e));
   const maxShip = rows.length? Math.max(...dailyTotals):0;
 
   document.getElementById('view').innerHTML = renderMonthBar() + `
-  <div class="grid grid-4" style="margin-bottom:16px;">
+  <div class="grid grid-5" style="margin-bottom:16px;">
     ${kpiCard('جمع کل قطعات ارسالی','عدد', fmt(grand,0), null, '#4c8dff')}
-    ${groupTotals.map((g,i)=>kpiCard(g.label,'عدد', fmt(g.total,0), null, PALETTE[i]) ).slice(0,3).join('')}
+    ${groupTotals.map((g,i)=>kpiCard(g.label,'عدد', fmt(g.total,0), null, PALETTE[i]) ).join('')}
   </div>
   <div class="grid grid-2" style="margin-bottom:16px;">
     <div class="card"><h3>روند ارسال روزانه به انبار</h3><div class="chart-box"><canvas id="chShipTrend"></canvas></div></div>
@@ -2504,18 +2509,16 @@ function renderShip(){
     <div class="flexbar"><h3 style="margin:0;">گزارش تجمیعی قطعات ارسالی</h3><button class="btn btn-ghost btn-sm" id="expShipCsv">خروجی CSV</button></div>
     <div class="table-wrap"><table>
       <thead><tr><th>تاریخ</th><th>روز</th>
-        <th class="num">ترموستات کلی</th><th class="num">بنز۷۱</th><th class="num">CKD89</th><th class="num">CKD76</th><th class="num">CKD83</th>
-        <th class="num">L90</th><th class="num">ساینا</th><th class="num">شاهین</th><th class="num">جک</th><th class="num">۲۰۶</th><th class="num">شاهین‌پس</th><th class="num">جمع روز</th></tr></thead>
+        ${groups.map(g=>`<th class="num">${esc(g.label)}</th>`).join('')}
+        <th class="num">جمع روز</th></tr></thead>
       <tbody>
-      ${rows.length===0?`<tr><td colspan="14"><div class="tbl-empty">داده‌ای برای نمایش وجود ندارد.</div></td></tr>`:
+      ${rows.length===0?`<tr><td colspan="${groups.length+3}"><div class="tbl-empty">داده‌ای برای نمایش وجود ندارد.</div></td></tr>`:
       rows.map(e=>`<tr data-shipdate="${esc(e.date)}" style="cursor:pointer;" title="کلیک کنید تا جزئیات ارسال این روز به‌تفکیک محصول را ببینید"><td>${esc(e.date)}</td><td>${esc(e.day)}</td>
-        <td class="num">${fmt(e.ship.termostat_koli,0)}</td><td class="num">${fmt(e.ship.benz71,0)}</td>
-        <td class="num">${fmt(e.ship.ckd89,0)}</td><td class="num">${fmt(e.ship.ckd76,0)}</td><td class="num">${fmt(e.ship.ckd83,0)}</td>
-        <td class="num">${fmt(e.ship.l90,0)}</td><td class="num">${fmt(e.ship.sayna,0)}</td><td class="num">${fmt(e.ship.shahin,0)}</td><td class="num">${fmt(e.ship.jack,0)}</td>
-        <td class="num">${fmt(e.ship.se206,0)}</td><td class="num">${fmt(e.ship.shahinpas,0)}</td><td class="num"><b>${fmt(shipTotal(e),0)}</b></td></tr>`).join('')}
+        ${groups.map(g=>`<td class="num">${fmt(groupSum(e,g),0)}</td>`).join('')}
+        <td class="num"><b>${fmt(shipTotal(e),0)}</b></td></tr>`).join('')}
       </tbody>
       <tfoot><tr style="background:#0f1729;"><td colspan="2"><b>جمع کل</b></td>
-        ${['termostat_koli','benz71','ckd89','ckd76','ckd83','l90','sayna','shahin','jack','se206','shahinpas'].map(f=>`<td class="num"><b>${fmt(rows.reduce((s,e)=>s+(e.ship[f]||0),0),0)}</b></td>`).join('')}
+        ${groupTotals.map(g=>`<td class="num"><b>${fmt(g.total,0)}</b></td>`).join('')}
         <td class="num"><b>${fmt(grand,0)}</b></td></tr></tfoot>
     </table></div>
   </div>`;
@@ -2527,8 +2530,8 @@ function renderShip(){
   }));
 
   document.getElementById('expShipCsv').addEventListener('click', ()=>{
-    const headers = ['تاریخ','روز','ترموستات کلی','بنز71','CKD89','CKD76','CKD83','L90','ساینا','شاهین','جک','206','شاهین‌پس','جمع'];
-    const rr = rows.map(e=>[e.date,e.day,e.ship.termostat_koli,e.ship.benz71,e.ship.ckd89,e.ship.ckd76,e.ship.ckd83,e.ship.l90,e.ship.sayna,e.ship.shahin,e.ship.jack,e.ship.se206,e.ship.shahinpas,shipTotal(e)]);
+    const headers = ['تاریخ','روز', ...groups.map(g=>g.label), 'جمع'];
+    const rr = rows.map(e=>[e.date,e.day, ...groups.map(g=>groupSum(e,g)), shipTotal(e)]);
     downloadFile('گزارش-ارسال-انبار.csv', toCSV(headers, rr), 'text/csv;charset=utf-8');
   });
 
