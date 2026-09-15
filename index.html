@@ -471,6 +471,11 @@ function fmt(v, digits){
   return n.toLocaleString('en-US', {maximumFractionDigits: digits ?? 1, minimumFractionDigits:0});
 }
 function pct(v,digits){ if(v===null||v===undefined||isNaN(v)) return '—'; return (v*100).toLocaleString('en-US',{maximumFractionDigits:digits??1}) + '٪'; }
+// نمایش هر زمانِ ثبت‌شده به دقیقه، همیشه به ترتیب «دقیقه/ساعت» — طبق درخواست شما در تب ضایعات/دوباره‌کاری
+function minHourFmt(mins){
+  if(mins===null || mins===undefined || mins==='' || isNaN(mins)) return '—';
+  return fmt(mins,0) + ' دقیقه / ' + fmt(mins/60,1) + ' ساعت';
+}
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 // برای تشخیص «همان متن، فقط با فاصله‌بندی/حروف متفاوت» — نیم‌فاصله، فاصله‌های چندگانه، رفع فاصله بین
 // کلمات چسبیده (مثل «در پوش» در برابر «درپوش»)، و یکسان‌سازی حروف عربی/فارسی مشابه.
@@ -2707,6 +2712,24 @@ function paretoFrom(items, keyFn, valFn){
   arr.forEach(x=>{ cum += x.value; x.pct = total? x.value/total : 0; x.cumPct = total? cum/total : 0; });
   return arr;
 }
+// نسخهٔ دوستونی پارتو — ضایعات (دورریز قطعی) و دوباره‌کاری (قابل‌جبران) را برای هر ایستگاه/علت/محصول
+// کنار هم می‌شمارد، ولی رتبه‌بندی (و خط درصد تجمعی) بر مبنای «مجموع» دو تاست — چون سؤال مدیریتی واقعی
+// این است که «این ایستگاه/علت روی‌هم‌رفته چقدر وقت و قطعه از ما گرفته»، نه فقط ضایعات به‌تنهایی.
+function paretoDualFrom(items, keyFn){
+  const map = new Map();
+  items.forEach(it=>{
+    const k = keyFn(it) || 'نامشخص';
+    if(!map.has(k)) map.set(k, { label:k, scrap:0, rework:0 });
+    const rec = map.get(k);
+    if((it.eventType||'ضایعات')==='دوباره‌کاری') rec.rework += (it.wasteCount||0);
+    else rec.scrap += (it.wasteCount||0);
+  });
+  const arr = [...map.values()].map(r=>({ ...r, value: r.scrap+r.rework })).sort((a,b)=>b.value-a.value);
+  const grand = arr.reduce((s,x)=>s+x.value,0);
+  let cum = 0;
+  arr.forEach(x=>{ cum += x.value; x.pct = grand? x.value/grand : 0; x.cumPct = grand? cum/grand : 0; });
+  return arr;
+}
 // یک جملهٔ کوتاه و مدیریتی زیر هر نمودار پارتو — دقیقاً همان چیزی که یک مدیر ارشد نگاهی می‌اندازد و می‌خواهد
 // «روی چند مورد اول تمرکز کنم؟» را بدون خواندن کل جدول بفهمد.
 function paretoInsight80_(arr, noun){
@@ -2736,9 +2759,9 @@ function renderWaste(){
   const reworkRecords = M.waste.filter(x=>x.reworkMinutes>0 || x.eventType==='دوباره‌کاری');
   const totalReworkQty = reworkRecords.reduce((s,x)=>s+(x.wasteCount||0),0);
   const reworkLostQtyEst = M.waste.reduce((s,x)=> s + (x.reworkMinutes? (x.reworkMinutes/60)*resolveStationRate(x.station) : 0), 0);
-  const stationPareto = paretoFrom(scrapOnly, x=>x.station, x=>x.wasteCount).slice(0,10);
-  const typePareto = paretoFrom(scrapOnly, x=>x.wasteType, x=>x.wasteCount).slice(0,10);
-  const productPareto = paretoFrom(scrapOnly.filter(x=>x.finalProduct), x=>x.finalProduct, x=>x.wasteCount).slice(0,10);
+  const stationPareto = paretoDualFrom(M.waste, x=>x.station).slice(0,10);
+  const typePareto = paretoDualFrom(M.waste, x=>x.wasteType).slice(0,10);
+  const productPareto = paretoDualFrom(M.waste.filter(x=>x.finalProduct), x=>x.finalProduct).slice(0,10);
   const catTotals = paretoFrom(M.waste, x=>x.category, x=>x.wasteCount);
   // «نوع رویداد» (فیلد ۱ در فرم ثبت) — ضایعات واقعی (دورریز) در برابر دوباره‌کاری (قابل‌جبران)؛ چون از نظر
   // مدیریتی مهم‌ترین تفکیک است (همان چیزی که در فرم با کادر آبی و شماره «۱» مشخص شده)، اولین نموداری است
@@ -2763,12 +2786,12 @@ function renderWaste(){
 
   <div class="section-title" style="margin:4px 0 12px;"><span>⏱ زمان دوباره‌کاری و جداسازی این ماه</span><span class="ln"></span></div>
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('⏱ جمع زمان (دوباره‌کاری + جداسازی)','دقیقه', fmt(totalReworkMin,0), null, totalReworkMin>0?'#ff5d6c':'#2fd9c4')}
+    ${kpiCard('⏱ جمع زمان (دوباره‌کاری + جداسازی)','', minHourFmt(totalReworkMin), null, totalReworkMin>0?'#ff5d6c':'#2fd9c4', true)}
     ${kpiCard('معادل ساعت کاری ازدست‌رفته','ساعت', fmt(totalReworkMin/60,1), null, '#ff9d42')}
     ${kpiCard('تعداد قطعه دوباره‌کاری/جداسازی‌شده','عدد', fmt(totalReworkQty,0), null, '#ffcf5c')}
     ${kpiCard('برآورد اثر روی ظرفیت تولید','عدد', '~'+fmt(reworkLostQtyEst,0), null, '#ff5d6c')}
   </div>
-  ${totalReworkMin>0? `<div class="hint" style="margin:-8px 0 16px;">این ${fmt(totalReworkMin,0)} دقیقه (دوباره‌کاری + جداسازی ورودی مشروط)، معادل برآوردیِ <b>~${fmt(reworkLostQtyEst,0)} عدد</b> ظرفیت تولید ازدست‌رفته است (بر مبنای نرخ استاندارد ساعتی همان ایستگاه) — این عدد قبلاً هیچ‌جای دیگری از داشبورد دیده نمی‌شد. برای ثبت این زمان، کافی است در هر ردیف ضایعات (چه «ورودی مشروط» چه «دوباره‌کاری») فیلد «زمان دوباره‌کاری/جداسازی» را پر کنید.</div>` : ''}
+  ${totalReworkMin>0? `<div class="hint" style="margin:-8px 0 16px;">این ${minHourFmt(totalReworkMin)} (دوباره‌کاری + جداسازی ورودی مشروط)، معادل برآوردیِ <b>~${fmt(reworkLostQtyEst,0)} عدد</b> ظرفیت تولید ازدست‌رفته است (بر مبنای نرخ استاندارد ساعتی همان ایستگاه) — این عدد قبلاً هیچ‌جای دیگری از داشبورد دیده نمی‌شد. برای ثبت این زمان، کافی است در هر ردیف ضایعات (چه «ورودی مشروط» چه «دوباره‌کاری») فیلد «زمان دوباره‌کاری/جداسازی» را پر کنید.</div>` : ''}
 
   <div class="card" style="margin-bottom:16px;">
     <h3>${editing.waste? '✏️ ویرایش ردیف ضایعات/دوباره‌کاری':'➕ ثبت ضایعات/دوباره‌کاری جدید'}</h3>
@@ -2841,12 +2864,12 @@ function renderWaste(){
 
   <div class="grid grid-2" style="margin-bottom:16px;">
     <div class="card">
-      <h3>تحلیل پارتو به تفکیک ایستگاه</h3>
+      <h3>تحلیل پارتو به تفکیک ایستگاه <span class="muted" style="font-weight:400; font-size:12px;">— ضایعات و دوباره‌کاری با هم</span></h3>
       <div class="chart-box"><canvas id="chWasteStation"></canvas></div>
       <div class="hint" style="margin-top:8px;">${paretoInsight80_(stationPareto,'ایستگاه')}</div>
     </div>
     <div class="card">
-      <h3>تحلیل پارتو به تفکیک علت دقیق</h3>
+      <h3>تحلیل پارتو به تفکیک علت دقیق <span class="muted" style="font-weight:400; font-size:12px;">— ضایعات و دوباره‌کاری با هم</span></h3>
       <div class="chart-box"><canvas id="chWasteType"></canvas></div>
       <div class="hint" style="margin-top:8px;">${paretoInsight80_(typePareto,'علت')}</div>
     </div>
@@ -2854,7 +2877,7 @@ function renderWaste(){
 
   ${productPareto.length? `
   <div class="card" style="margin-bottom:16px;">
-    <h3>تحلیل پارتو به تفکیک محصول نهایی (مدل خودرو)</h3>
+    <h3>تحلیل پارتو به تفکیک محصول نهایی (مدل خودرو) <span class="muted" style="font-weight:400; font-size:12px;">— ضایعات و دوباره‌کاری با هم</span></h3>
     <div class="chart-box"><canvas id="chWasteProduct"></canvas></div>
     <div class="hint" style="margin-top:8px;">${paretoInsight80_(productPareto,'محصول')}</div>
   </div>` : ''}
@@ -2877,7 +2900,7 @@ function renderWaste(){
       </div>
     </div>
     <div class="table-wrap" style="max-height:460px; overflow:auto;"><table>
-      <thead><tr><th>تاریخ</th><th>ایستگاه</th><th>نوع رویداد</th><th>قطعه</th><th>محصول نهایی</th><th>اپراتور</th><th class="num">تولید</th><th>علت دقیق</th><th class="num">تعداد</th><th>منشأ</th><th class="num">دوباره‌کاری/جداسازی (دقیقه)</th><th></th></tr></thead>
+      <thead><tr><th>تاریخ</th><th>ایستگاه</th><th>نوع رویداد</th><th>قطعه</th><th>محصول نهایی</th><th>اپراتور</th><th class="num">تولید</th><th>علت دقیق</th><th class="num">تعداد</th><th>منشأ</th><th class="num">دوباره‌کاری/جداسازی (دقیقه/ساعت)</th><th></th></tr></thead>
       <tbody>
       ${list.length===0?`<tr><td colspan="12"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
       list.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.station)}</td>
@@ -2885,7 +2908,7 @@ function renderWaste(){
         <td>${esc(x.part)}</td><td>${esc(x.finalProduct)||'—'}</td><td>${esc(x.operator)||'—'}</td>
         <td class="num">${fmt(x.produced,0)}</td><td>${esc(x.wasteType)}</td><td class="num">${fmt(x.wasteCount,0)}</td>
         <td><span class="badge ${x.category==='ورودی'?'badge-blue':x.category==='حین فرآیند'?'badge-warn':'badge-mute'}">${esc(x.category)}</span></td>
-        <td class="num">${x.reworkMinutes?('<b style="color:#ff9d42;">'+fmt(x.reworkMinutes,0)+'</b>'):'—'}</td>
+        <td class="num" style="white-space:nowrap;">${x.reworkMinutes?('<b style="color:#ff9d42;">'+minHourFmt(x.reworkMinutes)+'</b>'):'—'}</td>
         <td><div style="display:flex; gap:6px;">
           <button class="icon-btn" data-wedit="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
           <button class="icon-btn" data-wdel="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
@@ -2968,9 +2991,9 @@ function renderWaste(){
       scales:{ x:{grid:{color:'#182338'}}, y:{grid:{display:false}, ticks:{font:{size:12}}} } } });
   mkChart('chWasteCat', { type:'doughnut', data:{ labels: catTotals.map(x=>x.label), datasets:[{data:catTotals.map(x=>x.value), backgroundColor:catTotals.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#101827', borderWidth:3}]},
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}} } });
-  paretoChart('chWasteStation', stationPareto, '#ff5d6c');
-  paretoChart('chWasteType', typePareto, '#ffcf5c');
-  if(productPareto.length) paretoChart('chWasteProduct', productPareto, '#b389ff');
+  dualParetoChart('chWasteStation', stationPareto, '#ff5d6c', '#2fd9c4');
+  dualParetoChart('chWasteType', typePareto, '#ff5d6c', '#2fd9c4');
+  if(productPareto.length) dualParetoChart('chWasteProduct', productPareto, '#ff5d6c', '#2fd9c4');
 }
 function paretoChart(id, arr, color){
   mkChart(id, { data:{ labels: arr.map(x=>x.label),
@@ -2982,6 +3005,23 @@ function paretoChart(id, arr, color){
       plugins:{ legend:{position:'bottom', labels:{boxWidth:10,padding:14}} },
       scales:{ x:{grid:{display:false}, ticks:{maxRotation:60, minRotation:0, autoSkip:false, font:{size:10}}},
         y:{ position:'left', grid:{color:'#182338'}, title:{display:true, text:'تعداد', color:'#7c8aa5', font:{size:10}} },
+        y1:{ position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'٪'}, title:{display:true, text:'درصد تجمعی', color:'#7c8aa5', font:{size:10}} } } }
+  });
+}
+// نسخهٔ «مولتی» پارتو — دو ستون روی هم (ضایعات + دوباره‌کاری) برای هر ایستگاه/علت، به‌اضافهٔ خط درصد
+// تجمعیِ مجموع. رتبه‌بندی محور افقی همیشه بر اساس مجموع دو ستون است، دقیقاً مثل پارتوی معمولی —
+// فقط حالا ترکیب هر میله هم دیده می‌شود.
+function dualParetoChart(id, arr, colorScrap, colorRework){
+  mkChart(id, { data:{ labels: arr.map(x=>x.label),
+      datasets:[
+        { type:'bar', label:'ضایعات', data: arr.map(x=>x.scrap), backgroundColor: colorScrap, borderRadius:4, order:3, yAxisID:'y', stack:'w' },
+        { type:'bar', label:'دوباره‌کاری', data: arr.map(x=>x.rework), backgroundColor: colorRework, borderRadius:4, order:2, yAxisID:'y', stack:'w' },
+        { type:'line', label:'درصد تجمعی (مجموع)', data: arr.map(x=>x.cumPct*100), borderColor:'#4c8dff', backgroundColor:'#4c8dff', pointRadius:3, tension:.25, yAxisID:'y1', order:1, labelFmt:v=>Math.round(v)+'٪' },
+      ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{position:'bottom', labels:{boxWidth:10,padding:14}} },
+      scales:{ x:{stacked:true, grid:{display:false}, ticks:{maxRotation:60, minRotation:0, autoSkip:false, font:{size:10}}},
+        y:{ stacked:true, position:'left', grid:{color:'#182338'}, title:{display:true, text:'تعداد', color:'#7c8aa5', font:{size:10}} },
         y1:{ position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'٪'}, title:{display:true, text:'درصد تجمعی', color:'#7c8aa5', font:{size:10}} } } }
   });
 }
