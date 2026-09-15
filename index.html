@@ -439,6 +439,8 @@ const ICONS = {
   target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
   users:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>',
   monitor:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
+  lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
+  unlock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2.6"/>',
 };
 
 /* ---------------------------- persistent state ---------------------------- */
@@ -453,6 +455,10 @@ let charts = {};
 let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null };
 let filters = { waste:'', stop:'', short:'', wasteCat:'all', wasteEventType:'all', stopReason:'all', stationFilter:'all', stationOperatorFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'', dpDate:'' };
 let personnelUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
+// دو تب «شاخص‌های ناب» و «نقشه خط و گلوگاه‌ها» کاربرد روزمره کمی دارند و منوی تحلیل را شلوغ می‌کردند؛
+// طبق درخواست شما، از فهرست پنهان‌اند و فقط با وارد کردن رمز مدیر (همان رمز تنظیمات) در همان نشست باز می‌شوند.
+const ANALYTICS_LOCKED_TABS = ['lean','flowmap'];
+let analyticsUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
 
 /* ---------------------------- utils ---------------------------- */
 function uid(){ return 'id' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
@@ -1346,24 +1352,71 @@ window.addEventListener('pagehide', function(){ flushPendingSave(); });
 // تب‌هایی که اپراتور (نیروی تولیدی) اجازه دارد ببیند — بقیه فقط برای مدیر (admin) نمایش داده می‌شود
 const STAFF_ALLOWED_TABS = ['entry','stations','dailyProgram'];
 function visibleNavForRole(){
-  if(currentSessionRole()==='admin') return NAV;
-  return NAV.filter(item=> STAFF_ALLOWED_TABS.includes(item.id));
+  const base = currentSessionRole()==='admin' ? NAV : NAV.filter(item=> STAFF_ALLOWED_TABS.includes(item.id));
+  if(currentSessionRole()!=='admin') return base; // برای اپراتور اصلاً بحث این دو تب مطرح نیست
+  return base.filter(item=> !ANALYTICS_LOCKED_TABS.includes(item.id) || analyticsUnlocked);
 }
 function renderNav(){
   const el = document.getElementById('navList');
   let html = ''; let lastGroup = null;
   visibleNavForRole().forEach(item=>{
-    if(item.group !== lastGroup){ html += `<div class="nav-label">${item.group}</div>`; lastGroup = item.group; }
+    if(item.group !== lastGroup){
+      html += `<div class="nav-label">${item.group}</div>`;
+      lastGroup = item.group;
+      if(item.group==='تحلیل' && currentSessionRole()==='admin'){
+        html += `<div class="nav-item" id="analyticsLockToggle" style="opacity:.85;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[analyticsUnlocked?'unlock':'lock']}</svg>
+          <span>${analyticsUnlocked? 'پنهان‌کردن تحلیل‌های تخصصی' : 'نمایش تحلیل‌های تخصصی'}</span></div>`;
+      }
+    }
     html += `<div class="nav-item ${currentTab===item.id?'active':''}" data-tab="${item.id}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[item.icon]}</svg>
       <span>${item.label}</span></div>`;
   });
   el.innerHTML = html;
-  el.querySelectorAll('.nav-item').forEach(n=> n.addEventListener('click', ()=>{ goTo(n.dataset.tab); document.getElementById('sidebar').classList.remove('open'); }));
+  el.querySelectorAll('.nav-item[data-tab]').forEach(n=> n.addEventListener('click', ()=>{ goTo(n.dataset.tab); document.getElementById('sidebar').classList.remove('open'); }));
+  const lockBtn = document.getElementById('analyticsLockToggle');
+  if(lockBtn) lockBtn.addEventListener('click', ()=>{
+    if(analyticsUnlocked){
+      analyticsUnlocked = false;
+      if(ANALYTICS_LOCKED_TABS.includes(currentTab)) goTo('dash'); else renderNav();
+      return;
+    }
+    promptAnalyticsPin_();
+  });
+}
+// قفل نمایشی تب‌های تخصصی — یک قفل سمت مرورگر با همان رمز مدیر (تنظیمات)، نه یک لایهٔ امنیتی جداگانه؛
+// فقط در همین نشست باز می‌ماند. اگر pendingTab داده شود، بعد از رمز درست مستقیم به همان تب می‌رود.
+function promptAnalyticsPin_(pendingTab){
+  const root = document.getElementById('modalRoot');
+  const correctPin = DB.meta.adminPin || '1234';
+  root.innerHTML = `<div class="modal-bg" id="mbg"><div class="modal">
+    <h3>🔒 تحلیل‌های تخصصی</h3><p class="desc">«شاخص‌های ناب» و «نقشه خط و گلوگاه‌ها» برای شلوغ‌نشدن منو پنهان‌اند. برای بازکردن، رمز مدیر را وارد کنید.</p>
+    <div class="field" style="margin-top:12px;"><label>رمز مدیر</label><input type="password" id="aPin" placeholder="••••" autocomplete="off" inputmode="numeric"></div>
+    <p id="aPinErr" style="color:#ff5d6c; font-size:12px; display:none; margin-top:2px;">رمز اشتباه است.</p>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">انصراف</button><button class="btn btn-teal" id="mOk">باز کن</button></div>
+  </div></div>`;
+  document.getElementById('mCancel').addEventListener('click', ()=> root.innerHTML='');
+  document.getElementById('mbg').addEventListener('click', e=>{ if(e.target.id==='mbg') root.innerHTML=''; });
+  const doConfirm = ()=>{
+    const val = document.getElementById('aPin').value;
+    if(val !== correctPin){ document.getElementById('aPinErr').style.display='block'; document.getElementById('aPin').focus(); return; }
+    analyticsUnlocked = true; root.innerHTML='';
+    if(pendingTab) goTo(pendingTab); else renderNav();
+    toast('تحلیل‌های تخصصی باز شد.','ok');
+  };
+  document.getElementById('mOk').addEventListener('click', doConfirm);
+  document.getElementById('aPin').addEventListener('keydown', e=>{ if(e.key==='Enter') doConfirm(); });
+  setTimeout(()=>{ const el=document.getElementById('aPin'); if(el) el.focus(); }, 30);
 }
 function goTo(tab){
   // اپراتور اگر (مثلاً از طریق لینک قدیمی/کلیک از نمایشگر) به تبی خارج از دسترسی مجازش برسد، به «ورود داده» برمی‌گردد
   if(currentSessionRole()!=='admin' && !STAFF_ALLOWED_TABS.includes(tab)) tab = 'entry';
+  // دسترسی مستقیم به تب‌های قفل‌شده (مثلاً از راه‌های دیگری غیر از منو) هم رمز می‌خواهد
+  if(currentSessionRole()==='admin' && ANALYTICS_LOCKED_TABS.includes(tab) && !analyticsUnlocked){
+    promptAnalyticsPin_(tab);
+    return;
+  }
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
