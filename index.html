@@ -1484,11 +1484,12 @@ function autoDataLabels(config){
       };
     } else if(dtype==='doughnut' || dtype==='pie'){
       ds.datalabels = {
-        color:'#0c1220', font:{ size:10.5, weight:'800', family:'Vazirmatn' },
+        anchor:'center', align:'center',
+        color:'#0c1220', font:{ size:11, weight:'800', family:'Vazirmatn' },
         formatter:(v)=>{
           const arr = ds.data||[]; const total = arr.reduce((a,b)=>a+(b||0),0);
           const p = total? v/total : 0;
-          return p>=0.06 ? Math.round(p*100)+'٪' : '';
+          return p>=0.06 ? Math.round(p*100)+'%' : '';
         }
       };
     }
@@ -2037,8 +2038,8 @@ function renderStations(){
     ]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}}, scales:{x:{grid:{color:'#182338'}}, y:{grid:{color:'#182338'}}} } });
 
   const compareArr = Object.values(byStationDev).sort((a,b)=>a.dev-b.dev);
-  mkChart('chStCompare', { type:'bar', data:{ labels: compareArr.map(x=>x.name), datasets:[{label:'انحراف از استاندارد', data: compareArr.map(x=>x.dev*100), backgroundColor: compareArr.map(x=>x.dev>=0?'#2fd9c4':'#ff5d6c'), borderRadius:6, maxBarThickness:26, labelFmt:v=>Math.round(v)+'٪'}]},
-    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=> ctx.parsed.x.toFixed(1)+'٪'}}}, scales:{x:{grid:{color:'#182338'}, ticks:{callback:v=>v+'٪'}}, y:{grid:{display:false}, ticks:{font:{size:11}}}} } });
+  mkChart('chStCompare', { type:'bar', data:{ labels: compareArr.map(x=>x.name), datasets:[{label:'انحراف از استاندارد', data: compareArr.map(x=>x.dev*100), backgroundColor: compareArr.map(x=>x.dev>=0?'#2fd9c4':'#ff5d6c'), borderRadius:6, maxBarThickness:26, labelFmt:v=>Math.round(v)+'%'}]},
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=> ctx.parsed.x.toFixed(1)+'%'}}}, scales:{x:{grid:{color:'#182338'}, ticks:{callback:v=>v+'%'}}, y:{grid:{display:false}, ticks:{font:{size:11}}}} } });
 }
 function renderProd(){
   const rows = [...monthData().daily].sort((a,b)=>dateSortKey(a.date)-dateSortKey(b.date));
@@ -2870,9 +2871,30 @@ function renderWaste(){
   </details>
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>۱) نوع رویداد — ضایعات (دورریز قطعی) در برابر دوباره‌کاری (قابل‌جبران)</h3>
-    <div class="chart-box sm"><canvas id="chWasteEventType"></canvas></div>
-    <div class="hint" style="margin-top:8px;">${eventTypeQtyTotal? `از هر ۱۰۰ واحد مغایرت ثبت‌شده این ماه، <b>${fmt((eventTypeTotals[0].qty/eventTypeQtyTotal)*100,0)} واحد ضایعات قطعی</b> و <b>${fmt((eventTypeTotals[1].qty/eventTypeQtyTotal)*100,0)} واحد دوباره‌کاری</b> بوده است.` : 'هنوز داده‌ای برای این ماه ثبت نشده است.'}</div>
+    <h3>۱) نوع رویداد — ضایعات در برابر دوباره‌کاری</h3>
+    <div style="display:flex; align-items:stretch; margin:18px 0 14px; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.08);">
+      <div style="flex:1; background:linear-gradient(160deg, rgba(255,93,108,.18), rgba(255,93,108,.02)); padding:20px 14px; text-align:center;">
+        <div style="font-size:26px;">⚠️</div>
+        <div style="font-size:12.5px; color:#ffb0b8; font-weight:700; margin:6px 0 2px;">ضایعات <span class="muted" style="font-weight:400;">(دورریز قطعی)</span></div>
+        <div style="font-size:32px; font-weight:900; color:#ff5d6c; line-height:1.2;">${fmt(eventTypeTotals[0].qty,0)}</div>
+        <div style="font-size:13px; color:#8b98b5; margin-top:2px;">${fmt(eventTypeQtyTotal?(eventTypeTotals[0].qty/eventTypeQtyTotal)*100:0,0)}٪ از کل</div>
+      </div>
+      <div style="width:1px; background:rgba(255,255,255,.1);"></div>
+      <div style="flex:1; background:linear-gradient(200deg, rgba(47,217,196,.18), rgba(47,217,196,.02)); padding:20px 14px; text-align:center;">
+        <div style="font-size:26px;">🔧</div>
+        <div style="font-size:12.5px; color:#8ff0c8; font-weight:700; margin:6px 0 2px;">دوباره‌کاری <span class="muted" style="font-weight:400;">(قابل‌جبران)</span></div>
+        <div style="font-size:32px; font-weight:900; color:#2fd9c4; line-height:1.2;">${fmt(eventTypeTotals[1].qty,0)}</div>
+        <div style="font-size:13px; color:#8b98b5; margin-top:2px;">${fmt(eventTypeQtyTotal?(eventTypeTotals[1].qty/eventTypeQtyTotal)*100:0,0)}٪ از کل</div>
+      </div>
+    </div>
+    ${eventTypeQtyTotal? (()=>{
+      const sp = (eventTypeTotals[0].qty/eventTypeQtyTotal)*100, rp = (eventTypeTotals[1].qty/eventTypeQtyTotal)*100;
+      return `<div style="display:flex; height:26px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.06);">
+        <div style="width:${sp}%; background:linear-gradient(90deg,#ff5d6c,#ff8890); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#fff;">${sp>=8?fmt(sp,0)+'٪':''}</div>
+        <div style="width:${rp}%; background:linear-gradient(90deg,#5ee6d4,#2fd9c4); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#0c1220;">${rp>=8?fmt(rp,0)+'٪':''}</div>
+      </div>`;
+    })() : ''}
+    <div class="hint" style="margin-top:10px;">${eventTypeQtyTotal? `از هر ۱۰۰ واحد مغایرت ثبت‌شده این ماه، <b>${fmt((eventTypeTotals[0].qty/eventTypeQtyTotal)*100,0)} واحد ضایعات قطعی</b> و <b>${fmt((eventTypeTotals[1].qty/eventTypeQtyTotal)*100,0)} واحد دوباره‌کاری</b> بوده است.` : 'هنوز داده‌ای برای این ماه ثبت نشده است.'}</div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -3012,13 +3034,11 @@ function renderWaste(){
     inp.addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById(inp.id==='newCatInput'?'addCatBtn':'addTypeBtn').click(); });
   });
 
-  mkChart('chWasteEventType', { type:'bar', data:{ labels: eventTypeTotals.map(x=>x.label),
-      datasets:[{ label:'تعداد', data: eventTypeTotals.map(x=>x.qty), backgroundColor:['#ff5d6c','#2fd9c4'], borderRadius:8 }] },
-    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ x:{grid:{color:'#182338'}}, y:{grid:{display:false}, ticks:{font:{size:12}}} } } });
-  // طبق بازخورد شما، عدد/درصد داخل این نمودار (روی هر قطعه‌ی دونات) حذف شد؛ عدد دقیق هر منشأ با نگه‌داشتن
-  // موس روی هر قطعه (Tooltip) یا از روی برچسب‌های پایین نمودار قابل دیدن است.
-  mkChart('chWasteCat', { type:'doughnut', data:{ labels: catTotals.map(x=>x.label), datasets:[{data:catTotals.map(x=>x.value), backgroundColor:catTotals.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#101827', borderWidth:3, noLabel:true}]},
+  // نمودار «نوع رویداد» دیگر Chart.js نیست — به‌جای یک نمودار میله‌ای معمولی، یک کارت اختصاصی
+  // «ضایعات در برابر دوباره‌کاری» بالای همین تابع رندر شد (طبق بازخورد شما که آن نمودار را دوست نداشتید).
+  // درصد هر منشأ حالا وسط همان قطعه‌ی دونات نمایش داده می‌شود (نه بیرون آن)؛ علامت درصد هم به «%» ساده
+  // تغییر کرد چون گلیف «٪» در رندر روی canvas این نمودارها به‌درستی نمایش داده نمی‌شد.
+  mkChart('chWasteCat', { type:'doughnut', data:{ labels: catTotals.map(x=>x.label), datasets:[{data:catTotals.map(x=>x.value), backgroundColor:catTotals.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#101827', borderWidth:3}]},
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}} } });
   dualParetoChart('chWasteStation', stationPareto, paretoView, '#ff5d6c', '#2fd9c4');
   dualParetoChart('chWasteType', typePareto, paretoView, '#ff5d6c', '#2fd9c4');
@@ -3029,13 +3049,13 @@ function paretoChart(id, arr, color){
   mkChart(id, { data:{ labels: arr.map(x=>x.label),
       datasets:[
         { type:'bar', label:'تعداد', data: arr.map(x=>x.value), backgroundColor: color, borderRadius:6, order:2, yAxisID:'y' },
-        { type:'line', label:'درصد تجمعی', data: arr.map(x=>x.cumPct*100), borderColor:'#4c8dff', backgroundColor:'#4c8dff', pointRadius:3, tension:.25, yAxisID:'y1', order:1, labelFmt:v=>Math.round(v)+'٪' },
+        { type:'line', label:'درصد تجمعی', data: arr.map(x=>x.cumPct*100), borderColor:'#4c8dff', backgroundColor:'#4c8dff', pointRadius:3, tension:.25, yAxisID:'y1', order:1, labelFmt:v=>Math.round(v)+'%' },
       ]},
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{position:'bottom', labels:{boxWidth:10,padding:14}} },
       scales:{ x:{grid:{display:false}, ticks:{maxRotation:60, minRotation:0, autoSkip:false, font:{size:10}}},
         y:{ position:'left', grid:{color:'#182338'}, title:{display:true, text:'تعداد', color:'#7c8aa5', font:{size:10}} },
-        y1:{ position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'٪'}, title:{display:true, text:'درصد تجمعی', color:'#7c8aa5', font:{size:10}} } } }
+        y1:{ position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'%'}, title:{display:true, text:'درصد تجمعی', color:'#7c8aa5', font:{size:10}} } } }
   });
 }
 // نسخهٔ «مولتی» پارتو — یا دو ستون ضایعات/دوباره‌کاری با هم (نمای «هر دو»)، یا فقط یکی از آن دو (طبق
@@ -3052,13 +3072,13 @@ function dualParetoChart(id, arr, view, colorScrap, colorRework){
   mkChart(id, { data:{ labels: arr.map(x=>x.label),
       datasets:[
         ...bars,
-        { type:'line', label:'درصد تجمعی'+(view==='both'?' (مجموع)':''), data: arr.map(x=>x.cumPct*100), borderColor:'#4c8dff', backgroundColor:'#4c8dff', pointRadius:3, tension:.25, yAxisID:'y1', order:1, labelFmt:v=>Math.round(v)+'٪' },
+        { type:'line', label:'درصد تجمعی'+(view==='both'?' (مجموع)':''), data: arr.map(x=>x.cumPct*100), borderColor:'#4c8dff', backgroundColor:'#4c8dff', pointRadius:3, tension:.25, yAxisID:'y1', order:1, labelFmt:v=>Math.round(v)+'%' },
       ]},
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{position:'bottom', labels:{boxWidth:10,padding:14}} },
       scales:{ x:{stacked: view==='both', grid:{display:false}, ticks:{maxRotation:60, minRotation:0, autoSkip:false, font:{size:10}}},
         y:{ stacked: view==='both', position:'left', grid:{color:'#182338'}, title:{display:true, text:'تعداد', color:'#7c8aa5', font:{size:10}} },
-        y1:{ position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'٪'}, title:{display:true, text:'درصد تجمعی', color:'#7c8aa5', font:{size:10}} } } }
+        y1:{ position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'%'}, title:{display:true, text:'درصد تجمعی', color:'#7c8aa5', font:{size:10}} } } }
   });
 }
 
@@ -4234,21 +4254,21 @@ function renderLean(){
 
   mkChart('chOeeBars', { type:'bar', data:{ labels:['Availability','Performance','Quality','OEE'],
     datasets:[{ data:[availability===null?0:availability*100, performance===null?0:performance*100, quality===null?0:quality*100, oee*100],
-      backgroundColor:['#4c8dff','#ff9d42','#b389ff','#2fd9c4'], borderRadius:8, maxBarThickness:46, labelFmt:v=>Math.round(v)+'٪' }]},
+      backgroundColor:['#4c8dff','#ff9d42','#b389ff','#2fd9c4'], borderRadius:8, maxBarThickness:46, labelFmt:v=>Math.round(v)+'%' }]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-      scales:{ y:{ min:0, max:120, grid:{color:'#182338'}, ticks:{callback:v=>v+'٪'} }, x:{grid:{display:false}} } } });
+      scales:{ y:{ min:0, max:120, grid:{color:'#182338'}, ticks:{callback:v=>v+'%'} }, x:{grid:{display:false}} } } });
 
   paretoChart('chLeanStop', stationParetoS, '#ff5d6c');
 
   mkChart('chBenchmark', { type:'bar', data:{ labels:['Availability','Performance','Quality','OEE'],
     datasets:[
       { label:'شاخص شما', data:[availability===null?0:availability*100, performance===null?0:performance*100, quality===null?0:quality*100, oee*100],
-        backgroundColor:'#4c8dff', borderRadius:6, maxBarThickness:34, labelFmt:v=>Math.round(v)+'٪' },
+        backgroundColor:'#4c8dff', borderRadius:6, maxBarThickness:34, labelFmt:v=>Math.round(v)+'%' },
       { label:'معمول صنعت خودرو', data:[INDUSTRY_BENCHMARK.availability*100, INDUSTRY_BENCHMARK.performance*100, INDUSTRY_BENCHMARK.quality*100, INDUSTRY_BENCHMARK.oeeAutomotive*100],
         backgroundColor:'#3a4258', borderRadius:6, maxBarThickness:34, noLabel:true },
     ]},
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}},
-      scales:{ y:{ min:0, max:120, grid:{color:'#182338'}, ticks:{callback:v=>v+'٪'} }, x:{grid:{display:false}} } } });
+      scales:{ y:{ min:0, max:120, grid:{color:'#182338'}, ticks:{callback:v=>v+'%'} }, x:{grid:{display:false}} } } });
 
   document.getElementById('saveWorkforceBtn').addEventListener('click', ()=>{
     const mt = num(document.getElementById('monthlyTargetInput').value);
@@ -4747,7 +4767,7 @@ function renderDash(){
         scales:{
           x:{ grid:{display:false}, ticks:{font:{size:9.5}, maxRotation:35, minRotation:0} },
           y:{ position:'left', grid:{color:'#182338'} },
-          y1:{ position:'right', grid:{display:false}, min:0, max:100, ticks:{callback:v=>v+'٪'} },
+          y1:{ position:'right', grid:{display:false}, min:0, max:100, ticks:{callback:v=>v+'%'} },
         }
       }
     });
