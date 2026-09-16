@@ -1878,7 +1878,9 @@ function renderStations(){
   </div>
 
   <div class="grid grid-2" style="margin-bottom:16px;">
-    <div class="card"><h3>روند روزانه در برابر استاندارد ${filterStation!=='all'? '— '+esc((stationById(filterStation)||{}).name||''):'(همه ایستگاه‌ها)'}</h3><div class="chart-box"><canvas id="chStTrend"></canvas></div></div>
+    <div class="card"><h3>روند روزانه در برابر استاندارد ${filterStation!=='all'? '— '+esc((stationById(filterStation)||{}).name||''):'(همه ایستگاه‌ها)'}</h3><div class="chart-box"><canvas id="chStTrend"></canvas></div>
+      <div class="hint" style="margin-top:8px;">نشانه‌ی 🌙 کنار تاریخ = پنجشنبه/جمعه/تعطیل (شیفت کوتاه‌تر ثبت‌شده در «ورود داده روزانه»).</div>
+    </div>
     <div class="card"><h3>مقایسه انحراف ایستگاه‌ها از استاندارد (این ماه)</h3><div class="chart-box"><canvas id="chStCompare"></canvas></div></div>
   </div>
 
@@ -2040,7 +2042,11 @@ function renderStations(){
   const trendByDate = {};
   trendRows.forEach(r=>{ if(!trendByDate[r.date]) trendByDate[r.date] = {actual:0, target:0}; trendByDate[r.date].actual += r.total; trendByDate[r.date].target += r.target; });
   const trendDates = Object.keys(trendByDate).sort((a,b)=>dateSortKey(a)-dateSortKey(b));
-  mkChart('chStTrend', { type:'line', data:{ labels: trendDates, datasets:[
+  // پنجشنبه/جمعه/تعطیلات را از همان فیلد «ساعت شیفت» ثبت‌شده در «ورود داده روزانه» برای همان تاریخ
+  // تشخیص می‌دهیم — دقیقاً همان منطق نشانه‌ی 🌙 در تب «هدف و پیشرفت تولید»، تا هر دو یکدست باشند.
+  const dailyByDate = {}; M.daily.forEach(e=>{ dailyByDate[e.date] = e; });
+  const trendXLabels = trendDates.map(d=> d + (dayShiftFactor(dailyByDate[d])<1 ? ' 🌙' : ''));
+  mkChart('chStTrend', { type:'line', data:{ labels: trendXLabels, datasets:[
       {label:'تولید واقعی', data: trendDates.map(d=>trendByDate[d].actual), borderColor:'#ff9d42', backgroundColor:'rgba(255,157,66,.15)', fill:true, tension:.35, pointRadius:3},
       {label:'استاندارد', data: trendDates.map(d=>trendByDate[d].target), borderColor:'#4c8dff', borderDash:[6,5], pointRadius:0, noLabel:true}
     ]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}}, scales:{x:{grid:{color:'#182338'}}, y:{grid:{color:'#182338'}}} } });
@@ -2140,7 +2146,9 @@ function renderProd(){
   </div>
 
   <div class="grid grid-2" style="margin-bottom:16px;">
-    <div class="card"><h3>روند تولید روزانه در برابر هدف <span class="muted">جمع همه ۸ ردیف (۴ خط اصلی + CKD + سه‌راهی۲۰۶ + درپوش + دیزل/بنز)</span></h3><div class="chart-box"><canvas id="chProdTrend"></canvas></div></div>
+    <div class="card"><h3>روند تولید روزانه در برابر هدف <span class="muted">جمع همه ۸ ردیف (۴ خط اصلی + CKD + سه‌راهی۲۰۶ + درپوش + دیزل/بنز)</span></h3><div class="chart-box"><canvas id="chProdTrend"></canvas></div>
+      <div class="hint" style="margin-top:8px;">نشانه‌ی 🌙 کنار تاریخ = پنجشنبه/جمعه/تعطیل (شیفت کوتاه‌تر ثبت‌شده در «ورود داده روزانه»).</div>
+    </div>
     <div class="card"><h3>جمع تولید هر خط در بازه گزارش</h3><div class="chart-box"><canvas id="chProdByLine"></canvas></div></div>
   </div>
 
@@ -2260,9 +2268,12 @@ function renderProd(){
 
   const allLinesDailyTotals = rows.map(e=>allLinesTotal(e));
   const combinedTarget = target4Lines() + ckdTarget + se206Target + darpooshTarget + dieselTarget;
+  // پنجشنبه/جمعه/تعطیلات معمولاً همان روزهایی هستند که شیفت کوتاه‌تر ثبت شده — دقیقاً همان نشانه‌ی 🌙ی
+  // که در تب «هدف و پیشرفت تولید» استفاده می‌شود، اینجا هم گذاشته شده تا یکدست باشد.
+  const prodXLabels = rows.map(e=> e.date + (dayShiftFactor(e)<1 ? ' 🌙' : ''));
   mkChart('chProdTrend', {
     type:'line',
-    data:{ labels: rows.map(e=>e.date),
+    data:{ labels: prodXLabels,
       datasets:[
         {label:'جمع کل تولید (همه اقلام)', data: allLinesDailyTotals, borderColor:'#ff9d42', backgroundColor:'rgba(255,157,66,.15)', fill:true, tension:.35, pointRadius:3},
         {label:'هدف', data: rows.map(e=>dayCombinedTarget(e)), borderColor:'#4c8dff', borderDash:[6,5], pointRadius:0, tension:0, noLabel:true},
@@ -5071,8 +5082,8 @@ function renderTargetProgress(){
         tooltip:{ callbacks:{ afterBody:()=>'برای دیدن علت توقف/کسری این روز کلیک کنید' } } },
       scales:{
         x:{grid:{display:false}},
-        y:{ position:'right', grid:{color:'#182338'}, title:{display:true, text:'روزانه', color:'#7c8aa5', font:{size:10}} },
-        y1:{ position:'left', grid:{display:false}, title:{display:true, text:'تجمعی', color:'#7c8aa5', font:{size:10}} },
+        y:{ position:'right', grid:{color:'#182338'}, title:{display:true, text:'روزانه', color:'#7c8aa5', font:{size:10}}, afterFit:(axis)=>{ axis.width = 58; } },
+        y1:{ position:'left', grid:{display:false}, title:{display:true, text:'تجمعی', color:'#7c8aa5', font:{size:10}}, afterFit:(axis)=>{ axis.width = 64; } },
       },
       onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length? 'pointer':'default'; },
       onClick:(evt, els)=>{
@@ -5106,7 +5117,11 @@ function renderTargetProgress(){
       layout:{ padding:{ top:28, bottom:28 } },
       plugins:{ legend:{display:false},
         tooltip:{ callbacks:{ label:(c)=>{ const v=c.parsed.y; const p=devPctArr[c.dataIndex]; return 'انحراف: '+fmt(v,0)+' عدد'+(p===null?'':' ('+pct(p,1)+')'); }, afterBody:()=>'برای دیدن علت این روز کلیک کنید' } } },
-      scales:{ x:{grid:{display:false}}, y:{grid:{color:'#182338'}} },
+      // این نمودار زیر «روند روزانه تولید» قرار می‌گیرد و باید دقیقاً هم‌راستا با آن باشد؛ چون آن نمودار
+      // یک محور سمت راست هم دارد (تجمعی/روزانه)، اینجا هم یک محور نامرئی سمت راست با همان عرض ثابت
+      // اضافه شده — وگرنه عرض ناحیه‌ی رسم دو نمودار متفاوت می‌شد و ستون‌های هر روز زیر هم نمی‌افتادند.
+      scales: { x:{grid:{display:false}}, y:{position:'left', grid:{color:'#182338'}, afterFit:(axis)=>{ axis.width = 64; }},
+        yR:{ position:'right', display:true, grid:{display:false}, ticks:{display:false}, border:{display:false}, afterFit:(axis)=>{ axis.width = 58; } } },
       onHover:(evt, els)=>{ evt.native.target.style.cursor = els.length? 'pointer':'default'; },
       onClick:(evt, els)=>{
         if(!els.length) return;
