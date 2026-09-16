@@ -2698,6 +2698,7 @@ function renderShort(){
 
   mkChart('chShortBar', { type:'bar', data:{ labels: topParts.map(x=>x[0]), datasets:[{data: topParts.map(x=>x[1]), backgroundColor:'#ff5d6c', borderRadius:8, maxBarThickness:28}]},
     options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:'#182338'}}, y:{grid:{display:false}}} } });
+  wireComboAddSelects();
 }
 
 /* =========================================================================
@@ -2725,6 +2726,17 @@ function paretoDualFrom(items, keyFn){
     else rec.scrap += (it.wasteCount||0);
   });
   const arr = [...map.values()].map(r=>({ ...r, value: r.scrap+r.rework })).sort((a,b)=>b.value-a.value);
+  const grand = arr.reduce((s,x)=>s+x.value,0);
+  let cum = 0;
+  arr.forEach(x=>{ cum += x.value; x.pct = grand? x.value/grand : 0; x.cumPct = grand? cum/grand : 0; });
+  return arr;
+}
+// وقتی نمای انتخابی «فقط ضایعات» یا «فقط دوباره‌کاری» باشد، رتبه‌بندی و درصد تجمعی هم باید دوباره
+// فقط بر همان یک ستون حساب شود (نه بر مبنای مجموع) — وگرنه ترتیب پارتو گمراه‌کننده می‌شود.
+function viewFilteredPareto_(dualArr, view){
+  if(view!=='scrap' && view!=='rework') return dualArr; // 'both'
+  const arr = dualArr.map(x=>({ ...x, value:x[view] })).filter(x=>x.value>0);
+  arr.sort((a,b)=>b.value-a.value);
   const grand = arr.reduce((s,x)=>s+x.value,0);
   let cum = 0;
   arr.forEach(x=>{ cum += x.value; x.pct = grand? x.value/grand : 0; x.cumPct = grand? cum/grand : 0; });
@@ -2759,9 +2771,15 @@ function renderWaste(){
   const reworkRecords = M.waste.filter(x=>x.reworkMinutes>0 || x.eventType==='دوباره‌کاری');
   const totalReworkQty = reworkRecords.reduce((s,x)=>s+(x.wasteCount||0),0);
   const reworkLostQtyEst = M.waste.reduce((s,x)=> s + (x.reworkMinutes? (x.reworkMinutes/60)*resolveStationRate(x.station) : 0), 0);
-  const stationPareto = paretoDualFrom(M.waste, x=>x.station).slice(0,10);
-  const typePareto = paretoDualFrom(M.waste, x=>x.wasteType).slice(0,10);
-  const productPareto = paretoDualFrom(M.waste.filter(x=>x.finalProduct), x=>x.finalProduct).slice(0,10);
+  const stationParetoDual = paretoDualFrom(M.waste, x=>x.station).slice(0,10);
+  const typeParetoDual = paretoDualFrom(M.waste, x=>x.wasteType).slice(0,10);
+  const productParetoDual = paretoDualFrom(M.waste.filter(x=>x.finalProduct), x=>x.finalProduct).slice(0,10);
+  // انتخاب نمای پارتو: هر دو با هم (پیش‌فرض) یا فقط ضایعات یا فقط دوباره‌کاری — طبق درخواست شما این سه
+  // نمودار به‌جای فقط یک نمای ترکیبی، قابل‌انتخاب شدند.
+  const paretoView = filters.wasteParetoView || 'both';
+  const stationPareto = viewFilteredPareto_(stationParetoDual, paretoView);
+  const typePareto = viewFilteredPareto_(typeParetoDual, paretoView);
+  const productPareto = viewFilteredPareto_(productParetoDual, paretoView);
   const catTotals = paretoFrom(M.waste, x=>x.category, x=>x.wasteCount);
   // «نوع رویداد» (فیلد ۱ در فرم ثبت) — ضایعات واقعی (دورریز) در برابر دوباره‌کاری (قابل‌جبران)؛ چون از نظر
   // مدیریتی مهم‌ترین تفکیک است (همان چیزی که در فرم با کادر آبی و شماره «۱» مشخص شده)، اولین نموداری است
@@ -2862,14 +2880,22 @@ function renderWaste(){
     <div class="chart-box"><canvas id="chWasteCat"></canvas></div>
   </div>
 
+  <div class="flexbar" style="margin-bottom:12px;">
+    <div class="hint" style="margin:0;">نمای پارتوهای زیر (ایستگاه / علت دقیق / محصول):</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="pill ${paretoView==='both'?'active':''}" data-pv="both">هر دو با هم</button>
+      <button class="pill ${paretoView==='scrap'?'active':''}" data-pv="scrap">فقط ضایعات</button>
+      <button class="pill ${paretoView==='rework'?'active':''}" data-pv="rework">فقط دوباره‌کاری</button>
+    </div>
+  </div>
   <div class="grid grid-2" style="margin-bottom:16px;">
     <div class="card">
-      <h3>تحلیل پارتو به تفکیک ایستگاه <span class="muted" style="font-weight:400; font-size:12px;">— ضایعات و دوباره‌کاری با هم</span></h3>
+      <h3>تحلیل پارتو به تفکیک ایستگاه</h3>
       <div class="chart-box"><canvas id="chWasteStation"></canvas></div>
       <div class="hint" style="margin-top:8px;">${paretoInsight80_(stationPareto,'ایستگاه')}</div>
     </div>
     <div class="card">
-      <h3>تحلیل پارتو به تفکیک علت دقیق <span class="muted" style="font-weight:400; font-size:12px;">— ضایعات و دوباره‌کاری با هم</span></h3>
+      <h3>تحلیل پارتو به تفکیک علت دقیق</h3>
       <div class="chart-box"><canvas id="chWasteType"></canvas></div>
       <div class="hint" style="margin-top:8px;">${paretoInsight80_(typePareto,'علت')}</div>
     </div>
@@ -2877,7 +2903,7 @@ function renderWaste(){
 
   ${productPareto.length? `
   <div class="card" style="margin-bottom:16px;">
-    <h3>تحلیل پارتو به تفکیک محصول نهایی (مدل خودرو) <span class="muted" style="font-weight:400; font-size:12px;">— ضایعات و دوباره‌کاری با هم</span></h3>
+    <h3>تحلیل پارتو به تفکیک محصول نهایی (مدل خودرو)</h3>
     <div class="chart-box"><canvas id="chWasteProduct"></canvas></div>
     <div class="hint" style="margin-top:8px;">${paretoInsight80_(productPareto,'محصول')}</div>
   </div>` : ''}
@@ -2947,6 +2973,7 @@ function renderWaste(){
   }));
   document.getElementById('wasteSearch').addEventListener('input', e=>{ filters.waste = e.target.value; renderWaste(); });
   document.querySelectorAll('[data-wc]').forEach(b=>b.addEventListener('click', ()=>{ filters.wasteCat = b.dataset.wc; renderWaste(); }));
+  document.querySelectorAll('[data-pv]').forEach(b=>b.addEventListener('click', ()=>{ filters.wasteParetoView = b.dataset.pv; renderWaste(); }));
   document.querySelectorAll('[data-wet]').forEach(b=>b.addEventListener('click', ()=>{ filters.wasteEventType = b.dataset.wet; renderWaste(); }));
   document.getElementById('expWasteCsv').addEventListener('click', ()=>{
     const headers = ['تاریخ','ایستگاه','قطعه','محصول نهایی','اپراتور','تعداد تولید','نوع ضایعات','تعداد ضایعات','تیپ','دوباره‌کاری/جداسازی (دقیقه)'];
@@ -2989,11 +3016,14 @@ function renderWaste(){
       datasets:[{ label:'تعداد', data: eventTypeTotals.map(x=>x.qty), backgroundColor:['#ff5d6c','#2fd9c4'], borderRadius:8 }] },
     options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
       scales:{ x:{grid:{color:'#182338'}}, y:{grid:{display:false}, ticks:{font:{size:12}}} } } });
-  mkChart('chWasteCat', { type:'doughnut', data:{ labels: catTotals.map(x=>x.label), datasets:[{data:catTotals.map(x=>x.value), backgroundColor:catTotals.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#101827', borderWidth:3}]},
+  // طبق بازخورد شما، عدد/درصد داخل این نمودار (روی هر قطعه‌ی دونات) حذف شد؛ عدد دقیق هر منشأ با نگه‌داشتن
+  // موس روی هر قطعه (Tooltip) یا از روی برچسب‌های پایین نمودار قابل دیدن است.
+  mkChart('chWasteCat', { type:'doughnut', data:{ labels: catTotals.map(x=>x.label), datasets:[{data:catTotals.map(x=>x.value), backgroundColor:catTotals.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#101827', borderWidth:3, noLabel:true}]},
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}} } });
-  dualParetoChart('chWasteStation', stationPareto, '#ff5d6c', '#2fd9c4');
-  dualParetoChart('chWasteType', typePareto, '#ff5d6c', '#2fd9c4');
-  if(productPareto.length) dualParetoChart('chWasteProduct', productPareto, '#ff5d6c', '#2fd9c4');
+  dualParetoChart('chWasteStation', stationPareto, paretoView, '#ff5d6c', '#2fd9c4');
+  dualParetoChart('chWasteType', typePareto, paretoView, '#ff5d6c', '#2fd9c4');
+  if(productPareto.length) dualParetoChart('chWasteProduct', productPareto, paretoView, '#ff5d6c', '#2fd9c4');
+  wireComboAddSelects();
 }
 function paretoChart(id, arr, color){
   mkChart(id, { data:{ labels: arr.map(x=>x.label),
@@ -3008,20 +3038,26 @@ function paretoChart(id, arr, color){
         y1:{ position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'٪'}, title:{display:true, text:'درصد تجمعی', color:'#7c8aa5', font:{size:10}} } } }
   });
 }
-// نسخهٔ «مولتی» پارتو — دو ستون روی هم (ضایعات + دوباره‌کاری) برای هر ایستگاه/علت، به‌اضافهٔ خط درصد
-// تجمعیِ مجموع. رتبه‌بندی محور افقی همیشه بر اساس مجموع دو ستون است، دقیقاً مثل پارتوی معمولی —
-// فقط حالا ترکیب هر میله هم دیده می‌شود.
-function dualParetoChart(id, arr, colorScrap, colorRework){
-  mkChart(id, { data:{ labels: arr.map(x=>x.label),
-      datasets:[
+// نسخهٔ «مولتی» پارتو — یا دو ستون ضایعات/دوباره‌کاری با هم (نمای «هر دو»)، یا فقط یکی از آن دو (طبق
+// نمای انتخابی بالای صفحه)، به‌اضافهٔ خط درصد تجمعی. رتبه‌بندی و درصد تجمعی همیشه با همان نمای انتخابی هماهنگ‌اند.
+function dualParetoChart(id, arr, view, colorScrap, colorRework){
+  const bars = view==='both'
+    ? [
         { type:'bar', label:'ضایعات', data: arr.map(x=>x.scrap), backgroundColor: colorScrap, borderRadius:4, order:3, yAxisID:'y', stack:'w' },
         { type:'bar', label:'دوباره‌کاری', data: arr.map(x=>x.rework), backgroundColor: colorRework, borderRadius:4, order:2, yAxisID:'y', stack:'w' },
-        { type:'line', label:'درصد تجمعی (مجموع)', data: arr.map(x=>x.cumPct*100), borderColor:'#4c8dff', backgroundColor:'#4c8dff', pointRadius:3, tension:.25, yAxisID:'y1', order:1, labelFmt:v=>Math.round(v)+'٪' },
+      ]
+    : [
+        { type:'bar', label: view==='rework'?'دوباره‌کاری':'ضایعات', data: arr.map(x=>x.value), backgroundColor: view==='rework'?colorRework:colorScrap, borderRadius:4, order:2, yAxisID:'y' },
+      ];
+  mkChart(id, { data:{ labels: arr.map(x=>x.label),
+      datasets:[
+        ...bars,
+        { type:'line', label:'درصد تجمعی'+(view==='both'?' (مجموع)':''), data: arr.map(x=>x.cumPct*100), borderColor:'#4c8dff', backgroundColor:'#4c8dff', pointRadius:3, tension:.25, yAxisID:'y1', order:1, labelFmt:v=>Math.round(v)+'٪' },
       ]},
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{position:'bottom', labels:{boxWidth:10,padding:14}} },
-      scales:{ x:{stacked:true, grid:{display:false}, ticks:{maxRotation:60, minRotation:0, autoSkip:false, font:{size:10}}},
-        y:{ stacked:true, position:'left', grid:{color:'#182338'}, title:{display:true, text:'تعداد', color:'#7c8aa5', font:{size:10}} },
+      scales:{ x:{stacked: view==='both', grid:{display:false}, ticks:{maxRotation:60, minRotation:0, autoSkip:false, font:{size:10}}},
+        y:{ stacked: view==='both', position:'left', grid:{color:'#182338'}, title:{display:true, text:'تعداد', color:'#7c8aa5', font:{size:10}} },
         y1:{ position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'٪'}, title:{display:true, text:'درصد تجمعی', color:'#7c8aa5', font:{size:10}} } } }
   });
 }
@@ -3055,7 +3091,7 @@ function renderStop(){
       <div class="field"><label>ایستگاه متوقف‌شده</label>${stationSelectHtml('p_station', editing.stop?.station||'')}</div>
       <div class="field"><label>مدت ثبت‌شده</label><input id="p_dur" type="text" inputmode="numeric" value="${editing.stop?.durationValue ?? ''}"></div>
       <div class="field"><label>واحد</label><select id="p_unit"><option ${editing.stop?.unit==='دقیقه'?'selected':''}>دقیقه</option><option ${!editing.stop||editing.stop.unit==='ساعت'?'selected':''}>ساعت</option><option ${editing.stop?.unit==='روز'?'selected':''}>روز</option></select></div>
-      <div class="field"><label>علت توقف</label><select id="p_reason">${STOPPAGE_REASONS.map(r=>`<option ${editing.stop?.reason===r?'selected':''}>${r}</option>`).join('')}</select></div>
+      <div class="field"><label>علت توقف</label>${stopReasonSelectHtml('p_reason', editing.stop?.reason||'')}</div>
       <div class="field"><label>نوع توقف</label>
         <select id="p_planned">
           <option value="0" ${!editing.stop?.planned?'selected':''}>برنامه‌ریزی‌نشده (اضطراری)</option>
@@ -3155,6 +3191,7 @@ function renderStop(){
 
   paretoChart('chStopStation', stationPareto, '#ff9d42');
   paretoChart('chStopReason', reasonPareto, '#b389ff');
+  wireComboAddSelects();
 }
 
 /* =========================================================================
@@ -5205,19 +5242,111 @@ function readOperatorPicker(containerId){
 }
 // ایستگاه کشویی — از فهرست ایستگاه‌های ثبت‌شده در «تنظیمات ایستگاه‌ها» (DB.meta.stations) ساخته می‌شود؛
 // اگر مقدار فعلی رکورد در این فهرست نبود (مثلاً داده قدیمی)، همان مقدار به‌عنوان گزینه اضافه نگه داشته می‌شود.
+// گزینه‌ی «➕ افزودن ایستگاه جدید» هم همیشه ته لیست هست — چون این select بین چند تب (ضایعات، توقفات) مشترک
+// است، ایستگاهی که از هرکدام اضافه شود بلافاصله در بقیه هم دیده می‌شود (چون همه از DB.meta.stations می‌خوانند).
 function stationSelectHtml(id, currentVal){
   const names = [...new Set((DB.meta.stations||[]).map(s=>s.name).filter(Boolean))];
   let opts = ['<option value="">— انتخاب —</option>'].concat(names.map(n=>`<option value="${esc(n)}" ${currentVal===n?'selected':''}>${esc(n)}</option>`));
   if(currentVal && !names.includes(currentVal)) opts.push(`<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`);
-  return `<select id="${id}">${opts.join('')}</select>`;
+  opts.push('<option value="__add_new_station__">➕ افزودن ایستگاه جدید…</option>');
+  return `<select id="${id}" data-combo-stations="1">${opts.join('')}</select>`;
 }
-// قطعه/محصول کشویی — از فهرست قطعات پیوست‌شده (PART_LIST_DEFAULT) ساخته می‌شود؛
+// قطعه/محصول کشویی — از فهرست قطعات پیوست‌شده (PART_LIST_DEFAULT) به‌اضافه‌ی قطعاتی که شما بعداً از همین
+// دراپ‌داون اضافه کرده‌اید (DB.meta.customParts) ساخته می‌شود؛ چون این select بین «کسری قطعات» و
+// «ضایعات/دوباره‌کاری» مشترک است، هر قطعه‌ای که از یکی اضافه شود، در دیگری هم بلافاصله قابل انتخاب است.
 // اگر مقدار فعلی رکورد در این فهرست نبود، همان مقدار به‌عنوان گزینه اضافه نگه داشته می‌شود.
 function partSelectHtml(id, currentVal){
-  const names = PART_LIST_DEFAULT;
+  const names = [...PART_LIST_DEFAULT, ...(DB.meta.customParts||[])];
   let opts = ['<option value="">— انتخاب —</option>'].concat(names.map(n=>`<option value="${esc(n)}" ${currentVal===n?'selected':''}>${esc(n)}</option>`));
   if(currentVal && !names.includes(currentVal)) opts.push(`<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`);
-  return `<select id="${id}">${opts.join('')}</select>`;
+  opts.push('<option value="__add_new_part__">➕ افزودن قطعه جدید…</option>');
+  return `<select id="${id}" data-combo-parts="1">${opts.join('')}</select>`;
+}
+// علت توقف کشویی — از فهرست پیش‌فرض (STOPPAGE_REASONS) به‌اضافه‌ی علت‌هایی که خودتان بعداً اضافه کرده‌اید
+// (DB.meta.customStopReasons) ساخته می‌شود.
+function stopReasonSelectHtml(id, currentVal){
+  const base = STOPPAGE_REASONS.filter(r=>r!=='سایر');
+  const names = [...base, ...(DB.meta.customStopReasons||[]), 'سایر'];
+  let opts = names.map(n=>`<option value="${esc(n)}" ${currentVal===n?'selected':''}>${esc(n)}</option>`);
+  if(currentVal && !names.includes(currentVal)) opts.push(`<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`);
+  opts.push('<option value="__add_new_reason__">➕ افزودن علت جدید…</option>');
+  return `<select id="${id}" data-combo-reasons="1">${opts.join('')}</select>`;
+}
+// یک پنجرهٔ کوچک برای گرفتن یک متن از کاربر (برای افزودن قطعه/ایستگاه/علت جدید) — همان الگوی
+// پنجره‌های تأییدی موجود در برنامه.
+function promptTextModal_({title, desc, placeholder, onSubmit, onCancel}){
+  const root = document.getElementById('modalRoot');
+  root.innerHTML = `<div class="modal-bg" id="mbg"><div class="modal">
+    <h3>${esc(title)}</h3>${desc?`<p class="desc">${esc(desc)}</p>`:''}
+    <div class="field" style="margin-top:12px;"><input id="ptmInput" placeholder="${esc(placeholder||'')}" autocomplete="off"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">انصراف</button><button class="btn btn-teal" id="mOk">افزودن</button></div>
+  </div></div>`;
+  const close = ()=>{ root.innerHTML=''; };
+  document.getElementById('mCancel').addEventListener('click', ()=>{ close(); onCancel && onCancel(); });
+  document.getElementById('mbg').addEventListener('click', e=>{ if(e.target.id==='mbg'){ close(); onCancel && onCancel(); } });
+  const doOk = ()=>{ const v = document.getElementById('ptmInput').value.trim(); if(!v) return; close(); onSubmit(v); };
+  document.getElementById('mOk').addEventListener('click', doOk);
+  document.getElementById('ptmInput').addEventListener('keydown', e=>{ if(e.key==='Enter') doOk(); });
+  setTimeout(()=>{ const el=document.getElementById('ptmInput'); if(el) el.focus(); }, 30);
+}
+// روی هر select که گزینه‌ی «➕ افزودن …» دارد سوار می‌شود: با انتخاب آن گزینه، یک پنجره‌ی کوچک نام جدید
+// را می‌گیرد، به فهرست مشترک (DB.meta) اضافه و ذخیره می‌کند، و بدون رفرش کل فرم (تا مقادیر بقیه‌ی
+// فیلدهای در حال تکمیل از دست نرود) گزینه‌ی تازه را مستقیم داخل همان select انتخاب‌شده می‌گذارد.
+function wireComboAddSelects(){
+  document.querySelectorAll('select[data-combo-parts]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      if(sel.value !== '__add_new_part__') return;
+      sel.value = '';
+      promptTextModal_({
+        title:'➕ افزودن قطعه جدید',
+        desc:'این قطعه به فهرست مشترک اضافه می‌شود و از این پس هم در «کسری قطعات» هم در «ضایعات/دوباره‌کاری» قابل انتخاب است.',
+        placeholder:'نام قطعه / شرح کسری',
+        onSubmit:(val)=>{
+          const exists = [...PART_LIST_DEFAULT, ...(DB.meta.customParts||[])].some(n=>normalizeForGrouping(n)===normalizeForGrouping(val));
+          if(!exists){ DB.meta.customParts = [...(DB.meta.customParts||[]), val]; scheduleSave(); }
+          const opt = document.createElement('option'); opt.value = val; opt.textContent = val; opt.selected = true;
+          sel.insertBefore(opt, sel.lastElementChild); sel.value = val;
+          toast('قطعه «'+val+'» اضافه شد.','ok');
+        }
+      });
+    });
+  });
+  document.querySelectorAll('select[data-combo-stations]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      if(sel.value !== '__add_new_station__') return;
+      sel.value = '';
+      promptTextModal_({
+        title:'➕ افزودن ایستگاه جدید',
+        desc:'این ایستگاه با ظرفیت خالی (۰) اضافه می‌شود — همین کافی است برای ثبت توقف یا ضایعات رویش. اگر بعداً خواستید در محاسبات ظرفیت/گلوگاه هم لحاظ شود، هدف روزانه‌اش را در تب «آمار روزانه ایستگاه‌ها» تکمیل کنید.',
+        placeholder:'نام ایستگاه',
+        onSubmit:(val)=>{
+          const exists = (DB.meta.stations||[]).some(s=>normalizeForGrouping(s.name)===normalizeForGrouping(val));
+          if(!exists){ DB.meta.stations = [...(DB.meta.stations||[]), { id: uid(), name: val, dailyTarget:0, hourlyStandard:0 }]; scheduleSave(); }
+          const opt = document.createElement('option'); opt.value = val; opt.textContent = val; opt.selected = true;
+          sel.insertBefore(opt, sel.lastElementChild); sel.value = val;
+          toast('ایستگاه «'+val+'» اضافه شد.','ok');
+        }
+      });
+    });
+  });
+  document.querySelectorAll('select[data-combo-reasons]').forEach(sel=>{
+    sel.addEventListener('change', ()=>{
+      if(sel.value !== '__add_new_reason__') return;
+      sel.value = '';
+      promptTextModal_({
+        title:'➕ افزودن علت توقف جدید',
+        desc:'این علت به فهرست علت‌های توقف اضافه می‌شود.',
+        placeholder:'علت توقف',
+        onSubmit:(val)=>{
+          const exists = [...STOPPAGE_REASONS, ...(DB.meta.customStopReasons||[])].some(n=>normalizeForGrouping(n)===normalizeForGrouping(val));
+          if(!exists){ DB.meta.customStopReasons = [...(DB.meta.customStopReasons||[]), val]; scheduleSave(); }
+          const opt = document.createElement('option'); opt.value = val; opt.textContent = val; opt.selected = true;
+          sel.insertBefore(opt, sel.lastElementChild); sel.value = val;
+          toast('علت «'+val+'» اضافه شد.','ok');
+        }
+      });
+    });
+  });
 }
 // همان الگو، ولی از فهرست محصول/قطعهٔ رسمی برنامه تولید (LINE_PRODUCT_LIST_DEFAULT) — برای «تولید به‌تفکیک محصول»
 function productSelectHtml(id, currentVal){
