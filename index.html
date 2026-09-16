@@ -789,6 +789,14 @@ function shipTotal(entry){
     .reduce((sum,k)=> sum + (s[k]||0), 0);
 }
 function target4Lines(){ return (DB.meta.lineTarget||LINE_TARGET_DEFAULT)*4; }
+// جمع «هدف ماه» همه محصولات — همان عددی که در تب «ارسال به‌تفکیک محصول» به‌عنوان «جمع هدف ماه (همه
+// محصولات)» نشان داده می‌شود (از برنامهٔ ماهانهٔ محصول که از فایل آپلودی شما استخراج می‌شود). طبق
+// درخواست شما، هدف تولید ماهانهٔ تب «هدف و پیشرفت تولید» دیگر عدد جداگانه‌ای نیست که دستی تایپ شود؛
+// همیشه از همین‌جا خوانده می‌شود تا این دو تب هیچ‌وقت با هم ناهماهنگ نشوند.
+function productMonthlyTargetSum_(){
+  const targets = DB.meta.productMonthlyTargets || {};
+  return Object.values(targets).reduce((s,v)=>s+(v||0),0);
+}
 // روزهای تعطیل/نیمه‌شیفت شیفت کوتاه‌تری دارند (مثلاً ۸ ساعت به‌جای ۱۰ ساعت عادی) و طبیعتاً
 // تولید کمتری می‌دهند — این تابع نسبت واقعی آن روز را نسبت به یک روز عادی برمی‌گرداند
 // تا هدف روزانه هر خط/ایستگاه متناسب با آن کوچک شود، نه این‌که به‌اشتباه «کسری» ثبت شود.
@@ -3947,8 +3955,8 @@ function renderCover(){
   const wasteRate = totalProduced? (totalWaste/totalProduced) : null;
   const downtimeRate = plannedHours? (totalStopHours/plannedHours) : null;
 
-  // پیشرفت تا هدف ماهانه + پیش‌بینی پایان ماه (همان منطق تب «هدف و پیشرفت تولید»)
-  const monthlyTarget = DB.meta.monthlyTarget || 0;
+  // پیشرفت تا هدف ماهانه + پیش‌بینی پایان ماه (همان منطق تب «هدف و پیشرفت تولید» — از «ارسال به‌تفکیک محصول» خوانده می‌شود)
+  const monthlyTarget = productMonthlyTargetSum_();
   const workingDays = DB.meta.workingDaysPerMonth || 23;
   const cumTotal = rows.reduce((s,e)=> s + allLinesTotal(e), 0);
   const daysElapsed = rows.length;
@@ -4105,7 +4113,7 @@ function renderLean(){
   const weakestLine = perLine.filter(l=>l.dev!==null).sort((a,b)=>a.dev-b.dev)[0];
 
   // ---- برنامه‌ریزی نیروی انسانی بر اساس هدف ماهانه ----
-  const monthlyTarget = DB.meta.monthlyTarget || 0;
+  const monthlyTarget = productMonthlyTargetSum_();
   const workingDays = DB.meta.workingDaysPerMonth || 23;
   const standardHeadcount = DB.meta.standardHeadcount || 0;
   const roster = DB.meta.workforceRoster || [];
@@ -4172,11 +4180,15 @@ function renderLean(){
 
   <div class="card" style="margin-bottom:16px;">
     <h3>🎯 برنامه‌ریزی نیروی انسانی بر اساس هدف ماهانه</h3>
+    <div class="hint" style="margin:0 0 10px;">هدف تولید ماهانه دیگر دستی نیست — خودکار از «جمع هدف ماه (همه محصولات)» در تب «ارسال به‌تفکیک محصول» خوانده می‌شود.</div>
     <div class="form-grid">
-      <div class="field"><label>هدف تولید ماهانه (عدد)</label><input id="monthlyTargetInput" type="text" inputmode="numeric" value="${monthlyTarget||''}" placeholder="مثلاً 300000"></div>
+      <div class="field"><label>هدف تولید ماهانه (خودکار)</label>
+        <input type="text" value="${monthlyTarget? fmt(monthlyTarget,0) : '—'}" disabled style="opacity:.75; cursor:not-allowed;">
+      </div>
       <div class="field"><label>روزهای کاری در ماه</label><input id="workingDaysInput" type="text" inputmode="numeric" value="${workingDays}"></div>
       <div class="field"><label>پرسنل استاندارد (برای فعال بودن همه خطوط)</label><input id="stdHeadcountInput" type="text" inputmode="numeric" value="${standardHeadcount||''}" placeholder="مثلاً 37"></div>
     </div>
+    ${!monthlyTarget? `<div class="hint" style="margin-top:8px; color:#ffcf5c;">هنوز عددی در برنامهٔ ماهانهٔ محصول ثبت نشده — به تب «ارسال به‌تفکیک محصول» بروید و هدف ماه هر محصول را وارد کنید. <button class="btn btn-ghost btn-sm" id="lean_goProductOutput" style="margin-right:8px;">برو به آن تب</button></div>` : ''}
     <button class="btn btn-teal btn-sm" id="saveWorkforceBtn" style="margin-top:12px;">ذخیره برنامه</button>
 
     <div class="grid grid-4" style="margin-top:16px;">
@@ -4271,14 +4283,14 @@ function renderLean(){
       scales:{ y:{ min:0, max:120, grid:{color:'#182338'}, ticks:{callback:v=>v+'%'} }, x:{grid:{display:false}} } } });
 
   document.getElementById('saveWorkforceBtn').addEventListener('click', ()=>{
-    const mt = num(document.getElementById('monthlyTargetInput').value);
     const wd = num(document.getElementById('workingDaysInput').value);
     const sh = num(document.getElementById('stdHeadcountInput').value);
-    DB.meta.monthlyTarget = mt===null? 0 : Math.max(0, mt);
     DB.meta.workingDaysPerMonth = (wd===null || wd<=0)? 23 : wd;
     DB.meta.standardHeadcount = sh===null? 0 : Math.max(0, sh);
     scheduleSave(); toast('برنامه نیروی انسانی ذخیره شد.','ok'); renderLean();
   });
+  const leanGoPoBtn = document.getElementById('lean_goProductOutput');
+  if(leanGoPoBtn) leanGoPoBtn.addEventListener('click', ()=> goTo('productOutput'));
   const syncRosterInputs = ()=>{
     document.querySelectorAll('.roster-role').forEach(inp=>{ const i=+inp.dataset.i; if(roster[i]) roster[i].role = inp.value; });
     document.querySelectorAll('.roster-count').forEach(inp=>{ const i=+inp.dataset.i; if(roster[i]) roster[i].count = num(inp.value)||0; });
@@ -4591,7 +4603,7 @@ function renderDash(){
   const trendAll = linearTrend(rows.map(e=>allLinesTotal(e)));
   let forecastTotalAll = sumAll;
   for(let i=rows.length; i<rows.length+daysRemainingD; i++) forecastTotalAll += Math.max(0, trendAll.intercept + trendAll.slope*i);
-  const monthlyTargetD = DB.meta.monthlyTarget || (combinedTarget*workingDaysD);
+  const monthlyTargetD = productMonthlyTargetSum_() || (combinedTarget*workingDaysD);
   const forecastVsTargetPctD = monthlyTargetD ? (forecastTotalAll-monthlyTargetD)/monthlyTargetD : null;
   const avgDailyAll = rows.length? sumAll/rows.length : 0;
   const trendDirection = Math.abs(trendAll.slope) < avgDailyAll*0.02 ? 'stable' : (trendAll.slope>0 ? 'up' : 'down');
@@ -4860,7 +4872,7 @@ function renderTargetProgress(){
   const M = monthData();
   const rows = [...M.daily].sort((a,b)=>dateSortKey(a.date)-dateSortKey(b.date));
 
-  const monthlyTarget = DB.meta.monthlyTarget || 0;
+  const monthlyTarget = productMonthlyTargetSum_();
   const workingDays = DB.meta.workingDaysPerMonth || 23;
   const dailyTargetFlat = workingDays ? monthlyTarget/workingDays : 0; // مبنای «روز عادی» — روزهای تعطیل از این کوچک‌تر می‌شوند
   const dayTargets = rows.map(e=> dailyTargetFlat * dayShiftFactor(e));
@@ -4921,7 +4933,7 @@ function renderTargetProgress(){
   // ---- تحلیل خودکار (قاعده‌محور) ----
   const insights = [];
   if(monthlyTarget<=0){
-    insights.push({icon:'⚙️', color:'#93a4c3', text:'برای فعال‌سازی این تحلیل، ابتدا «هدف تولید ماهانه» را در کادر بالا وارد و ذخیره کنید (همان عددی که واحد برنامه‌ریزی تولید اعلام می‌کند، مثلاً 290000).'});
+    insights.push({icon:'⚙️', color:'#93a4c3', text:'برای فعال‌سازی این تحلیل، ابتدا برنامهٔ ماهانهٔ محصول را در تب «ارسال به‌تفکیک محصول» تکمیل کنید — هدف ماهانه این صفحه خودکار از همان‌جا (جمع هدف ماه همهٔ محصولات) خوانده می‌شود.'});
   } else if(rows.length===0){
     insights.push({icon:'⚙️', color:'#93a4c3', text:'برای این ماه هنوز روزی در «ورود داده روزانه» ثبت نشده — پس از اولین ثبت، این تحلیل کامل می‌شود.'});
   } else {
@@ -4951,13 +4963,16 @@ function renderTargetProgress(){
   <div class="card" style="margin-bottom:16px;">
     <div class="flexbar">
       <h3 style="margin:0;">🎯 هدف تولید ماهانه</h3>
-      <span class="hint" style="margin:0;">همان «هدف تولید ماهانه» تب شاخص‌های ناب — از هرکدام تغییر دهید، همه‌جا به‌روز می‌شود.</span>
+      <span class="hint" style="margin:0;">این عدد دیگر دستی نیست — خودکار از «جمع هدف ماه (همه محصولات)» در تب «ارسال به‌تفکیک محصول» خوانده می‌شود.</span>
     </div>
     <div class="form-grid" style="margin-top:10px;">
-      <div class="field"><label>هدف تولید ماهانه (عدد کل — همه اقلام)</label><input id="tp_target" type="text" inputmode="numeric" value="${monthlyTarget||''}" placeholder="مثلاً 290000"></div>
+      <div class="field"><label>هدف تولید ماهانه (خودکار — از برنامهٔ ماهانهٔ محصول)</label>
+        <input type="text" value="${monthlyTarget? fmt(monthlyTarget,0) : '—'}" disabled style="opacity:.75; cursor:not-allowed;">
+      </div>
       <div class="field"><label>روزهای کاری این ماه</label><input id="tp_workdays" type="text" inputmode="numeric" value="${workingDays}"></div>
     </div>
-    <button class="btn btn-teal btn-sm" id="tp_saveBtn" style="margin-top:12px;">ذخیره هدف</button>
+    ${!monthlyTarget? `<div class="hint" style="margin-top:8px; color:#ffcf5c;">هنوز عددی در برنامهٔ ماهانهٔ محصول ثبت نشده — برای فعال‌شدن این هدف، به تب «ارسال به‌تفکیک محصول» بروید و هدف ماه هر محصول را وارد کنید. <button class="btn btn-ghost btn-sm" id="tp_goProductOutput" style="margin-right:8px;">برو به آن تب</button></div>` : ''}
+    <button class="btn btn-teal btn-sm" id="tp_saveBtn" style="margin-top:12px;">ذخیره روزهای کاری</button>
   </div>
 
   <div class="grid grid-4" style="margin-bottom:16px;">
@@ -5026,12 +5041,12 @@ function renderTargetProgress(){
   bindMonthBar(()=>renderTargetProgress());
 
   document.getElementById('tp_saveBtn').addEventListener('click', ()=>{
-    const mt = num(document.getElementById('tp_target').value);
     const wd = num(document.getElementById('tp_workdays').value);
-    DB.meta.monthlyTarget = mt===null? 0 : Math.max(0, mt);
     DB.meta.workingDaysPerMonth = (wd===null||wd<=0)? 23 : wd;
-    scheduleSave(); toast('هدف تولید ماهانه ذخیره شد.','ok'); renderTargetProgress();
+    scheduleSave(); toast('روزهای کاری ماه ذخیره شد.','ok'); renderTargetProgress();
   });
+  const goPoBtn = document.getElementById('tp_goProductOutput');
+  if(goPoBtn) goPoBtn.addEventListener('click', ()=> goTo('productOutput'));
 
   document.getElementById('tp_aiBtn').addEventListener('click', ()=> openAiSummaryModal({
     monthlyTarget, workingDays, cumTotal, remaining, daysElapsed, daysRemaining, progressPct, paceDevPct,
