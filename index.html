@@ -805,6 +805,15 @@ function dayShiftFactor(e){
   const hrs = (e && e.shiftHours) || normal;
   return normal ? hrs/normal : 1;
 }
+// نشانه‌ی 🌙 برای پنجشنبه/جمعه/تعطیلات — همان قراردادی که در تب «هدف و پیشرفت تولید» استفاده می‌شود،
+// طبق درخواست شما حالا در همه‌ی نمودارها و جدول‌های تاریخ‌دار به همین شکل تکرار می‌شود.
+// نسخه‌ی مستقیم: وقتی خودِ رکورد «ورود داده روزانه» (با فیلد shiftHours) در دست است.
+function moonSuffix_(dailyRow){ return dailyRow && dayShiftFactor(dailyRow)<1 ? ' 🌙' : ''; }
+function moonLabel_(dateStr, dailyRow){ return dateStr + moonSuffix_(dailyRow); }
+// نسخه‌ی نگاشتی: وقتی رکورد فعلی از نوع «ورود داده روزانه» نیست (مثلاً ضایعات، توقفات، کسری قطعات،
+// آمار ایستگاه) و باید طبق تاریخ به رکورد «ورود داده روزانه» همان روز مراجعه شود.
+function dailyByDateMap_(dailyRows){ const m={}; (dailyRows||[]).forEach(e=>{ m[e.date]=e; }); return m; }
+function moonLabelByDate_(dateStr, dateMap){ return dateStr + moonSuffix_(dateMap[dateStr]); }
 // برآورد نرخ استاندارد ساعتی هر ایستگاه از روی متن آزادِ ثبت‌شده در «توقفات تولید».
 // چون نام ایستگاه دستی تایپ می‌شود (مثلاً «مونتاژنهایی 1»، «پرچ سیلندر1» یا چند ایستگاه با «|»)،
 // اول تطبیق دقیق، بعد تطبیق فازی (نادیده‌گرفتن فاصله/اعداد/علائم) امتحان می‌شود. اگر هیچ ایستگاهی
@@ -1667,7 +1676,7 @@ function renderEntry(){
           const devPct = tAll? (devAll/tAll) : null;
           const stopped = ['line1','line2','line3','line4'].filter(k=>e.lines[k].status==='stop').length;
           return `<tr>
-            <td>${esc(e.date)}</td><td>${esc(e.day)}</td>
+            <td>${esc(e.date)}</td><td>${esc(e.day)}${moonSuffix_(e)}</td>
             <td class="num">${e.lines.line1.status==='stop'?'<span class="badge badge-stop">توقف</span>':fmt(e.lines.line1.qty,0)}</td>
             <td class="num">${e.lines.line2.status==='stop'?'<span class="badge badge-stop">توقف</span>':fmt(e.lines.line2.qty,0)}</td>
             <td class="num">${e.lines.line3.status==='stop'?'<span class="badge badge-stop">توقف</span>':fmt(e.lines.line3.qty,0)}</td>
@@ -1778,6 +1787,9 @@ function emptyStationHourlyDraft(){
 function renderStations(){
   const M = monthData();
   const stations = DB.meta.stations || [];
+  // برای نشانه‌ی 🌙 (پنجشنبه/جمعه/تعطیل) روی تاریخ ثبت‌های این تب، چون رکورد آمار ایستگاه خودش
+  // «ساعت شیفت» ندارد، از رکورد «ورود داده روزانه» همان تاریخ می‌خوانیم.
+  const dMapSt = dailyByDateMap_(M.daily);
   const draft = editing.stationHourly || emptyStationHourlyDraft();
   const filterStation = filters.stationFilter || 'all';
   const filterOperator = filters.stationOperatorFilter || 'all';
@@ -1911,7 +1923,7 @@ function renderStations(){
       list.map(r=>{
         const devp = r.target? (r.total-r.target)/r.target : null;
         const shiftRange = (r.shiftStart||r.shiftEnd) ? `${esc(r.shiftStart)||'—'}–${esc(r.shiftEnd)||'—'}` : '—';
-        return `<tr><td>${esc(r.date)}</td><td>${esc((stationById(r.stationId)||{}).name||'—')}</td><td>${esc(r.operator)||'—'}</td>
+        return `<tr><td>${moonLabelByDate_(r.date, dMapSt)}</td><td>${esc((stationById(r.stationId)||{}).name||'—')}</td><td>${esc(r.operator)||'—'}</td>
           <td style="direction:ltr; text-align:center;">${shiftRange}</td><td>${esc(r.product)||'—'}</td>
           <td style="direction:ltr; text-align:center; font-family:monospace; font-size:12px;">${esc(r.traceId)||'—'}</td>
           <td class="num"><b>${fmt(r.total,0)}</b></td><td class="num">${fmt(r.target,0)}</td>
@@ -2196,12 +2208,12 @@ function renderProd(){
       <div class="strip-card" style="min-width:0;">
         <div class="l">بیشترین تولید یک‌روزه (۴ خط اصلی)</div>
         <div class="v" style="color:#8ff0c8;">${maxDay? fmt(mainFourTotal(maxDay),0):'—'}</div>
-        <div class="hint" style="margin-top:6px;">${maxDay? esc(maxDay.date)+' — '+esc(maxDay.day):''}</div>
+        <div class="hint" style="margin-top:6px;">${maxDay? esc(maxDay.date)+' — '+esc(maxDay.day)+moonSuffix_(maxDay):''}</div>
       </div>
       <div class="strip-card" style="min-width:0;">
         <div class="l">کمترین تولید یک‌روزه (روزهای فعال)</div>
         <div class="v" style="color:#ffb0b8;">${minDay? fmt(mainFourTotal(minDay),0):'—'}</div>
-        <div class="hint" style="margin-top:6px;">${minDay? esc(minDay.date)+' — '+esc(minDay.day):''}</div>
+        <div class="hint" style="margin-top:6px;">${minDay? esc(minDay.date)+' — '+esc(minDay.day)+moonSuffix_(minDay):''}</div>
       </div>
     </div>
   </div>
@@ -2222,7 +2234,7 @@ function renderProd(){
           if(!itemTarget || q===null) return fmt(q,0);
           return `<span style="color:${q>=itemTarget?'#8ff0c8':'#ffb0b8'}">${fmt(q,0)}</span>`;
         };
-        return `<tr><td>${esc(e.date)}</td><td>${esc(e.day)}</td>
+        return `<tr><td>${esc(e.date)}</td><td>${esc(e.day)}${moonSuffix_(e)}</td>
           <td class="num">${c('line1')}</td><td class="num">${c('line2')}</td><td class="num">${c('line3')}</td>
           <td class="num">${c('line4')}${e.lines.line4.transferFromDiesel>0?` <span class="tag" style="background:#3a3220;color:#ffcf5c;padding:1px 6px;border-radius:8px;font-size:9.5px;" title="بابت توقف دستگاه دیزل، ${fmt(e.lines.line4.transferFromDiesel,0)} عدد از دیزل به این خط منتقل شد">🔁${fmt(e.lines.line4.transferFromDiesel,0)}</span>`:''}</td>
           <td class="num">${cItem('ckd', ckdTarget)}</td><td class="num">${cItem('se206', se206Target)}</td><td class="num">${cItem('darpoosh', darpooshTarget)}</td><td class="num">${cItem('diesel', dieselTarget)}</td>
@@ -2301,7 +2313,7 @@ function renderProd(){
         pointBackgroundColor:'#ff5d6c', pointBorderColor:'#ff5d6c', borderColor:'transparent', backgroundColor:'transparent', noLabel:true },
     ];
     if(d.target>0) datasets.push({ label:'هدف', data: rows.map(e=>d.target*dayShiftFactor(e)), borderColor:'#93a4c3', borderDash:[5,4], pointRadius:0, tension:0, noLabel:true });
-    mkChart('chDaily_'+d.key, { type:'line', data:{ labels: rows.map(e=>e.date.slice(5)), datasets },
+    mkChart('chDaily_'+d.key, { type:'line', data:{ labels: rows.map(e=>e.date.slice(5)+moonSuffix_(e)), datasets },
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},
         tooltip:{ callbacks:{ label:(ctx)=> ctx.dataset.label==='⛔ توقف تولید' ? '⛔ توقف تولید در این روز — کلیک کنید تا علت آن را در تب «توقفات تولید» ببینید' : (ctx.dataset.label+': '+fmt(ctx.parsed.y,0)) } } },
         scales:{ x:{grid:{display:false}, ticks:{font:{size:8.5}, maxRotation:0, autoSkip:true, maxTicksLimit:5}},
@@ -2377,6 +2389,8 @@ function renderProductOutput(){
   const M = monthData();
   const list = [...(M.productOutput||[])].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date));
   const filteredList = filters.poDateFocus ? list.filter(x=>x.date===filters.poDateFocus) : list;
+  // برای نشانه‌ی 🌙 (پنجشنبه/جمعه/تعطیل) روی تاریخ ثبت‌ها
+  const dMapPo = dailyByDateMap_(M.daily);
   const targets = DB.meta.productMonthlyTargets || {};
   const productNames = [...new Set([...Object.keys(targets), ...list.map(x=>x.product)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fa'));
 
@@ -2505,7 +2519,7 @@ function renderProductOutput(){
       <thead><tr><th>تاریخ</th><th>محصول / کد کالا</th><th class="num">تعداد</th><th>شماره ردیابی</th><th></th></tr></thead>
       <tbody>
       ${filteredList.length===0?`<tr><td colspan="5"><div class="tbl-empty">موردی ثبت نشده.</div></td></tr>`:
-      filteredList.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.product)}</td><td class="num">${fmt(x.qty,0)}</td><td>${esc(x.traceId)||'—'}</td>
+      filteredList.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapPo)}</td><td>${esc(x.product)}</td><td class="num">${fmt(x.qty,0)}</td><td>${esc(x.traceId)||'—'}</td>
         <td><div style="display:flex; gap:6px;">
           <button class="icon-btn" data-poedit="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
           <button class="icon-btn" data-podel="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
@@ -2591,7 +2605,7 @@ function renderShip(){
         <th class="num">جمع روز</th></tr></thead>
       <tbody>
       ${rows.length===0?`<tr><td colspan="${groups.length+3}"><div class="tbl-empty">داده‌ای برای نمایش وجود ندارد.</div></td></tr>`:
-      rows.map(e=>`<tr data-shipdate="${esc(e.date)}" style="cursor:pointer;" title="کلیک کنید تا جزئیات ارسال این روز به‌تفکیک محصول را ببینید"><td>${esc(e.date)}</td><td>${esc(e.day)}</td>
+      rows.map(e=>`<tr data-shipdate="${esc(e.date)}" style="cursor:pointer;" title="کلیک کنید تا جزئیات ارسال این روز به‌تفکیک محصول را ببینید"><td>${esc(e.date)}</td><td>${esc(e.day)}${moonSuffix_(e)}</td>
         ${groups.map(g=>`<td class="num">${fmt(groupSum(e,g),0)}</td>`).join('')}
         <td class="num"><b>${fmt(shipTotal(e),0)}</b></td></tr>`).join('')}
       </tbody>
@@ -2613,7 +2627,7 @@ function renderShip(){
     downloadFile('گزارش-ارسال-انبار.csv', toCSV(headers, rr), 'text/csv;charset=utf-8');
   });
 
-  mkChart('chShipTrend', { type:'bar', data:{ labels: rows.map(e=>e.date), datasets:[{label:'جمع ارسال روزانه', data:dailyTotals, backgroundColor:'#4c8dff', borderRadius:8, maxBarThickness:34}] },
+  mkChart('chShipTrend', { type:'bar', data:{ labels: rows.map(e=>moonLabel_(e.date, e)), datasets:[{label:'جمع ارسال روزانه', data:dailyTotals, backgroundColor:'#4c8dff', borderRadius:8, maxBarThickness:34}] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{grid:{color:'#182338'}}} } });
   mkChart('chShipDonut', { type:'doughnut', data:{ labels: groupTotals.map(g=>g.label), datasets:[{ data: groupTotals.map(g=>g.total), backgroundColor: PALETTE, borderColor:'#101827', borderWidth:3 }] },
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}} } });
@@ -2626,6 +2640,7 @@ function renderShort(){
   const M = monthData();
   const list = [...M.short].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
     .filter(x=> !filters.short || (x.part+x.description).toLowerCase().includes(filters.short.toLowerCase()));
+  const dMapSh = dailyByDateMap_(M.daily);
   const byPart = {};
   M.short.forEach(x=>{ byPart[x.part] = (byPart[x.part]||0)+1; });
   const topParts = Object.entries(byPart).sort((a,b)=>b[1]-a[1]).slice(0,8);
@@ -2661,7 +2676,7 @@ function renderShort(){
       <h3>موارد کسری ثبت‌شده در «ورود داده روزانه»</h3>
       <div class="note-list" style="max-height:230px; overflow:auto;">
       ${M.daily.filter(e=>e.notes.shortage).length===0? '<div class="tbl-empty">موردی ثبت نشده است.</div>':
-        M.daily.filter(e=>e.notes.shortage).sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date)).map(e=>`<div class="note-item"><b>${esc(e.date)}</b><span>${esc(e.notes.shortage)}</span></div>`).join('')}
+        M.daily.filter(e=>e.notes.shortage).sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date)).map(e=>`<div class="note-item"><b>${esc(e.date)}${moonSuffix_(e)}</b><span>${esc(e.notes.shortage)}</span></div>`).join('')}
       </div>
     </div>
   </div>
@@ -2675,7 +2690,7 @@ function renderShort(){
       <thead><tr><th>تاریخ</th><th>قطعه / شرح</th><th>وضعیت</th><th class="num">تعداد نیاز</th><th>توضیحات</th><th></th></tr></thead>
       <tbody>
       ${list.length===0?`<tr><td colspan="6"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
-      list.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.part)}</td>
+      list.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapSh)}</td><td>${esc(x.part)}</td>
         <td><span class="badge ${x.status==='تامین شده'?'badge-run':x.status==='پیگیری فوری'?'badge-stop':'badge-warn'}">${esc(x.status)}</span></td>
         <td class="num">${fmt(x.qty,0)}</td><td>${esc(x.description)||'—'}</td>
         <td><div style="display:flex; gap:6px;">
@@ -2772,6 +2787,7 @@ function paretoInsight80_(arr, noun){
 }
 function renderWaste(){
   const M = monthData();
+  const dMapWa = dailyByDateMap_(M.daily);
   const list = [...M.waste].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
     .filter(x=> (!filters.waste || (x.station+x.part+x.operator+x.wasteType).toLowerCase().includes(filters.waste.toLowerCase()))
              && (filters.wasteCat==='all' || x.category===filters.wasteCat)
@@ -2970,8 +2986,7 @@ function renderWaste(){
       <thead><tr><th>تاریخ</th><th>ایستگاه</th><th>نوع رویداد</th><th>قطعه</th><th>محصول نهایی</th><th>اپراتور</th><th class="num">تولید</th><th>علت دقیق</th><th class="num">تعداد</th><th>منشأ</th><th class="num">دوباره‌کاری/جداسازی (دقیقه/ساعت)</th><th></th></tr></thead>
       <tbody>
       ${list.length===0?`<tr><td colspan="12"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
-      list.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.station)}</td>
-        <td><span class="badge ${(x.eventType||'ضایعات')==='دوباره‌کاری'?'badge-blue':'badge-stop'}">${(x.eventType||'ضایعات')==='دوباره‌کاری'?'🔧 دوباره‌کاری':'🗑 ضایعات'}</span></td>
+      list.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapWa)}</td><td>${esc(x.station)}</td>        <td><span class="badge ${(x.eventType||'ضایعات')==='دوباره‌کاری'?'badge-blue':'badge-stop'}">${(x.eventType||'ضایعات')==='دوباره‌کاری'?'🔧 دوباره‌کاری':'🗑 ضایعات'}</span></td>
         <td>${esc(x.part)}</td><td>${esc(x.finalProduct)||'—'}</td><td>${esc(x.operator)||'—'}</td>
         <td class="num">${fmt(x.produced,0)}</td><td>${esc(x.wasteType)}</td><td class="num">${fmt(x.wasteCount,0)}</td>
         <td><span class="badge ${x.category==='ورودی'?'badge-blue':x.category==='حین فرآیند'?'badge-warn':'badge-mute'}">${esc(x.category)}</span></td>
@@ -3106,6 +3121,7 @@ function dualParetoChart(id, arr, view, colorScrap, colorRework){
    ========================================================================= */
 function renderStop(){
   const M = monthData();
+  const dMapSp = dailyByDateMap_(M.daily);
   const list = [...M.stop].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
     .filter(x=> (!filters.stop || (x.station+x.description).toLowerCase().includes(filters.stop.toLowerCase()))
              && (filters.stopReason==='all' || x.reason===filters.stopReason)
@@ -3170,7 +3186,7 @@ function renderStop(){
       <thead><tr><th>تاریخ</th><th>ایستگاه</th><th class="num">مدت ثبت‌شده</th><th>واحد</th><th class="num">ساعت</th><th>علت</th><th>نوع</th><th>توضیحات</th><th></th></tr></thead>
       <tbody>
       ${list.length===0?`<tr><td colspan="9"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
-      list.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.station)}</td><td class="num">${fmt(x.durationValue,1)}</td><td>${esc(x.unit)}</td>
+      list.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapSp)}</td><td>${esc(x.station)}</td><td class="num">${fmt(x.durationValue,1)}</td><td>${esc(x.unit)}</td>
         <td class="num"><b>${fmt(x.hours,1)}</b></td><td><span class="badge badge-warn">${esc(x.reason)}</span></td>
         <td>${x.planned?'<span class="tag" style="background:#173a2e;color:#8ff0c8;padding:2px 9px;border-radius:10px;font-size:10.5px;">🗓 برنامه‌ریزی‌شده</span>':'<span class="tag" style="background:#3a1f22;color:#ff8d95;padding:2px 9px;border-radius:10px;font-size:10.5px;">⚡ اضطراری</span>'}</td>
         <td>${esc(x.description)||'—'}</td>
@@ -4044,7 +4060,7 @@ function renderCover(){
   // (جمع هدف ۴خط + CKD + سه‌راهی + درپوش + دیزل)، نه از تقسیم ساده هدف ماه بر روزهای کاری؛ این‌طور توقف یک
   // خط دیگر باعث افت خودِ خط هدف نمی‌شود — فقط شیفت واقعاً کوتاه/تعطیل مجاز است هدف را کم کند.
   // روی هر نقطه کلیک کنید تا علت افت آن روز (توقفات ثبت‌شده) را در تب «توقفات تولید» ببینید.
-  mkChart('chCoverTrend', { type:'line', data:{ labels: rows.map(e=>e.date.slice(5)), datasets:[
+  mkChart('chCoverTrend', { type:'line', data:{ labels: rows.map(e=>e.date.slice(5)+moonSuffix_(e)), datasets:[
       { label:'تولید روزانه', data: rows.map(e=>allLinesTotal(e)), borderColor:'#4c8dff', backgroundColor:'#4c8dff26', fill:true, tension:.35, pointRadius:2 },
       { label:'ارسال روزانه', data: rows.map(e=>shipTotal(e)), borderColor:'#2fd9c4', backgroundColor:'#2fd9c426', fill:true, tension:.35, pointRadius:2 },
       { label:'هدف روزانه', data: rows.map(e=>Math.round(dayCombinedTarget(e))), borderColor:'#93a4c3', borderDash:[5,4], pointRadius:0, tension:0, fill:false },
@@ -4655,7 +4671,7 @@ function renderDash(){
   else if(rows.length) insights.push({icon:'✅', color:'#2fd9c4', text:`میانگین تولید ۴ خط اصلی <b>${pct(avgDevPct,1)}</b> نسبت به هدف روزانه، عملکرد مثبت را نشان می‌دهد.`});
 
   document.getElementById('view').innerHTML = renderMonthBar() + `
-  <div class="section-title" style="margin:0 0 12px;"><span>📅 امروز ${todayRow?'— '+esc(todayRow.date):''} <span class="hint" style="font-weight:400;">(آخرین روز ثبت‌شده در ماه فعال)</span></span><span class="ln"></span></div>
+  <div class="section-title" style="margin:0 0 12px;"><span>📅 امروز ${todayRow?'— '+esc(todayRow.date)+moonSuffix_(todayRow):''} <span class="hint" style="font-weight:400;">(آخرین روز ثبت‌شده در ماه فعال)</span></span><span class="ln"></span></div>
   ${!todayRow? `<div class="card" style="margin-bottom:16px;"><div class="tbl-empty">هنوز روزی در این ماه ثبت نشده.</div></div>` : `
   <div class="grid grid-4" style="margin-bottom:10px;">
     ${kpiCard('هدف امروز','عدد', todayTarget===null?'—':fmt(todayTarget,0), null, '#93a4c3')}
@@ -4775,7 +4791,7 @@ function renderDash(){
     <div id="aiAnalysisBox" style="margin-top:12px; min-height:40px;"></div>
   </div>`;
 
-  mkChart('dChTrend', { type:'line', data:{ labels: rows.map(e=>e.date), datasets:[
+  mkChart('dChTrend', { type:'line', data:{ labels: rows.map(e=>moonLabel_(e.date, e)), datasets:[
       {label:'جمع کل تولید (همه اقلام)', data: rows.map(e=>allLinesTotal(e)), borderColor:'#ff9d42', backgroundColor:'rgba(255,157,66,.15)', fill:true, tension:.35, pointRadius:3},
       {label:'هدف', data: rows.map(e=>dayCombinedTarget(e)), borderColor:'#4c8dff', borderDash:[6,5], pointRadius:0, noLabel:true}
     ]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}}, scales:{x:{grid:{color:'#182338'}}, y:{grid:{color:'#182338'}}} } });
@@ -5188,6 +5204,7 @@ function renderTargetProgress(){
 // جزئیات رویدادهای تشکیل‌دهنده یک «علت توقف» — با کلیک روی میله نمودار «سهم علل توقف» باز می‌شود
 function openStopReasonDrilldown(reason, stopArr){
   const items = stopArr.filter(x=>(x.reason||'سایر')===reason).sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date));
+  const dMapDd = dailyByDateMap_(monthData().daily);
   let totalLost = 0;
   const totalHours = items.reduce((s,x)=>s+(x.hours||0),0);
   const rowsHtml = items.map(x=>{
@@ -5195,7 +5212,7 @@ function openStopReasonDrilldown(reason, stopArr){
     const lost = (x.hours||0)*rate;
     totalLost += lost;
     return `<tr>
-      <td>${esc(x.date)}</td>
+      <td>${moonLabelByDate_(x.date, dMapDd)}</td>
       <td>${esc(x.station)}</td>
       <td class="num">${fmt(x.hours,1)}</td>
       <td class="num"><b style="color:#ff5d6c;">${fmt(lost,0)}</b></td>
