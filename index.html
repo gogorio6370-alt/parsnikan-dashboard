@@ -484,6 +484,7 @@ function normalizeForGrouping(s){
     .replace(/[\u200c\u200f\u200e]/g, '')
     .replace(/\s+/g, '')
     .replace(/ك/g, 'ک').replace(/ي/g, 'ی').replace(/ة/g, 'ه')
+    .toLowerCase() // «CKD» و «ckd» (یا «L90»/«l90») باید یک مورد حساب شوند، نه دو ردیف جدا
     .trim();
 }
 
@@ -4880,7 +4881,16 @@ async function runAiAnalysis(data){
     if(res && res.ok && res.text){
       box.innerHTML = `<div style="background:#0e1626; border:1px solid var(--panel-border); border-radius:12px; padding:16px; white-space:pre-line; line-height:2; font-size:13.5px;">${esc(res.text)}</div>`;
     } else {
-      box.innerHTML = `<div class="hint" style="color:#ffb0b8;">تحلیل انجام نشد (${esc(res && res.error || 'خطای نامشخص')}). اگر تازه این قابلیت را فعال کرده‌اید، مطمئن شوید کلید API هوش مصنوعی داخل Apps Script تنظیم شده.</div>`;
+      const errMsg = (res && res.error) || 'خطای نامشخص';
+      // «تقاضای بالا/overloaded» یک وضعیت موقت سمت گوگل است (سرور Apps Script هم یک‌بار خودکار دوباره
+      // تلاش می‌کند)، نه مشکلی در تنظیمات شما — پس پیام و راهنمایی باید فرق کند با خطای واقعی کلید/تنظیمات.
+      const isOverloaded = /overloaded|high demand|unavailable|503/i.test(errMsg);
+      if(isOverloaded){
+        box.innerHTML = `<div class="hint" style="color:#ffcf5c;">سرویس هوش مصنوعی گوگل موقتاً شلوغ است (این مشکل تنظیمات شما نیست). چند لحظه صبر کنید و دوباره امتحان کنید. <button class="btn btn-ghost btn-sm" id="aiRetryBtn" style="margin-right:8px;">تلاش دوباره</button></div>`;
+        document.getElementById('aiRetryBtn')?.addEventListener('click', ()=> runAiAnalysis(data));
+      } else {
+        box.innerHTML = `<div class="hint" style="color:#ffb0b8;">تحلیل انجام نشد (${esc(errMsg)}). اگر تازه این قابلیت را فعال کرده‌اید، مطمئن شوید کلید API هوش مصنوعی داخل Apps Script تنظیم شده.</div>`;
+      }
     }
   }catch(e){
     box.innerHTML = `<div class="hint" style="color:#ffb0b8;">خطا در ارتباط با سرویس تحلیل. اتصال اینترنت یا تنظیمات گوگل‌شیت را بررسی کنید.</div>`;
