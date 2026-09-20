@@ -3230,7 +3230,9 @@ function renderStop(){
     <div class="form-grid">
       <div class="field"><label>تاریخ</label>${datePickerHtml('p_date', editing.stop?.date)}</div>
       <div class="field"><label>ایستگاه متوقف‌شده</label>${stationSelectHtml('p_station', editing.stop?.station||'')}</div>
-      <div class="field"><label>مدت ثبت‌شده</label><input id="p_dur" type="text" inputmode="numeric" value="${editing.stop?.durationValue ?? ''}"></div>
+      <div class="field"><label>ساعت شروع توقف</label><input id="p_startTime" type="time" value="${esc(editing.stop?.startTime||'')}"></div>
+      <div class="field"><label>ساعت پایان توقف</label><input id="p_endTime" type="time" value="${esc(editing.stop?.endTime||'')}"></div>
+      <div class="field"><label>مدت ثبت‌شده <span class="muted" style="font-weight:400;">(اگر ساعت شروع/پایان را زدید، خودکار پر می‌شود)</span></label><input id="p_dur" type="text" inputmode="numeric" value="${editing.stop?.durationValue ?? ''}"></div>
       <div class="field"><label>واحد</label><select id="p_unit"><option ${editing.stop?.unit==='دقیقه'?'selected':''}>دقیقه</option><option ${!editing.stop||editing.stop.unit==='ساعت'?'selected':''}>ساعت</option><option ${editing.stop?.unit==='روز'?'selected':''}>روز</option></select></div>
       <div class="field"><label>علت توقف</label>${stopReasonSelectHtml('p_reason', editing.stop?.reason||'')}</div>
       <div class="field"><label>نوع توقف</label>
@@ -3242,7 +3244,7 @@ function renderStop(){
       <div class="field span-2"><label>توضیحات</label><input id="p_desc" placeholder="شرح مختصر" value="${esc(editing.stop?.description||'')}"></div>
       <div class="field"><label>مدت به ساعت (خودکار — قابل ویرایش)</label><input id="p_hours" type="text" inputmode="numeric" value="${editing.stop?.hours ?? ''}" placeholder="بر اساس واحد محاسبه می‌شود"></div>
     </div>
-    <div class="hint">تبدیل خودکار: ۱ روز = ۸ ساعت شیفت کاری، ۱ ساعت = ۶۰ دقیقه — در صورت نیاز مقدار «مدت به ساعت» را دستی اصلاح کنید. توقف «برنامه‌ریزی‌شده» یعنی از پیش برای تعمیرات دوره‌ای، تنظیم یا تعویض قالب در نظر گرفته شده بود (نه خرابی ناگهانی) — این برچسب فقط برای گزارش‌گیری دقیق‌تر است و فعلاً در محاسبه Availability اثری ندارد.</div>
+    <div class="hint">اگر ساعت شروع و پایان توقف را بزنید، «مدت ثبت‌شده» و «مدت به ساعت» خودکار محاسبه می‌شوند (نیازی به تبدیل دستی دقیقه/ساعت نیست) — اگر توقف از نیمه‌شب رد شده باشد (مثلاً ۲۳:۳۰ تا ۰۰:۱۵)، این هم خودکار درست حساب می‌شود. اگر ساعت دقیق را نمی‌دانید، همان «مدت ثبت‌شده + واحد» قبلی را دستی وارد کنید. تبدیل خودکار واحد: ۱ روز = ۸ ساعت شیفت کاری، ۱ ساعت = ۶۰ دقیقه — در صورت نیاز مقدار «مدت به ساعت» را دستی اصلاح کنید. توقف «برنامه‌ریزی‌شده» یعنی از پیش برای تعمیرات دوره‌ای، تنظیم یا تعویض قالب در نظر گرفته شده بود (نه خرابی ناگهانی) — این برچسب فقط برای گزارش‌گیری دقیق‌تر است و فعلاً در محاسبه Availability اثری ندارد.</div>
     <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
       <button class="btn btn-primary" id="saveStopBtn">${editing.stop?'ذخیره تغییرات':'ثبت توقف'}</button>
       ${editing.stop?'<button class="btn btn-ghost" id="cancelStopBtn">انصراف</button>':''}
@@ -3269,10 +3271,12 @@ function renderStop(){
       </div>
     </div>
     <div class="table-wrap" style="max-height:420px; overflow:auto;"><table>
-      <thead><tr><th>تاریخ</th><th>ایستگاه</th><th class="num">مدت ثبت‌شده</th><th>واحد</th><th class="num">ساعت</th><th>علت</th><th>نوع</th><th>توضیحات</th><th></th></tr></thead>
+      <thead><tr><th>تاریخ</th><th>ایستگاه</th><th>بازه زمانی</th><th class="num">مدت ثبت‌شده</th><th>واحد</th><th class="num">ساعت</th><th>علت</th><th>نوع</th><th>توضیحات</th><th></th></tr></thead>
       <tbody>
-      ${list.length===0?`<tr><td colspan="9"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
-      list.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapSp)}</td><td>${esc(x.station)}</td><td class="num">${fmt(x.durationValue,1)}</td><td>${esc(x.unit)}</td>
+      ${list.length===0?`<tr><td colspan="10"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
+      list.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapSp)}</td><td>${esc(x.station)}</td>
+        <td style="direction:ltr; text-align:center; font-family:monospace; font-size:12px;">${x.startTime&&x.endTime? `${esc(x.startTime)}–${esc(x.endTime)}` : '—'}</td>
+        <td class="num">${fmt(x.durationValue,1)}</td><td>${esc(x.unit)}</td>
         <td class="num"><b>${fmt(x.hours,1)}</b></td><td><span class="badge badge-warn">${esc(x.reason)}</span></td>
         <td>${x.planned?'<span class="tag" style="background:#173a2e;color:#8ff0c8;padding:2px 9px;border-radius:10px;font-size:10.5px;">🗓 برنامه‌ریزی‌شده</span>':'<span class="tag" style="background:#3a1f22;color:#ff8d95;padding:2px 9px;border-radius:10px;font-size:10.5px;">⚡ اضطراری</span>'}</td>
         <td>${esc(x.description)||'—'}</td>
@@ -3295,13 +3299,31 @@ function renderStop(){
   const autoHours = ()=>{ const v = num(durInput.value); const h = unitToHours(v, unitInput.value); if(h!==null) hoursInput.value = h; };
   durInput.addEventListener('input', autoHours); unitInput.addEventListener('change', autoHours);
 
+  // از روی ساعت شروع/پایان، مدت را خودکار حساب می‌کند و توی «مدت ثبت‌شده» (به ساعت) می‌گذارد — اگر
+  // توقف از نیمه‌شب رد شود (پایان از شروع کوچک‌تر باشد)، ۲۴ ساعت اضافه می‌شود تا درست حساب شود.
+  const startTimeInput = document.getElementById('p_startTime'), endTimeInput = document.getElementById('p_endTime');
+  const autoFromClock = ()=>{
+    const sv = startTimeInput.value, ev = endTimeInput.value;
+    if(!sv || !ev) return;
+    const [sh,sm] = sv.split(':').map(Number), [eh,em] = ev.split(':').map(Number);
+    let mins = (eh*60+em) - (sh*60+sm);
+    if(mins < 0) mins += 24*60;
+    const hrs = Math.round((mins/60)*100)/100;
+    unitInput.value = 'ساعت';
+    durInput.value = hrs;
+    hoursInput.value = hrs;
+  };
+  startTimeInput.addEventListener('change', autoFromClock);
+  endTimeInput.addEventListener('change', autoFromClock);
+
   document.getElementById('saveStopBtn').addEventListener('click', ()=>{
     const date = readDatePicker('p_date');
     const station = document.getElementById('p_station').value.trim();
     const hours = num(hoursInput.value);
     if(!date || !station || hours===null){ toast('تاریخ، ایستگاه و مدت توقف الزامی است.','err'); return; }
     const rec = { id: editing.stop?.id || uid(), date, station, durationValue: num(durInput.value), unit: unitInput.value,
-      hours, reason: document.getElementById('p_reason').value, planned: document.getElementById('p_planned').value==='1', description: document.getElementById('p_desc').value };
+      hours, reason: document.getElementById('p_reason').value, planned: document.getElementById('p_planned').value==='1', description: document.getElementById('p_desc').value,
+      startTime: startTimeInput.value||'', endTime: endTimeInput.value||'' };
     const isNew = !editing.stop;
     if(editing.stop){ DB.stop = DB.stop.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
     else{ DB.stop.push(rec); toast('توقف ثبت شد.','ok'); }
@@ -3325,8 +3347,8 @@ function renderStop(){
   document.getElementById('reasonFilter').addEventListener('change', e=>{ filters.stopReason = e.target.value; renderStop(); });
   { const el = document.getElementById('clearStopDateFilter'); if(el) el.addEventListener('click', ()=>{ filters.stopDate=''; renderStop(); }); }
   document.getElementById('expStopCsv').addEventListener('click', ()=>{
-    const headers = ['تاریخ','ایستگاه','مدت','واحد','ساعت','علت','توضیحات'];
-    const rr = M.stop.map(x=>[x.date,x.station,x.durationValue,x.unit,x.hours,x.reason,x.description]);
+    const headers = ['تاریخ','ایستگاه','ساعت شروع','ساعت پایان','مدت','واحد','ساعت','علت','توضیحات'];
+    const rr = M.stop.map(x=>[x.date,x.station,x.startTime||'',x.endTime||'',x.durationValue,x.unit,x.hours,x.reason,x.description]);
     downloadFile('ثبت-توقفات.csv', toCSV(headers, rr), 'text/csv;charset=utf-8');
   });
 
