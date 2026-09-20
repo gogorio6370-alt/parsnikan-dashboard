@@ -389,6 +389,91 @@ const LINE_TARGET_DEFAULT = 2500; // daily target for each of the 4 main lines
 const DIESEL_TARGET_DEFAULT = 500; // دیزل/بنز — a separate 5th line, not one of the 4 main lines
 const WEEKDAYS_BY_JSDAY = ['یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه'];
 const STOPPAGE_REASONS = ['عدم تامین قطعه','خرابی دستگاه','خرابی سیلندر','تست قرص','تست قطعه','قطعی باد','افت فشار باد','قطع برق','توقف کیفی','عدم تنظیم دستگاه','نداشتن نیروی انسانی','بالانس نبودن خط تولید','تغییر برنامه','سایر'];
+// نگاشت پیش‌فرض «علت توقف → واحد مسئول رسیدگی» — برای جعبه «هشدارهای مدیریتی» در صفحه‌ی کاور. این یک
+// حدس نیست؛ منطق سازمانی معمول کارخانه‌هاست (خرابی دستگاه با تعمیرات، کمبود قطعه با تدارکات و...). اگر
+// نام واحدهای واقعی کارخانه با این‌ها فرق دارد، به‌راحتی قابل ویرایش است.
+const STOP_REASON_DEPARTMENT = {
+  'عدم تامین قطعه':'تدارکات و انبار', 'خرابی دستگاه':'تعمیرات و نگهداری', 'خرابی سیلندر':'تعمیرات و نگهداری',
+  'تست قرص':'کنترل کیفیت', 'تست قطعه':'کنترل کیفیت', 'قطعی باد':'تاسیسات', 'افت فشار باد':'تاسیسات',
+  'قطع برق':'تاسیسات', 'توقف کیفی':'کنترل کیفیت', 'عدم تنظیم دستگاه':'سرپرست خط تولید',
+  'نداشتن نیروی انسانی':'منابع انسانی', 'بالانس نبودن خط تولید':'مهندسی صنایع', 'تغییر برنامه':'برنامه‌ریزی تولید',
+};
+function departmentForStopReason_(reason){ return STOP_REASON_DEPARTMENT[reason] || 'سرپرست تولید'; }
+// همان منطق برای «منشأ بروز ضایعات»
+const WASTE_CATEGORY_DEPARTMENT = { 'ورودی':'کنترل کیفیت ورودی', 'ورودی مشروط':'کنترل کیفیت ورودی', 'حین فرآیند':'سرپرست خط تولید', 'کنترل نهایی':'کنترل کیفیت' };
+function departmentForWasteCategory_(cat){ return WASTE_CATEGORY_DEPARTMENT[cat] || 'سرپرست تولید'; }
+// آیا نام آزادِ ثبت‌شده‌ی یک ایستگاه، با یکی از نام‌های هدف هم‌خوانی دارد؟ (تطبیق زیررشته‌ای دوطرفه، مثل بقیه‌ی تطبیق‌های این فایل)
+function stationNameMatchesAny_(stationRaw, targetNames){
+  const norm = normalizeForGrouping(stationRaw);
+  if(!norm) return false;
+  return targetNames.some(tn=>{ const t = normalizeForGrouping(tn); return norm.includes(t) || t.includes(norm); });
+}
+// جعبه «هشدارهای مدیریتی» صفحه‌کاور — کاملاً از داده‌های همین ماه ساخته می‌شود، چیزی حدس زده نمی‌شود:
+// اگر علت اختصاصی یک خط در توقفات/ضایعاتِ ایستگاه‌های همان خط قابل تشخیص نبود، همین صادقانه گفته
+// می‌شود (نه یک علت نامربوط). حداکثر ۳ هشدار، به‌ترتیب شدت.
+function buildManagementAlerts_(M){
+  const alerts = [];
+  const lineStations = { line1:['تنظیم 1','مونتاژ نهایی 1'], line2:['تنظیم 2','مونتاژ نهایی 2'], line3:['تنظیم 3','مونتاژ نهایی 3'], line4:['مونتاژ نهایی 4'] };
+  const lineNames = { line1:'خط ۱', line2:'خط ۲', line3:'خط ۳', line4:'خط ۴' };
+
+  // ۱) کدام خط بیشترین عقب‌ماندگی از هدف را در این ماه دارد؟
+  // نکته‌ی مهم: خط ۴ همیشه محصول اصلی خودش را نمی‌زند — گاهی (وقتی خط دیزل/بنز مشکل دارد) با آن
+  // تعویض می‌شود و بنز/دیزل می‌زند (دقیقاً همان چیزی که در «ورود داده روزانه»، فیلد محصول خط ۴ نشان
+  // می‌دهد). آن روزها هدف درست برای مقایسه، هدف کوچک دیزل/بنز است، نه هدف کامل ۲۵۰۰ خط اصلی — وگرنه
+  // این هشدار هر ماه بی‌دلیل قرمز می‌ماند.
+  let worstLine = null;
+  Object.keys(lineStations).forEach(lk=>{
+    let actual=0, target=0;
+    M.daily.forEach(e=>{
+      const shiftF = dayShiftFactor(e);
+      actual += (e.lines[lk] && e.lines[lk].qty) || 0;
+      const onDieselDuty = lk==='line4' && e.lines.line4 && /بنز|دیزل/.test(e.lines.line4.product||'');
+      target += (onDieselDuty ? (DB.meta.dieselTarget||DIESEL_TARGET_DEFAULT) : (DB.meta.lineTarget||LINE_TARGET_DEFAULT)) * shiftF;
+    });
+    if(target<=0) return;
+    const dev = (actual-target)/target;
+    if(dev < -0.05 && (!worstLine || dev < worstLine.dev)) worstLine = { key:lk, dev, actual, target };
+  });
+  if(worstLine){
+    const stNames = lineStations[worstLine.key];
+    const matchedStops = stopLossRanking(M.stop.filter(x=>stationNameMatchesAny_(x.station, stNames)));
+    const matchedWasteQty = M.waste.filter(x=>stationNameMatchesAny_(x.station, stNames) && (x.eventType||'ضایعات')!=='دوباره‌کاری').reduce((s,x)=>s+(x.wasteCount||0),0);
+    const lostQtyEst = Math.abs(worstLine.actual - worstLine.target);
+    let cause, dept;
+    if(matchedStops.length && matchedStops[0].lostQty>0){
+      cause = `علت غالب: ${matchedStops[0].label} (${fmt(matchedStops[0].hours,1)} ساعت توقف در ایستگاه‌های این خط)`;
+      dept = departmentForStopReason_(matchedStops[0].label);
+    } else if(matchedWasteQty>0){
+      cause = `علت غالب: ضایعات ایستگاه‌های این خط (${fmt(matchedWasteQty,0)} عدد)`;
+      dept = 'سرپرست خط تولید';
+    } else {
+      cause = 'علت اختصاصیِ این خط در توقفات/ضایعات ثبت‌نشده — احتمالاً مشترک با سایر خطوط است (مثلاً کمبود قطعه عمومی)';
+      dept = 'سرپرست خط تولید';
+    }
+    alerts.push({ level: worstLine.dev<=-0.15?'red':'yellow', title:`${lineNames[worstLine.key]} — افت ${pct(Math.abs(worstLine.dev),1)} نسبت به هدف`, cause, impact:`~${fmt(lostQtyEst,0)} عدد کسری تولید`, dept });
+  }
+
+  // ۲) غالب‌ترین علت توقف کل کارخانه این ماه (اگر واقعاً غالب باشد)
+  const stopRanked = stopLossRanking(M.stop);
+  const totalStopHours = stopRanked.reduce((s,x)=>s+x.hours,0);
+  if(stopRanked.length && totalStopHours>0){
+    const top = stopRanked[0];
+    const sharePct = top.hours/totalStopHours;
+    if(sharePct>=0.2){
+      alerts.push({ level: sharePct>=0.4?'red':'yellow', title:`مکررترین علت توقف کارخانه — ${top.label}`, cause:`${fmt(top.hours,1)} ساعت از کل توقفات ماه (${pct(sharePct,0)})`, impact:`~${fmt(top.lostQty,0)} عدد تولید ازدست‌رفته`, dept: departmentForStopReason_(top.label) });
+    }
+  }
+
+  // ۳) غالب‌ترین منشأ ضایعات کل کارخانه این ماه (اگر واقعاً غالب باشد)
+  const wasteScrap = M.waste.filter(x=>(x.eventType||'ضایعات')!=='دوباره‌کاری');
+  const wasteByCat = paretoFrom(wasteScrap, x=>x.category, x=>x.wasteCount);
+  if(wasteByCat.length && wasteByCat[0].pct>=0.4){
+    const top = wasteByCat[0];
+    alerts.push({ level: top.pct>=0.6?'red':'yellow', title:`غالب‌ترین منشأ ضایعات کارخانه — ${top.label}`, cause:`${fmt(top.value,0)} عدد از کل ضایعات ماه (${pct(top.pct,0)})`, impact:`~${fmt(top.value,0)} عدد ضایعات`, dept: departmentForWasteCategory_(top.label) });
+  }
+
+  return alerts.slice(0,3);
+}
 // فهرست اپراتورهای واحد — برای تکمیل خودکار سریع‌تر و یکسان (بدون غلط تایپی) در فرم ثبت ضایعات استفاده می‌شود؛
 // یک نام آزاد که در این فهرست نیست هم قابل ثبت است (فقط پیشنهاد است، نه محدودیت).
 const OPERATOR_LIST_DEFAULT = ['درخشان','فوزی','نادری','سبلان زاده','ایمانی','حمامی','مرادی','گروسی','خ علیپور','محمدی','ملایی','بختیاری','ناصری','تیموری','نجفی','خزایی','پرتو','میرزایی','سهیلی','جودکی','شقاقی','گلی','شاکری','عموزاده','پیری','رحمتی','پیرمحمدی','اسمعیلی','خسروی','حسین پور','آ علیپور','حاج میر','غلامی','دهقان نسب'];
@@ -3998,6 +4083,7 @@ function renderCover(){
 
   const stopReasons = paretoFrom(M.stop, x=>x.reason, x=>x.hours);
   const wasteReasons = paretoFrom(M.waste.filter(x=>x.eventType!=='دوباره‌کاری'), x=>x.wasteType, x=>x.wasteCount);
+  const mgmtAlerts = buildManagementAlerts_(M);
 
   document.getElementById('view').innerHTML = `
   <div style="margin:-4px -4px 0; padding:28px 26px 34px; border-radius:22px;
@@ -4034,6 +4120,28 @@ function renderCover(){
         ${coverStat('🔮','فاصله پیش‌بینی تا هدف ماه', monthlyTarget? (forecastGap>=0? '+':'')+fmt(forecastGap,0) : '—', monthlyTarget? (forecastGap>=0? 'پیش‌بینی می‌شود هدف محقق شود':'پیش‌بینی می‌شود کسری داشته باشیم') : 'هدف ماهانه تنظیم نشده', monthlyTarget? (forecastGap>=0?'#2fd9c4':'#ff5d6c') : '#93a4c3', 'target')}
       </div>
     </div>
+
+    ${mgmtAlerts.length? `
+    <div style="background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:18px; padding:20px; margin-bottom:16px;">
+      <div style="font-size:14px; font-weight:800; color:#e8edf7; margin-bottom:14px;">🚨 هشدارهای مدیریتی</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        ${mgmtAlerts.map(a=>{
+          const clr = a.level==='red' ? '#ff5d6c' : '#ffcf5c';
+          const dot = a.level==='red' ? '🔴' : '🟡';
+          return `<div style="display:flex; align-items:flex-start; gap:12px; background:rgba(255,255,255,.03); border-right:3px solid ${clr}; border-radius:10px; padding:12px 14px;">
+            <div style="font-size:18px; line-height:1.4;">${dot}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-weight:800; color:#e8edf7; font-size:13.5px;">${esc(a.title)}</div>
+              <div style="color:#9fb0d1; font-size:12.5px; margin-top:3px;">${esc(a.cause)}</div>
+              <div style="display:flex; gap:16px; margin-top:6px; flex-wrap:wrap;">
+                <span style="font-size:12px; color:${clr}; font-weight:700;">اثر: ${esc(a.impact)}</span>
+                <span style="font-size:12px; color:#8b98b5;">مسئول پیگیری: <b style="color:#dfe6f5;">${esc(a.dept)}</b></span>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
 
     <div style="background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.09); border-radius:18px; padding:20px; margin-bottom:16px;" class="cover-clickable" data-goto="target">
       <div style="font-size:14px; font-weight:800; color:#e8edf7; margin-bottom:6px;">📉 روند روزانه تولید و ارسال در برابر هدف روزانه</div>
