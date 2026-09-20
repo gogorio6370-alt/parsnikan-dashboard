@@ -3208,9 +3208,10 @@ function dualParetoChart(id, arr, view, colorScrap, colorRework){
 // انتخاب‌گر ساعت با دو کشویی ساده (ساعت ۰۰-۲۳ و دقیقه ۰۰-۵۹) — به‌جای input type="time" که در برخی
 // مرورگرها/سیستم‌عامل‌ها به‌صورت ۱۲ساعته با AM/PM نمایش داده می‌شود؛ این کشویی‌ها همیشه ۲۴ساعته و
 // بدون AM/PM هستند، مستقل از تنظیمات زبان/منطقه‌ی سیستم.
-function timePickerHtml(prefix, currentVal){
+function stopTimePickerHtml(prefix, currentVal){
   const [ch, cm] = (currentVal||'').split(':');
-  const hh = String(ch||'').padStart(2,'0'), mm = String(cm||'').padStart(2,'0');
+  const hh = ch? String(ch).padStart(2,'0') : '';
+  const mm = cm? String(cm).padStart(2,'0') : '';
   const hours = Array.from({length:24}, (_,i)=>String(i).padStart(2,'0'));
   const mins = Array.from({length:60}, (_,i)=>String(i).padStart(2,'0'));
   return `<div style="display:flex; align-items:center; gap:6px; direction:ltr;">
@@ -3219,7 +3220,7 @@ function timePickerHtml(prefix, currentVal){
     <select id="${prefix}M" style="width:auto;"><option value="">--</option>${mins.map(m=>`<option value="${m}" ${mm===m?'selected':''}>${m}</option>`).join('')}</select>
   </div>`;
 }
-function timePickerValue(prefix){
+function stopTimePickerValue(prefix){
   const h = document.getElementById(prefix+'H')?.value, m = document.getElementById(prefix+'M')?.value;
   return (h && m) ? (h+':'+m) : '';
 }
@@ -3248,8 +3249,8 @@ function renderStop(){
     <div class="form-grid">
       <div class="field"><label>تاریخ</label>${datePickerHtml('p_date', editing.stop?.date)}</div>
       <div class="field"><label>ایستگاه متوقف‌شده</label>${stationSelectHtml('p_station', editing.stop?.station||'')}</div>
-      <div class="field"><label>ساعت شروع توقف</label>${timePickerHtml('p_startTime', editing.stop?.startTime||'')}</div>
-      <div class="field"><label>ساعت پایان توقف</label>${timePickerHtml('p_endTime', editing.stop?.endTime||'')}</div>
+      <div class="field"><label>ساعت شروع توقف</label>${stopTimePickerHtml('p_startTime', editing.stop?.startTime||'')}</div>
+      <div class="field"><label>ساعت پایان توقف</label>${stopTimePickerHtml('p_endTime', editing.stop?.endTime||'')}</div>
       <div class="field"><label>مدت ثبت‌شده <span class="muted" style="font-weight:400;">(اگر ساعت شروع/پایان را زدید، خودکار پر می‌شود)</span></label><input id="p_dur" type="text" inputmode="numeric" value="${editing.stop?.durationValue ?? ''}"></div>
       <div class="field"><label>واحد</label><select id="p_unit"><option ${editing.stop?.unit==='دقیقه'?'selected':''}>دقیقه</option><option ${!editing.stop||editing.stop.unit==='ساعت'?'selected':''}>ساعت</option><option ${editing.stop?.unit==='روز'?'selected':''}>روز</option></select></div>
       <div class="field"><label>علت توقف</label>${stopReasonSelectHtml('p_reason', editing.stop?.reason||'')}</div>
@@ -3320,7 +3321,7 @@ function renderStop(){
   // از روی ساعت شروع/پایان، مدت را خودکار حساب می‌کند و توی «مدت ثبت‌شده» (به ساعت) می‌گذارد — اگر
   // توقف از نیمه‌شب رد شود (پایان از شروع کوچک‌تر باشد)، ۲۴ ساعت اضافه می‌شود تا درست حساب شود.
   const autoFromClock = ()=>{
-    const sv = timePickerValue('p_startTime'), ev = timePickerValue('p_endTime');
+    const sv = stopTimePickerValue('p_startTime'), ev = stopTimePickerValue('p_endTime');
     if(!sv || !ev) return;
     const [sh,sm] = sv.split(':').map(Number), [eh,em] = ev.split(':').map(Number);
     let mins = (eh*60+em) - (sh*60+sm);
@@ -3330,7 +3331,10 @@ function renderStop(){
     durInput.value = hrs;
     hoursInput.value = hrs;
   };
-  ['p_startTimeH','p_startTimeM','p_endTimeH','p_endTimeM'].forEach(id=> document.getElementById(id)?.addEventListener('change', autoFromClock));
+  ['p_startTimeH','p_startTimeM','p_endTimeH','p_endTimeM'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.addEventListener('change', autoFromClock); el.addEventListener('input', autoFromClock); }
+  });
 
   document.getElementById('saveStopBtn').addEventListener('click', ()=>{
     const date = readDatePicker('p_date');
@@ -3339,7 +3343,7 @@ function renderStop(){
     if(!date || !station || hours===null){ toast('تاریخ، ایستگاه و مدت توقف الزامی است.','err'); return; }
     const rec = { id: editing.stop?.id || uid(), date, station, durationValue: num(durInput.value), unit: unitInput.value,
       hours, reason: document.getElementById('p_reason').value, planned: document.getElementById('p_planned').value==='1', description: document.getElementById('p_desc').value,
-      startTime: timePickerValue('p_startTime'), endTime: timePickerValue('p_endTime') };
+      startTime: stopTimePickerValue('p_startTime'), endTime: stopTimePickerValue('p_endTime') };
     const isNew = !editing.stop;
     if(editing.stop){ DB.stop = DB.stop.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
     else{ DB.stop.push(rec); toast('توقف ثبت شد.','ok'); }
