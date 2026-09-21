@@ -505,6 +505,7 @@ const NAV = [
   {id:'lean',    label:'شاخص‌های ناب (OEE)', group:'تحلیل',       icon:'gauge'},
   {id:'flowmap', label:'نقشه خط و گلوگاه‌ها', group:'تحلیل',       icon:'map'},
   {id:'target',  label:'🎯 هدف و پیشرفت تولید', group:'تحلیل',    icon:'target'},
+  {id:'actions', label:'✅ مرکز اقدامات',      group:'تحلیل',    icon:'checklist'},
   {id:'dash',    label:'داشبورد مدیریتی',   group:'تحلیل',       icon:'chart'},
 ];
 
@@ -526,10 +527,11 @@ const ICONS = {
   monitor:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/>',
   lock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/>',
   unlock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2.6"/>',
+  checklist:'<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
 };
 
 /* ---------------------------- persistent state ---------------------------- */
-let DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], dailyProgram: [], meta: {} };
+let DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], dailyProgram: [], actions: [], meta: {} };
 let LINES = []; // [{id, name}] — registry of all production lines/units sharing this tool
 let currentLineId = null;
 let ORG = { managerPhone: '' }; // organization-wide settings (shared across all lines)
@@ -537,7 +539,7 @@ let cloudOK = true;
 let dirty = { daily:false, waste:false, stop:false, short:false, meta:false };
 let currentTab = 'dash';
 let charts = {};
-let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null };
+let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null, action:null };
 let filters = { waste:'', stop:'', short:'', wasteCat:'all', wasteEventType:'all', stopReason:'all', stationFilter:'all', stationOperatorFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'', dpDate:'' };
 let personnelUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
 // دو تب «شاخص‌های ناب» و «نقشه خط و گلوگاه‌ها» کاربرد روزمره کمی دارند و منوی تحلیل را شلوغ می‌کردند؛
@@ -1211,13 +1213,13 @@ async function loadAll(){
     await loadLinesRegistry();
     // ONE batched round-trip for all 7 collections instead of 7 separate requests
     // (this is what was making Google Sheets sync feel slow/stuck)
-    const keys = ['daily','waste','stop','short','meta','trash','stationHourly','productOutput','dailyProgram'].map(p=>lineKey(currentLineId,p));
+    const keys = ['daily','waste','stop','short','meta','trash','stationHourly','productOutput','dailyProgram','actions'].map(p=>lineKey(currentLineId,p));
     const got = await cloudBatchGet(keys);
     const d = got[lineKey(currentLineId,'daily')], w = got[lineKey(currentLineId,'waste')],
           s = got[lineKey(currentLineId,'stop')], sh = got[lineKey(currentLineId,'short')],
           m = got[lineKey(currentLineId,'meta')], tr = got[lineKey(currentLineId,'trash')],
           sd = got[lineKey(currentLineId,'stationHourly')], po = got[lineKey(currentLineId,'productOutput')],
-          dp = got[lineKey(currentLineId,'dailyProgram')];
+          dp = got[lineKey(currentLineId,'dailyProgram')], ac = got[lineKey(currentLineId,'actions')];
     const isNewLineFirstLoad = !m && !d;
     const lineName = (LINES.find(l=>l.id===currentLineId)||{}).name || 'خط تولید';
     if(currentLineId==='thermostat' && isNewLineFirstLoad){
@@ -1231,6 +1233,7 @@ async function loadAll(){
       DB.stationHourly = sd || cloneEmbedded('stationHourly');
       DB.productOutput = po || [];
       DB.dailyProgram = dp || [];
+      DB.actions = ac || [];
       if(!d && !w && !s && !sh && !m) await saveAll(true);
     } else {
       DB.daily = normalizeDailyArray(d || []);
@@ -1242,6 +1245,7 @@ async function loadAll(){
       DB.stationHourly = sd || [];
       DB.productOutput = po || [];
       DB.dailyProgram = dp || [];
+      DB.actions = ac || [];
     }
     if(!DB.meta.stations || !DB.meta.stations.length){ DB.meta.stations = currentLineId==='thermostat' ? seedStations() : []; }
     setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت شما — به‌روز' : 'متصل به فضای ابری Claude — به‌روز'));
@@ -1253,6 +1257,7 @@ async function loadAll(){
     DB.daily = normalizeDailyArray(cloneEmbedded('daily')); DB.waste = cloneEmbedded('waste'); DB.stop = cloneEmbedded('stop'); DB.short = cloneEmbedded('short'); DB.trash = cloneEmbedded('trash'); DB.stationHourly = cloneEmbedded('stationHourly');
     DB.productOutput = [];
     DB.dailyProgram = [];
+    DB.actions = [];
     DB.meta = cloneEmbedded('meta');
     setSync('off', 'حالت آفلاین — تغییرات فقط در همین نشست ذخیره می‌شود');
   }
@@ -1376,6 +1381,7 @@ async function saveAll(silent){
   pairs[lineKey(currentLineId,'stationHourly')] = DB.stationHourly;
   pairs[lineKey(currentLineId,'productOutput')] = DB.productOutput;
   pairs[lineKey(currentLineId,'dailyProgram')] = DB.dailyProgram;
+  pairs[lineKey(currentLineId,'actions')] = DB.actions;
   const allOk = await cloudBatchSet(pairs);
   if(allOk){ lastSavedAt = new Date(); setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت — ذخیره شد' : 'متصل به فضای ابری — ذخیره شد')); if(!silent) toast('اطلاعات با موفقیت ذخیره شد.','ok'); }
   else{
@@ -1397,7 +1403,7 @@ async function switchToLine(lineId){
   await saveAll(true);
   currentLineId = lineId;
   await saveCurrentLinePointer();
-  DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], dailyProgram: [], meta: {} };
+  DB = { daily: [], waste: [], stop: [], short: [], trash: [], stationHourly: [], productOutput: [], risks: [], dailyProgram: [], actions: [], meta: {} };
   await loadAll();
   renderLineSwitcher();
   goTo('dash');
@@ -1529,7 +1535,7 @@ function goTo(tab){
   currentTab = tab;
   renderNav();
   const titles = {cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
-    waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', dash:'داشبورد مدیریتی'};
+    waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', actions:'مرکز اقدامات', dash:'داشبورد مدیریتی'};
   const subs = {
     cover:'نمای کلی زنده برای مدیریت ارشد و مشتری — تاریخ، ساعت و شاخص‌های کلیدی',
     entry:'تنها فرمی که باید هر روز تکمیل شود — سایر گزارش‌ها به‌صورت خودکار محاسبه می‌شوند',
@@ -1545,12 +1551,13 @@ function goTo(tab){
     lean:'اثربخشی کلی تجهیزات — برآمده از داده‌های تولید، ضایعات و توقفات همین خط',
     flowmap:'ثبت ظرفیت روزانه هر ایستگاه و شناسایی خودکار گلوگاه(های) خط تولید',
     target:'هدف ماهانه، مسیر پیشرفت روزانه و تحلیل ریشه‌ای انحراف',
+    actions:'اقدامات اصلاحی باز — مسئول، موعد و وضعیت هرکدام',
     dash:'تصویر کلی عملکرد ' + currentLineName()
   };
   document.getElementById('pageTitle').textContent = titles[tab];
   document.getElementById('pageSub').textContent = subs[tab] + ' — ماه فعال: ' + monthLabel(DB.meta.activeMonth);
   destroyCharts();
-  const renderers = {cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, dash:renderDash};
+  const renderers = {cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
   renderers[tab]();
   document.getElementById('view').dataset.hadContent = '1';
   document.getElementById('view').scrollTop = 0;
@@ -3234,6 +3241,11 @@ function renderStop(){
   const totalHours = M.stop.reduce((s,x)=>s+(x.hours||0),0);
   const stationPareto = paretoFrom(M.stop, x=>x.station, x=>x.hours);
   const reasonPareto = paretoFrom(M.stop, x=>x.reason, x=>x.hours);
+  // توزیع توقفات بر اساس ساعت روز — فقط از رکوردهایی ساخته می‌شود که «ساعت شروع» دارند (از وقتی این
+  // فیلد اضافه شد به بعد)؛ رکوردهای قدیمی‌تر بدون ساعت دقیق، طبیعتاً در این نمودار دیده نمی‌شوند.
+  const stopsWithClock = M.stop.filter(x=>x.startTime);
+  const hourBuckets = Array.from({length:24}, ()=>({hours:0, count:0}));
+  stopsWithClock.forEach(x=>{ const h = parseInt(x.startTime.split(':')[0],10); if(h>=0 && h<24){ hourBuckets[h].hours += (x.hours||0); hourBuckets[h].count++; } });
   const avgPerEvent = M.stop.length? totalHours/M.stop.length : 0;
 
   document.getElementById('view').innerHTML = renderMonthBar() + `
@@ -3274,6 +3286,13 @@ function renderStop(){
   <div class="grid grid-2" style="margin-bottom:16px;">
     <div class="card"><h3>تحلیل پارتو توقفات به تفکیک ایستگاه (ساعت)</h3><div class="chart-box"><canvas id="chStopStation"></canvas></div></div>
     <div class="card"><h3>تحلیل پارتو توقفات به تفکیک علت (ساعت)</h3><div class="chart-box"><canvas id="chStopReason"></canvas></div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>توزیع توقفات بر اساس ساعت روز</h3>
+    ${stopsWithClock.length? `<div class="chart-box"><canvas id="chStopHourly"></canvas></div>
+      <div class="hint" style="margin-top:8px;">از ${fmt(M.stop.length,0)} توقف ثبت‌شده این ماه، ${fmt(stopsWithClock.length,0)} مورد ساعت دقیق دارند و در این نمودار لحاظ شده‌اند.</div>`
+      : `<div class="hint">هنوز هیچ توقفی با «ساعت شروع» ثبت نشده — از این پس، وقتی توقفی را با ساعت شروع/پایان ثبت کنید، این نمودار خودکار پر می‌شود و نشان می‌دهد توقفات بیشتر چه ساعتی از روز تکرار می‌شوند.</div>`}
   </div>
 
   <div class="card">
@@ -3374,6 +3393,15 @@ function renderStop(){
 
   paretoChart('chStopStation', stationPareto, '#ff9d42');
   paretoChart('chStopReason', reasonPareto, '#b389ff');
+  if(stopsWithClock.length){
+    const maxHours = Math.max(...hourBuckets.map(b=>b.hours));
+    mkChart('chStopHourly', { type:'bar', data:{ labels: hourBuckets.map((_,h)=>String(h).padStart(2,'0')+':00'),
+        datasets:[{ label:'ساعت توقف', data: hourBuckets.map(b=>Math.round(b.hours*100)/100),
+          backgroundColor: hourBuckets.map(b=> b.hours===0? '#1c2740' : b.hours>=maxHours*0.7? '#ff5d6c' : b.hours>=maxHours*0.35? '#ff9d42' : '#4c8dff'),
+          borderRadius:5, maxBarThickness:22 }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{afterLabel:(ctx)=> 'تعداد رویداد: '+hourBuckets[ctx.dataIndex].count}}},
+        scales:{ x:{grid:{display:false}, ticks:{font:{size:10}}}, y:{grid:{color:'#182338'}, title:{display:true, text:'ساعت توقف', color:'#7c8aa5', font:{size:10}}} } } });
+  }
   wireComboAddSelects();
 }
 
@@ -3418,6 +3446,21 @@ function computeOEE(rows, M){
 }
 // بنچمارک‌های رایج صنعت خودرو/تولید ناب (مرجع عمومی؛ استاندارد رسمی یک کارخانه خاص نیست — صرفاً محک اولیه)
 const INDUSTRY_BENCHMARK = { oeeWorldClass:0.85, oeeAutomotive:0.75, oeeAverage:0.60, availability:0.90, performance:0.95, quality:0.99, scrapRateMax:0.02 };
+// بهترین ماهِ تاریخیِ خودِ همین کارخانه (نه یک عدد بیرونی) — از کل تاریخچه‌ی ثبت‌شده (همه‌ی ماه‌ها، نه فقط
+// ماه جاری) محاسبه می‌شود. این سومین سطح مقایسه (کنار هدف و مرجع صنعت) است: «بهترینی که خودمان قبلاً
+// نشان داده‌ایم» — واقع‌بینانه‌ترین معیار چون از همین خط و همین پرسنل به دست آمده.
+function bestHistoricalOEE_(){
+  const monthKeys = [...new Set(DB.daily.map(e=>monthKeyOf(e.date)))];
+  let best = null;
+  monthKeys.forEach(mk=>{
+    const rows = DB.daily.filter(e=>monthKeyOf(e.date)===mk);
+    if(!rows.length) return;
+    const Mx = { waste: DB.waste.filter(x=>monthKeyOf(x.date)===mk), stop: DB.stop.filter(x=>monthKeyOf(x.date)===mk) };
+    const r = computeOEE(rows, Mx);
+    if(r.oee!==null && (!best || r.oee>best.oee)) best = { ...r, monthKey: mk };
+  });
+  return best;
+}
 /* =========================================================================
    TAB: پرسنل — فهرست نیروی انسانی خط با سابقه/مهارت/ایستگاه اصلی. شماره تماس
    به‌طور پیش‌فرض پنهان است و فقط با وارد کردن رمز عبور در همان نشست مرورگر
@@ -4307,6 +4350,7 @@ function renderLean(){
   const wasteTrend = halfTrend(M.waste, halves, x=>x.wasteCount||0);
   const oeeGapAutomotive = oee - INDUSTRY_BENCHMARK.oeeAutomotive;
   const scrapRate = totalProduced? totalWaste/totalProduced : null;
+  const bestHist = bestHistoricalOEE_();
 
   const insights = [];
   if(availability!==null) insights.push({icon:'🟢', color: availability>=0.9?'#2fd9c4':availability>=0.75?'#ffcf5c':'#ff5d6c',
@@ -4399,12 +4443,13 @@ function renderLean(){
   </div>
 
   <div class="card" style="margin-bottom:16px;">
-    <div class="flexbar"><h3 style="margin:0;">🏭 بنچمارک با استاندارد صنعت خودرو</h3><span class="hint" style="margin:0;">مرجع عمومی صنعت — نه استاندارد رسمی یک کارخانه خاص</span></div>
+    <div class="flexbar"><h3 style="margin:0;">🏭 بنچمارک — هدف شما، بهترین رکورد خودتان، و مرجع صنعت</h3><span class="hint" style="margin:0;">مرجع صنعت عمومی است — نه استاندارد رسمی یک کارخانه خاص</span></div>
     <div class="chart-box" style="height:220px;"><canvas id="chBenchmark"></canvas></div>
+    ${bestHist? `<div class="hint" style="margin-top:8px;">بهترین ماه ثبت‌شده‌ی خودتان تاکنون <b>${esc(bestHist.monthKey)}</b> با OEE <b style="color:#8ff0c8;">${pct(bestHist.oee,1)}</b> بوده${bestHist.monthKey!==DB.meta.activeMonth? ` — ماه جاری (${pct(oee,1)}) نسبت به آن ${oee>=bestHist.oee?'<b style="color:#8ff0c8;">بهتر یا برابر</b>':'<b style=\"color:#ffcf5c;\">'+pct(oee-bestHist.oee,1)+' فاصله</b>'} است.`:' (همین ماه جاری، رکورد شماست).'}</div>` : ''}
     <div class="grid grid-4" style="margin-top:12px;">
       ${kpiCard('سقف معمول ضایعات صنعت', '', pct(INDUSTRY_BENCHMARK.scrapRateMax,0), null, '#93a4c3')}
       ${kpiCard('نرخ ضایعات شما', '', scrapRate===null?'—':pct(scrapRate,2), null, (scrapRate!==null&&scrapRate<=INDUSTRY_BENCHMARK.scrapRateMax)?'#2fd9c4':'#ff5d6c')}
-      ${kpiCard('OEE کلاس جهانی (مرجع)', '', pct(INDUSTRY_BENCHMARK.oeeWorldClass,0), null, '#93a4c3')}
+      ${kpiCard('بهترین OEE تاریخی خودتان', '', bestHist?pct(bestHist.oee,1):'—', null, '#8ff0c8')}
       ${kpiCard('فاصله OEE تا معمول صنعت خودرو (٪۷۵)', '', pct(oeeGapAutomotive,1), null, oeeGapAutomotive>=0?'#2fd9c4':'#ff5d6c')}
     </div>
   </div>
@@ -4454,6 +4499,8 @@ function renderLean(){
     datasets:[
       { label:'شاخص شما', data:[availability===null?0:availability*100, performance===null?0:performance*100, quality===null?0:quality*100, oee*100],
         backgroundColor:'#4c8dff', borderRadius:6, maxBarThickness:34, labelFmt:v=>Math.round(v)+'%' },
+      ...(bestHist? [{ label:'بهترین رکورد خودتان', data:[bestHist.availability===null?0:bestHist.availability*100, bestHist.performance===null?0:bestHist.performance*100, bestHist.quality===null?0:bestHist.quality*100, bestHist.oee*100],
+        backgroundColor:'#2fd9c4', borderRadius:6, maxBarThickness:34, noLabel:true }] : []),
       { label:'معمول صنعت خودرو', data:[INDUSTRY_BENCHMARK.availability*100, INDUSTRY_BENCHMARK.performance*100, INDUSTRY_BENCHMARK.quality*100, INDUSTRY_BENCHMARK.oeeAutomotive*100],
         backgroundColor:'#3a4258', borderRadius:6, maxBarThickness:34, noLabel:true },
     ]},
@@ -5046,6 +5093,118 @@ async function runAiAnalysis(data){
     box.innerHTML = `<div class="hint" style="color:#ffb0b8;">خطا در ارتباط با سرویس تحلیل. اتصال اینترنت یا تنظیمات گوگل‌شیت را بررسی کنید.</div>`;
   }
   btn.disabled = false; btn.textContent = 'دریافت تحلیل';
+}
+
+/* =========================================================================
+   TAB: مرکز اقدامات (actions) — «چه کسی، چه کاری، تا کِی؟». بدون این تب، جعبه‌ی «هشدارهای
+   مدیریتی» صفحه‌کاور فقط یک تشخیص است؛ این تب همان تشخیص را به یک اقدام قابل‌پیگیری تبدیل می‌کند.
+   ========================================================================= */
+const ACTION_STATUSES = ['باز','در حال انجام','انجام‌شده','لغو شده'];
+function emptyActionDraft(){ return { title:'', dept:'', dueDate:'', status:'باز', description:'' }; }
+function renderActionCenter(){
+  const draft = editing.action || emptyActionDraft();
+  const list = [...(DB.actions||[])].sort((a,b)=>{
+    // باز/در حال انجام اول (نزدیک‌ترین موعد بالاتر)، بعد انجام‌شده/لغوشده ته لیست
+    const openA = a.status!=='انجام‌شده' && a.status!=='لغو شده', openB = b.status!=='انجام‌شده' && b.status!=='لغو شده';
+    if(openA!==openB) return openA? -1 : 1;
+    return (a.dueDate||'9999').localeCompare(b.dueDate||'9999');
+  });
+  const filterStatus = filters.actionStatus || 'open';
+  const today = todayJalaliStr();
+  const filtered = list.filter(x=>{
+    if(filterStatus==='open') return x.status!=='انجام‌شده' && x.status!=='لغو شده';
+    if(filterStatus==='overdue') return (x.status!=='انجام‌شده' && x.status!=='لغو شده') && x.dueDate && x.dueDate<today;
+    if(filterStatus==='done') return x.status==='انجام‌شده';
+    return true; // 'all'
+  });
+  const openCount = list.filter(x=>x.status!=='انجام‌شده' && x.status!=='لغو شده').length;
+  const overdueCount = list.filter(x=>(x.status!=='انجام‌شده' && x.status!=='لغو شده') && x.dueDate && x.dueDate<today).length;
+  const doneThisMonth = list.filter(x=>x.status==='انجام‌شده' && x.resolvedDate && monthKeyOf(x.resolvedDate)===DB.meta.activeMonth).length;
+
+  document.getElementById('view').innerHTML = `
+  <div class="grid grid-3" style="margin-bottom:16px;">
+    ${kpiCard('اقدامات باز','عدد', fmt(openCount,0), null, openCount>0?'#ffcf5c':'#2fd9c4')}
+    ${kpiCard('سررسیدگذشته','عدد', fmt(overdueCount,0), null, overdueCount>0?'#ff5d6c':'#2fd9c4')}
+    ${kpiCard('انجام‌شده در ماه فعال','عدد', fmt(doneThisMonth,0), null, '#4c8dff')}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>${editing.action? '✏️ ویرایش اقدام' : '➕ ثبت اقدام جدید'}</h3>
+    <div class="form-grid" style="margin-top:10px;">
+      <div class="field" style="grid-column:1/-1;"><label>شرح اقدام</label><input id="ac_title" type="text" value="${esc(draft.title)}" placeholder="مثلاً: پیگیری تامین قطعه با انبار مرکزی"></div>
+      <div class="field"><label>مسئول / واحد</label><input id="ac_dept" type="text" value="${esc(draft.dept)}" placeholder="مثلاً: تعمیرات و نگهداری" list="ac_deptList">
+        <datalist id="ac_deptList">${[...new Set([...Object.values(STOP_REASON_DEPARTMENT), ...Object.values(WASTE_CATEGORY_DEPARTMENT)])].map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
+      </div>
+      <div class="field"><label>موعد انجام</label>${datePickerHtml('ac_due', draft.dueDate)}</div>
+      <div class="field"><label>وضعیت</label><select id="ac_status">${ACTION_STATUSES.map(s=>`<option ${draft.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+      <div class="field" style="grid-column:1/-1;"><label>توضیحات (اختیاری)</label><input id="ac_desc" type="text" value="${esc(draft.description||'')}" placeholder="جزئیات بیشتر، در صورت نیاز"></div>
+    </div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn btn-teal btn-sm" id="saveActionBtn">${editing.action?'ذخیره ویرایش':'ثبت اقدام'}</button>
+      ${editing.action? `<button class="btn btn-ghost btn-sm" id="cancelActionBtn">انصراف</button>` : ''}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="flexbar">
+      <h3 style="margin:0;">فهرست اقدامات</h3>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="pill ${filterStatus==='open'?'active':''}" data-af="open">باز (${openCount})</button>
+        <button class="pill ${filterStatus==='overdue'?'active':''}" data-af="overdue">سررسیدگذشته (${overdueCount})</button>
+        <button class="pill ${filterStatus==='done'?'active':''}" data-af="done">انجام‌شده</button>
+        <button class="pill ${filterStatus==='all'?'active':''}" data-af="all">همه</button>
+      </div>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>شرح اقدام</th><th>مسئول</th><th>موعد</th><th>وضعیت</th><th></th></tr></thead>
+      <tbody>
+      ${filtered.length===0?`<tr><td colspan="5"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
+      filtered.map(x=>{
+        const isOverdue = (x.status!=='انجام‌شده' && x.status!=='لغو شده') && x.dueDate && x.dueDate<today;
+        const stColor = x.status==='انجام‌شده'?'#2fd9c4':x.status==='لغو شده'?'#7c8aa5':isOverdue?'#ff5d6c':x.status==='در حال انجام'?'#4c8dff':'#ffcf5c';
+        return `<tr>
+          <td>${esc(x.title)}${x.description?`<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>`:''}</td>
+          <td>${esc(x.dept)||'—'}</td>
+          <td style="${isOverdue?'color:#ff5d6c; font-weight:700;':''}">${esc(x.dueDate)||'—'}${isOverdue?' ⚠️':''}</td>
+          <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span></td>
+          <td><div style="display:flex; gap:6px;">
+            ${x.status!=='انجام‌شده'? `<button class="icon-btn" data-adone="${x.id}" title="علامت‌گذاری به‌عنوان انجام‌شده">✅</button>`:''}
+            <button class="icon-btn" data-aedit="${x.id}" title="ویرایش">✏️</button>
+            <button class="icon-btn" data-adel="${x.id}" title="حذف">🗑️</button>
+          </div></td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>
+  </div>`;
+
+  document.getElementById('saveActionBtn').addEventListener('click', ()=>{
+    const title = document.getElementById('ac_title').value.trim();
+    if(!title){ toast('شرح اقدام الزامی است.','err'); return; }
+    const status = document.getElementById('ac_status').value;
+    const wasNotDone = draft.status!=='انجام‌شده';
+    const rec = {
+      id: editing.action?.id || uid(),
+      title, dept: document.getElementById('ac_dept').value.trim(),
+      dueDate: readDatePicker('ac_due'), status,
+      description: document.getElementById('ac_desc').value.trim(),
+      createdDate: editing.action?.createdDate || todayJalaliStr(),
+      resolvedDate: status==='انجام‌شده' ? (editing.action?.resolvedDate && !wasNotDone ? editing.action.resolvedDate : todayJalaliStr()) : (editing.action?.resolvedDate||''),
+    };
+    if(editing.action){ DB.actions = DB.actions.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
+    else{ DB.actions = [...(DB.actions||[]), rec]; toast('اقدام ثبت شد.','ok'); }
+    editing.action = null; scheduleSave(); renderActionCenter();
+  });
+  const cAc = document.getElementById('cancelActionBtn'); if(cAc) cAc.addEventListener('click', ()=>{ editing.action=null; renderActionCenter(); });
+  document.querySelectorAll('[data-af]').forEach(b=>b.addEventListener('click', ()=>{ filters.actionStatus = b.dataset.af; renderActionCenter(); }));
+  document.querySelectorAll('[data-aedit]').forEach(b=>b.addEventListener('click', ()=>{ editing.action = JSON.parse(JSON.stringify(DB.actions.find(x=>x.id===b.dataset.aedit))); renderActionCenter(); window.scrollTo({top:0,behavior:'smooth'}); }));
+  document.querySelectorAll('[data-adone]').forEach(b=>b.addEventListener('click', ()=>{
+    DB.actions = DB.actions.map(x=>x.id===b.dataset.adone? {...x, status:'انجام‌شده', resolvedDate: todayJalaliStr()} : x);
+    scheduleSave(); toast('انجام‌شده علامت خورد.','ok'); renderActionCenter();
+  }));
+  document.querySelectorAll('[data-adel]').forEach(b=>b.addEventListener('click', ()=>{
+    confirmDeleteModal('حذف اقدام', 'این اقدام حذف شود؟', ()=>{ DB.actions = DB.actions.filter(x=>x.id!==b.dataset.adel); scheduleSave(); toast('حذف شد.','ok'); renderActionCenter(); });
+  }));
 }
 
 /* =========================================================================
