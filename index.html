@@ -5103,6 +5103,8 @@ const ACTION_STATUSES = ['باز','در حال انجام','انجام‌شده'
 function emptyActionDraft(){ return { title:'', dept:'', dueDate:'', status:'باز', description:'' }; }
 function renderActionCenter(){
   const draft = editing.action || emptyActionDraft();
+  const isRealEdit = !!(editing.action && (DB.actions||[]).some(x=>x.id===editing.action.id)); // یک پیش‌نویسِ پرشده از پیشنهاد، id واقعی در DB ندارد؛ پس با «ویرایش واقعی» فرق دارد
+  const M = monthData();
   const list = [...(DB.actions||[])].sort((a,b)=>{
     // باز/در حال انجام اول (نزدیک‌ترین موعد بالاتر)، بعد انجام‌شده/لغوشده ته لیست
     const openA = a.status!=='انجام‌شده' && a.status!=='لغو شده', openB = b.status!=='انجام‌شده' && b.status!=='لغو شده';
@@ -5121,6 +5123,33 @@ function renderActionCenter(){
   const overdueCount = list.filter(x=>(x.status!=='انجام‌شده' && x.status!=='لغو شده') && x.dueDate && x.dueDate<today).length;
   const doneThisMonth = list.filter(x=>x.status==='انجام‌شده' && x.resolvedDate && monthKeyOf(x.resolvedDate)===DB.meta.activeMonth).length;
 
+  // ---- پیشنهادهای خودکار: کسری قطعات، ضایعات/دوباره‌کاری، توقفات — «متصدی» هرکدام از همان
+  // نگاشت علت/منشأ → واحد گرفته می‌شود (همان جدول جعبه «هشدارهای مدیریتی» صفحه‌کاور)؛ شما فقط
+  // موعد انجام و توضیح تکمیلی را اضافه می‌کنید. هر مورد فقط یک‌بار پیشنهاد می‌شود — بعد از تبدیل
+  // به اقدام، دوباره در این لیست ظاهر نمی‌شود (even اگر هنوز باز باشد).
+  const existingSourceKeys = new Set((DB.actions||[]).map(x=>x.sourceKey).filter(Boolean));
+  const shortSuggestions = M.short.filter(x=>x.status!=='تامین شده').map(x=>({
+    sourceType:'short', sourceKey:'short:'+x.id, icon:'📦',
+    title:`کسری قطعه: ${x.part}${x.description?' — '+x.description:''}`, dept:'تدارکات و انبار', detail: x.date,
+  })).filter(x=>!existingSourceKeys.has(x.sourceKey));
+
+  const wasteScrap = M.waste.filter(x=>(x.eventType||'ضایعات')!=='دوباره‌کاری');
+  const stationWastePareto = paretoFrom(wasteScrap, x=>x.station, x=>x.wasteCount).slice(0,5);
+  const wasteSuggestions = stationWastePareto.map(s=>{
+    const rowsAtStation = wasteScrap.filter(x=>x.station===s.label);
+    const domCat = paretoFrom(rowsAtStation, x=>x.category, x=>x.wasteCount)[0]?.label || 'سایر';
+    return { sourceType:'waste', sourceKey:'waste:'+DB.meta.activeMonth+':'+s.label, icon:'♻️',
+      title:`ضایعات مکرر — ایستگاه «${s.label}» (بیشترین منشأ: ${domCat})`, dept: departmentForWasteCategory_(domCat), detail:`${fmt(s.value,0)} عدد این ماه` };
+  }).filter(x=>!existingSourceKeys.has(x.sourceKey));
+
+  const stopRankedAll = stopLossRanking(M.stop);
+  const stopSuggestions = stopRankedAll.slice(0,5).map(x=>({
+    sourceType:'stop', sourceKey:'stop:'+DB.meta.activeMonth+':'+x.label, icon:'⏸',
+    title:`توقف مکرر — علت «${x.label}»`, dept: departmentForStopReason_(x.label), detail:`${fmt(x.hours,1)} ساعت این ماه`,
+  })).filter(x=>!existingSourceKeys.has(x.sourceKey));
+
+  const allSuggestions = [...shortSuggestions, ...wasteSuggestions, ...stopSuggestions];
+
   document.getElementById('view').innerHTML = `
   <div class="grid grid-3" style="margin-bottom:16px;">
     ${kpiCard('اقدامات باز','عدد', fmt(openCount,0), null, openCount>0?'#ffcf5c':'#2fd9c4')}
@@ -5128,20 +5157,34 @@ function renderActionCenter(){
     ${kpiCard('انجام‌شده در ماه فعال','عدد', fmt(doneThisMonth,0), null, '#4c8dff')}
   </div>
 
+  ${allSuggestions.length? `
   <div class="card" style="margin-bottom:16px;">
-    <h3>${editing.action? '✏️ ویرایش اقدام' : '➕ ثبت اقدام جدید'}</h3>
+    <div class="flexbar"><h3 style="margin:0;">🔗 پیشنهادهای این ماه — از کسری قطعات، ضایعات/دوباره‌کاری و توقفات</h3></div>
+    <div class="hint" style="margin:2px 0 10px;">شرح و مسئول هرکدام خودکار پر شده — فقط موعد انجام و توضیح تکمیلی (در صورت نیاز) را اضافه کنید.</div>
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      ${allSuggestions.map((s,i)=>`<div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.03); border-radius:10px; padding:10px 12px;">
+        <div style="font-size:16px;">${s.icon}</div>
+        <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:13px; color:#e8edf7;">${esc(s.title)}</div>
+          <div class="muted" style="font-size:12px; margin-top:2px;">${esc(s.detail)} — مسئول پیشنهادی: <b>${esc(s.dept)}</b></div></div>
+        <button class="btn btn-teal btn-sm" data-sgidx="${i}">➕ تبدیل به اقدام</button>
+      </div>`).join('')}
+    </div>
+  </div>` : ''}
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>${isRealEdit? '✏️ ویرایش اقدام' : '➕ ثبت اقدام جدید'}</h3>
     <div class="form-grid" style="margin-top:10px;">
       <div class="field" style="grid-column:1/-1;"><label>شرح اقدام</label><input id="ac_title" type="text" value="${esc(draft.title)}" placeholder="مثلاً: پیگیری تامین قطعه با انبار مرکزی"></div>
       <div class="field"><label>مسئول / واحد</label><input id="ac_dept" type="text" value="${esc(draft.dept)}" placeholder="مثلاً: تعمیرات و نگهداری" list="ac_deptList">
-        <datalist id="ac_deptList">${[...new Set([...Object.values(STOP_REASON_DEPARTMENT), ...Object.values(WASTE_CATEGORY_DEPARTMENT)])].map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
+        <datalist id="ac_deptList">${[...new Set([...Object.values(STOP_REASON_DEPARTMENT), ...Object.values(WASTE_CATEGORY_DEPARTMENT), 'تدارکات و انبار'])].map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
       </div>
       <div class="field"><label>موعد انجام</label>${datePickerHtml('ac_due', draft.dueDate)}</div>
       <div class="field"><label>وضعیت</label><select id="ac_status">${ACTION_STATUSES.map(s=>`<option ${draft.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
       <div class="field" style="grid-column:1/-1;"><label>توضیحات (اختیاری)</label><input id="ac_desc" type="text" value="${esc(draft.description||'')}" placeholder="جزئیات بیشتر، در صورت نیاز"></div>
     </div>
     <div class="btn-row" style="margin-top:12px;">
-      <button class="btn btn-teal btn-sm" id="saveActionBtn">${editing.action?'ذخیره ویرایش':'ثبت اقدام'}</button>
-      ${editing.action? `<button class="btn btn-ghost btn-sm" id="cancelActionBtn">انصراف</button>` : ''}
+      <button class="btn btn-teal btn-sm" id="saveActionBtn">${isRealEdit?'ذخیره ویرایش':'ثبت اقدام'}</button>
+      ${(editing.action)? `<button class="btn btn-ghost btn-sm" id="cancelActionBtn">انصراف</button>` : ''}
     </div>
   </div>
 
@@ -5178,20 +5221,28 @@ function renderActionCenter(){
     </table></div>
   </div>`;
 
+  document.querySelectorAll('[data-sgidx]').forEach(b=>b.addEventListener('click', ()=>{
+    const s = allSuggestions[+b.dataset.sgidx];
+    editing.action = { title:s.title, dept:s.dept, dueDate:'', status:'باز', description:'', sourceType:s.sourceType, sourceKey:s.sourceKey };
+    renderActionCenter();
+    window.scrollTo({top:0, behavior:'smooth'});
+  }));
+
   document.getElementById('saveActionBtn').addEventListener('click', ()=>{
     const title = document.getElementById('ac_title').value.trim();
     if(!title){ toast('شرح اقدام الزامی است.','err'); return; }
     const status = document.getElementById('ac_status').value;
     const wasNotDone = draft.status!=='انجام‌شده';
     const rec = {
-      id: editing.action?.id || uid(),
+      id: isRealEdit? editing.action.id : uid(),
       title, dept: document.getElementById('ac_dept').value.trim(),
       dueDate: readDatePicker('ac_due'), status,
       description: document.getElementById('ac_desc').value.trim(),
-      createdDate: editing.action?.createdDate || todayJalaliStr(),
+      sourceType: editing.action?.sourceType || null, sourceKey: editing.action?.sourceKey || null,
+      createdDate: isRealEdit? editing.action.createdDate : todayJalaliStr(),
       resolvedDate: status==='انجام‌شده' ? (editing.action?.resolvedDate && !wasNotDone ? editing.action.resolvedDate : todayJalaliStr()) : (editing.action?.resolvedDate||''),
     };
-    if(editing.action){ DB.actions = DB.actions.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
+    if(isRealEdit){ DB.actions = DB.actions.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
     else{ DB.actions = [...(DB.actions||[]), rec]; toast('اقدام ثبت شد.','ok'); }
     editing.action = null; scheduleSave(); renderActionCenter();
   });
