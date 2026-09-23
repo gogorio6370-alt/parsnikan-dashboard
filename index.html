@@ -393,7 +393,7 @@ const STOPPAGE_REASONS = ['عدم تامین قطعه','خرابی دستگاه'
 // حدس نیست؛ منطق سازمانی معمول کارخانه‌هاست (خرابی دستگاه با تعمیرات، کمبود قطعه با تدارکات و...). اگر
 // نام واحدهای واقعی کارخانه با این‌ها فرق دارد، به‌راحتی قابل ویرایش است.
 const STOP_REASON_DEPARTMENT = {
-  'عدم تامین قطعه':'تدارکات و انبار', 'خرابی دستگاه':'تعمیرات و نگهداری', 'خرابی سیلندر':'تعمیرات و نگهداری',
+  'عدم تامین قطعه':'برنامه‌ریزی و تامین', 'خرابی دستگاه':'تعمیرات و نگهداری', 'خرابی سیلندر':'تعمیرات و نگهداری',
   'تست قرص':'کنترل کیفیت', 'تست قطعه':'کنترل کیفیت', 'قطعی باد':'تاسیسات', 'افت فشار باد':'تاسیسات',
   'قطع برق':'تاسیسات', 'توقف کیفی':'کنترل کیفیت', 'عدم تنظیم دستگاه':'سرپرست خط تولید',
   'نداشتن نیروی انسانی':'منابع انسانی', 'بالانس نبودن خط تولید':'مهندسی صنایع', 'تغییر برنامه':'برنامه‌ریزی تولید',
@@ -5130,7 +5130,7 @@ function renderActionCenter(){
   const existingSourceKeys = new Set((DB.actions||[]).map(x=>x.sourceKey).filter(Boolean));
   const shortSuggestions = M.short.filter(x=>x.status!=='تامین شده').map(x=>({
     sourceType:'short', sourceKey:'short:'+x.id, icon:'📦',
-    title:`کسری قطعه: ${x.part}${x.description?' — '+x.description:''}`, dept:'تدارکات و انبار', detail: x.date,
+    title:`کسری قطعه: ${x.part}${x.description?' — '+x.description:''}`, dept:'برنامه‌ریزی و تامین', detail: x.date,
   })).filter(x=>!existingSourceKeys.has(x.sourceKey));
 
   const wasteScrap = M.waste.filter(x=>(x.eventType||'ضایعات')!=='دوباره‌کاری');
@@ -5176,7 +5176,7 @@ function renderActionCenter(){
     <div class="form-grid" style="margin-top:10px;">
       <div class="field" style="grid-column:1/-1;"><label>شرح اقدام</label><input id="ac_title" type="text" value="${esc(draft.title)}" placeholder="مثلاً: پیگیری تامین قطعه با انبار مرکزی"></div>
       <div class="field"><label>مسئول / واحد</label><input id="ac_dept" type="text" value="${esc(draft.dept)}" placeholder="مثلاً: تعمیرات و نگهداری" list="ac_deptList">
-        <datalist id="ac_deptList">${[...new Set([...Object.values(STOP_REASON_DEPARTMENT), ...Object.values(WASTE_CATEGORY_DEPARTMENT), 'تدارکات و انبار'])].map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
+        <datalist id="ac_deptList">${[...new Set([...Object.values(STOP_REASON_DEPARTMENT), ...Object.values(WASTE_CATEGORY_DEPARTMENT), 'برنامه‌ریزی و تامین'])].map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
       </div>
       <div class="field"><label>موعد انجام</label>${datePickerHtml('ac_due', draft.dueDate)}</div>
       <div class="field"><label>وضعیت</label><select id="ac_status">${ACTION_STATUSES.map(s=>`<option ${draft.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
