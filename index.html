@@ -5150,7 +5150,7 @@ function renderActionCenter(){
 
   const allSuggestions = [...shortSuggestions, ...wasteSuggestions, ...stopSuggestions];
 
-  document.getElementById('view').innerHTML = `
+  document.getElementById('view').innerHTML = renderMonthBar() + `
   <div class="grid grid-3" style="margin-bottom:16px;">
     ${kpiCard('اقدامات باز','عدد', fmt(openCount,0), null, openCount>0?'#ffcf5c':'#2fd9c4')}
     ${kpiCard('سررسیدگذشته','عدد', fmt(overdueCount,0), null, overdueCount>0?'#ff5d6c':'#2fd9c4')}
@@ -5159,7 +5159,7 @@ function renderActionCenter(){
 
   ${allSuggestions.length? `
   <div class="card" style="margin-bottom:16px;">
-    <div class="flexbar"><h3 style="margin:0;">🔗 پیشنهادهای این ماه — از کسری قطعات، ضایعات/دوباره‌کاری و توقفات</h3></div>
+    <div class="flexbar"><h3 style="margin:0;">🔗 پیشنهادها — از کسری قطعات، ضایعات/دوباره‌کاری و توقفات</h3><span class="hint" style="margin:0;">ماه: ${monthLabel(DB.meta.activeMonth)}</span></div>
     <div class="hint" style="margin:2px 0 10px;">شرح و مسئول هرکدام خودکار پر شده — فقط موعد انجام و توضیح تکمیلی (در صورت نیاز) را اضافه کنید.</div>
     <div style="display:flex; flex-direction:column; gap:8px;">
       ${allSuggestions.map((s,i)=>`<div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.03); border-radius:10px; padding:10px 12px;">
@@ -5220,6 +5220,8 @@ function renderActionCenter(){
       </tbody>
     </table></div>
   </div>`;
+
+  bindMonthBar(()=>renderActionCenter());
 
   document.querySelectorAll('[data-sgidx]').forEach(b=>b.addEventListener('click', ()=>{
     const s = allSuggestions[+b.dataset.sgidx];
@@ -6245,7 +6247,7 @@ function openSettings(){
     root.innerHTML='';
     confirmDeleteModal('پاک‌سازی کامل داده‌های این خط', 'همه ردیف‌های ثبت‌شده (تولید، ارسال، ضایعات، توقفات، کسری، برنامه تولید روزانه) برای خط «' + esc(DB.meta.unitName||'') + '» برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', async ()=>{
       DB.daily.forEach(r=>moveToTrash('daily', r)); DB.waste.forEach(r=>moveToTrash('waste', r)); DB.stop.forEach(r=>moveToTrash('stop', r)); DB.short.forEach(r=>moveToTrash('short', r)); DB.stationHourly.forEach(r=>moveToTrash('stationHourly', r)); (DB.productOutput||[]).forEach(r=>moveToTrash('productOutput', r));
-      DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], productOutput:[], risks: DB.risks, dailyProgram: [], meta: DB.meta };
+      DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], productOutput:[], risks: DB.risks, dailyProgram: [], actions: DB.actions, meta: DB.meta };
       await saveAll(true); toast('همه داده‌های این خط پاک شد.','ok'); goTo(currentTab);
     });
   });
@@ -6456,6 +6458,9 @@ document.getElementById('importJsonInput').addEventListener('change', (e)=>{
           short: parsed.short || [], trash: parsed.trash && parsed.trash.length ? parsed.trash : keepTrash,
           stationHourly: parsed.stationHourly || [],
           productOutput: parsed.productOutput || [],
+          dailyProgram: parsed.dailyProgram || [],
+          actions: parsed.actions || DB.actions || [],
+          risks: parsed.risks || DB.risks,
           meta: parsed.meta || DB.meta
         };
         scheduleSave(); updateTrashBadge(); toast('بازیابی از فایل پشتیبان انجام شد.','ok'); goTo(currentTab);
