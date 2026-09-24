@@ -2265,8 +2265,9 @@ function renderProd(){
     </div>
   </div>
 
-  <div class="card" style="margin-bottom:16px;">
-    <h3>🎯 تولید روزانه ایستگاه‌ها نسبت به هدف <span class="muted">میانگین این ماه — هر ایستگاه با هدف خودش مقایسه می‌شود</span></h3>
+  <details class="card" style="margin-bottom:16px;">
+    <summary style="cursor:pointer; font-weight:800; font-size:14px; list-style:none;">🎯 تولید روزانه ایستگاه‌ها نسبت به هدف <span class="hint" style="font-weight:400;">میانگین این ماه — هر ایستگاه با هدف خودش مقایسه می‌شود (برای باز کردن کلیک کنید)</span></summary>
+    <div style="margin-top:12px;">
     ${stationBullets.length===0? `<div class="tbl-empty">داده‌ای برای مقایسه نیست — از تب «آمار روزانه ایستگاه‌ها» تولید ایستگاه‌ها را ثبت کنید (باید برای ایستگاه هم هدف روزانه تعیین شده باشد).</div>` :
     `<div style="display:flex; flex-direction:column; gap:14px;">
       ${stationBullets.map(sb=>{
@@ -2293,7 +2294,8 @@ function renderProd(){
       <span class="legend-dot"><i style="background:linear-gradient(90deg,#c73f4d,#ff5d6c);"></i> فاصله زیاد از هدف</span>
       <span class="legend-dot"><i style="background:#eef2f9; width:2px; border-radius:0;"></i> خط هدف هر ایستگاه</span>
     </div>`}
-  </div>
+    </div>
+  </details>
 
   <div class="card" style="margin-bottom:16px;">
     <div class="flexbar"><h3 style="margin:0;">بهترین و ضعیف‌ترین روز تولید</h3></div>
@@ -5289,6 +5291,11 @@ function renderTargetProgress(){
   const daysElapsed = rows.length;
   const daysRemaining = Math.max(workingDays - daysElapsed, 0);
   const progressPct = monthlyTarget ? cumTotal/monthlyTarget : null;
+  // «درصد پیشرفت از هدف ارسال» — همان هدف ماهانه، ولی برای مقدار واقعاً ارسال‌شده به انبار (نه فقط
+  // تولیدشده). این دو عمداً کنار هم نشان داده می‌شوند: اگر تولید جلوتر از ارسال بیفتد، یعنی محصول در
+  // انبار روی هم انباشته می‌شود بدون این‌که ارسال شود — یک سیگنال مدیریتی جداگانه از خودِ «عقب بودن از هدف».
+  const cumShipTotal = rows.reduce((s,e)=> s + shipTotal(e), 0);
+  const shipProgressPct = monthlyTarget ? cumShipTotal/monthlyTarget : null;
   const paceDevPct = idealSoFar ? (cumTotal-idealSoFar)/idealSoFar : null;
   const avgDailyActual = daysElapsed ? cumTotal/daysElapsed : 0;
   const requiredDailyRate = (daysRemaining>0 && remaining>0) ? remaining/daysRemaining : (remaining<=0 ? 0 : null);
@@ -5374,11 +5381,12 @@ function renderTargetProgress(){
     <button class="btn btn-teal btn-sm" id="tp_saveBtn" style="margin-top:12px;">ذخیره روزهای کاری</button>
   </div>
 
-  <div class="grid grid-4" style="margin-bottom:16px;">
+  <div class="grid grid-5" style="margin-bottom:16px;">
     ${kpiCard('هدف ماهانه','عدد', monthlyTarget? fmt(monthlyTarget,0):'—', null, '#4c8dff')}
     ${kpiCard('تولید تجمعی تا امروز','عدد', fmt(cumTotal,0), null, '#ff9d42')}
     ${kpiCard('باقیمانده تا هدف','عدد', monthlyTarget? fmt(remaining,0):'—', null, remaining>0?'#ffcf5c':'#2fd9c4')}
-    ${kpiCard('درصد پیشرفت از هدف','', progressPct===null?'—':pct(progressPct,1), null, (progressPct!==null&&progressPct>=1)?'#2fd9c4':'#4c8dff')}
+    ${kpiCard('درصد پیشرفت از هدف تولید','', progressPct===null?'—':pct(progressPct,1), null, (progressPct!==null&&progressPct>=1)?'#2fd9c4':'#4c8dff')}
+    ${kpiCard('درصد پیشرفت از هدف ارسال','', shipProgressPct===null?'—':pct(shipProgressPct,1), null, (shipProgressPct!==null&&shipProgressPct>=1)?'#2fd9c4':(shipProgressPct!==null&&progressPct!==null&&shipProgressPct<progressPct-0.05)?'#ff5d6c':'#4c8dff')}
   </div>
   <div class="grid grid-4" style="margin-bottom:16px;">
     ${kpiCard('انحراف از مسیر برنامه تا امروز','', paceDevPct===null?'—':pct(paceDevPct,1), null, paceDevPct===null?'#93a4c3':paceDevPct>=0?'#2fd9c4':'#ff5d6c')}
