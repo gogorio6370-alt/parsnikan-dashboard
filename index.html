@@ -3473,17 +3473,30 @@ function bestHistoricalOEE_(){
 const PERSONNEL_PASSWORD = 'Yalda@1391';
 // آمار تولید/هدف/انحراف هر نفر از روی «ثبت‌های آمار ایستگاه‌ها» — اگر یک ردیف چند اپراتور هم‌زمان داشته باشد
 // (کار گروهی روی یک ایستگاه)، عدد آن ردیف عادلانه بین همان چند نفر تقسیم می‌شود، نه این‌که به هرکدام کامل داده شود.
+// آمار تولید/هدف/انحراف هر نفر از روی «ثبت‌های آمار ایستگاه‌ها» — اگر یک ردیف چند اپراتور هم‌زمان داشته باشد
+// (کار گروهی روی یک ایستگاه)، عدد آن ردیف عادلانه بین همان چند نفر تقسیم می‌شود، نه این‌که به هرکدام کامل داده شود.
+// نکته‌ی مهم برای انصاف امتیازدهی: بعضی ایستگاه‌ها هنوز هدف/استاندارد ساعتی تعریف‌شده ندارند (dailyTarget=0،
+// مثلاً ایستگاه‌های تازه‌اضافه‌شده یا مواردی مثل «توزین قرص»). قبلاً تولید همین ردیف‌ها به صورت کامل جمع
+// می‌شد ولی چون هدف آن‌ها صفر بود به مخرج کسر اضافه نمی‌شد — نتیجه: هرکس بیشتر روی چنین ایستگاهی کار
+// می‌کرد، انحراف (و امتیاز) به‌طور کاذب بالاتر می‌رفت، بدون این‌که واقعاً عملکرد بهتری داشته باشد. برای
+// همین، ردیف‌های بدون هدف نه در تولید و نه در هدف این محاسبه حساب نمی‌شوند؛ جداگانه گزارش می‌شوند تا
+// «نامرئی» نمانند.
 function personEvalStats_(name, records){
-  let production = 0, target = 0;
+  let production = 0, target = 0, untrackedProduction = 0, untrackedCount = 0;
   records.forEach(r=>{
     const ops = (r.operator||'').split(/[،,]/).map(s=>s.trim()).filter(Boolean);
     if(!ops.includes(name)) return;
     const share = ops.length || 1;
-    production += (r.total||0)/share;
-    target += (r.target||0)/share;
+    if((r.target||0) > 0){
+      production += (r.total||0)/share;
+      target += (r.target||0)/share;
+    } else {
+      untrackedProduction += (r.total||0)/share;
+      untrackedCount++;
+    }
   });
   const dev = target? (production-target)/target : null;
-  return { production, target, dev };
+  return { production, target, dev, untrackedProduction, untrackedCount };
 }
 // امتیاز کل = میانگین چهار مؤلفه: عملکرد تولید (خودکار، از تحقق هدف) + نظم و تردد + 5S + کیفیت (هر سه دستی).
 // اگر مؤلفه‌ای هنوز داده ندارد (مثلاً امتیاز دستی وارد نشده)، در میانگین حساب نمی‌شود، نه این‌که صفر لحاظ شود.
@@ -3566,7 +3579,11 @@ function renderPersonnel(){
       <h3 style="margin:0;">🏅 امتیاز ارزیابی پرسنل صف — ${esc(monthLabel(DB.meta.activeMonth))}</h3>
       <span class="hint" style="margin:0;">مبنای پیشنهادی برای پاداش/جریمه — نه محاسبهٔ نهایی حقوق</span>
     </div>
-    <div class="hint" style="margin-bottom:10px;">«عملکرد تولید» خودکار از «ثبت‌های آمار ایستگاه‌ها» همین ماه محاسبه می‌شود (جمع تولید نسبت به جمع هدف، وقتی چند نفر هم‌زمان یک ایستگاه بودند به‌طور مساوی بین‌شان تقسیم شده)؛ سه ستون دیگر را خودتان دستی وارد کنید (۰ تا ۱۰۰). «امتیاز کل» میانگین همان مؤلفه‌هایی است که مقدار دارند.</div>
+    <div class="hint" style="margin-bottom:6px;">«عملکرد تولید» خودکار از «ثبت‌های آمار ایستگاه‌ها» همین ماه محاسبه می‌شود (جمع تولید نسبت به جمع هدف، وقتی چند نفر هم‌زمان یک ایستگاه بودند به‌طور مساوی بین‌شان تقسیم شده)؛ سه ستون دیگر را خودتان دستی وارد کنید (۰ تا ۱۰۰). «امتیاز کل» میانگین همان مؤلفه‌هایی است که مقدار دارند. ثبت‌های روی ایستگاه‌های بدون هدف تعریف‌شده، دیگر باعث بالارفتن کاذب امتیاز کسی نمی‌شود — نه در تولید و نه در هدف حساب می‌شوند (نشانه‌ی ⓘ کنار «جمع تولید» یعنی بخشی از کار این فرد این‌طور بوده).</div>
+    ${(()=>{
+      const untargetedStations = [...new Set((M.stationHourly||[]).filter(r=>!(r.target>0)).map(r=>(stationById(r.stationId)||{}).name).filter(Boolean))];
+      return untargetedStations.length? `<div class="hint" style="margin-bottom:10px; color:#ffcf5c;">⚠️ این ماه روی ${fmt(untargetedStations.length,0)} ایستگاه بدون هدف تعریف‌شده کار ثبت شده: ${untargetedStations.map(esc).join('، ')}. اگر این‌ها کار واقعی و مستمرند، بهتر است در تب «آمار روزانه ایستگاه‌ها» برایشان هدف روزانه/استاندارد ساعتی تعیین کنید — وگرنه عملکرد کسانی که آنجا کار می‌کنند اصلاً در امتیاز لحاظ نمی‌شود (نه این‌که کاذب بالا برود، ولی «دیده» هم نمی‌شود).</div>` : '';
+    })()}
     <div class="table-wrap"><table>
       <thead><tr><th>نام</th><th class="num">جمع تولید</th><th class="num">جمع هدف</th><th class="num">انحراف٪</th><th class="num">نظم و تردد</th><th class="num">5S</th><th class="num">کیفیت</th><th class="num">امتیاز کل</th></tr></thead>
       <tbody>
@@ -3578,7 +3595,7 @@ function renderPersonnel(){
           const overall = personOverallScore_(p, stat);
           return `<tr data-evalrow="${p.id}">
             <td>${esc(p.name)}</td>
-            <td class="num">${fmt(stat.production,0)}</td>
+            <td class="num">${fmt(stat.production,0)}${stat.untrackedCount? ` <span title="${fmt(stat.untrackedProduction,0)} عدد از این تولید، مربوط به ${fmt(stat.untrackedCount,0)} ثبتِ روی ایستگاه(های) بدون هدف/استاندارد تعریف‌شده است — نه در این عدد و نه در انحراف/امتیاز لحاظ نشده." style="cursor:help; color:#ffcf5c;">ⓘ</span>` : ''}</td>
             <td class="num">${stat.target? fmt(stat.target,0) : '<span class="muted">—</span>'}</td>
             <td class="num" style="color:${stat.dev===null?'var(--text-mute)':stat.dev>=0?'#8ff0c8':'#ffb0b8'}; font-weight:800;">${pct(stat.dev,1)}</td>
             <td class="num"><input data-evalfield="scoreDiscipline" type="text" inputmode="numeric" value="${p.scoreDiscipline??''}" style="width:64px; text-align:center;" placeholder="—"></td>
@@ -5292,8 +5309,8 @@ function renderTargetProgress(){
   const daysRemaining = Math.max(workingDays - daysElapsed, 0);
   const progressPct = monthlyTarget ? cumTotal/monthlyTarget : null;
   // «درصد پیشرفت از هدف ارسال» — همان هدف ماهانه، ولی برای مقدار واقعاً ارسال‌شده به انبار (نه فقط
-  // تولیدشده). این دو عمداً کنار هم نشان داده می‌شوند: اگر تولید جلوتر از ارسال بیفتد، یعنی محصول در
-  // انبار روی هم انباشته می‌شود بدون این‌که ارسال شود — یک سیگنال مدیریتی جداگانه از خودِ «عقب بودن از هدف».
+  // تولیدشده). این دو عمداً کنار هم نشان داده می‌شوند: اگر تولید جلوتر از ارسال بیفتد، یعنی محصول
+  // تولید شده ولی هنوز به انبار ارسال نشده — یک سیگنال مدیریتی جداگانه از خودِ «عقب بودن از هدف».
   const cumShipTotal = rows.reduce((s,e)=> s + shipTotal(e), 0);
   const shipProgressPct = monthlyTarget ? cumShipTotal/monthlyTarget : null;
   const paceDevPct = idealSoFar ? (cumTotal-idealSoFar)/idealSoFar : null;
