@@ -5124,23 +5124,32 @@ function renderActionCenter(){
   const draft = editing.action || emptyActionDraft();
   const isRealEdit = !!(editing.action && (DB.actions||[]).some(x=>x.id===editing.action.id)); // یک پیش‌نویسِ پرشده از پیشنهاد، id واقعی در DB ندارد؛ پس با «ویرایش واقعی» فرق دارد
   const M = monthData();
-  const list = [...(DB.actions||[])].sort((a,b)=>{
+  // هر اقدام به «ماهی» تعلق دارد که در آن ثبت شده (فیلد month؛ برای اقدام‌های قدیمی که این فیلد را ندارند،
+  // ماه تاریخ ثبتشان). با عوض‌شدن ماه فعال، این تب مثل بقیه‌ی تب‌ها تمیز شروع می‌شود و فقط اقدام‌های همان
+  // ماه را نشان می‌دهد. اقدام‌های «باز» ماه‌های قبل گم نمی‌شوند: جدا و با هشدار زیر نشان داده می‌شوند.
+  const actionMonthOf = x => x.month || monthKeyOf(x.createdDate || x.dueDate || '') || DB.meta.activeMonth;
+  const isOpenAct = x => x.status!=='انجام‌شده' && x.status!=='لغو شده';
+  const sortActs = arr => [...arr].sort((a,b)=>{
     // باز/در حال انجام اول (نزدیک‌ترین موعد بالاتر)، بعد انجام‌شده/لغوشده ته لیست
-    const openA = a.status!=='انجام‌شده' && a.status!=='لغو شده', openB = b.status!=='انجام‌شده' && b.status!=='لغو شده';
+    const openA = isOpenAct(a), openB = isOpenAct(b);
     if(openA!==openB) return openA? -1 : 1;
     return (a.dueDate||'9999').localeCompare(b.dueDate||'9999');
   });
-  const filterStatus = filters.actionStatus || 'open';
+  const allActs = DB.actions||[];
+  const list = sortActs(allActs.filter(x=>actionMonthOf(x)===DB.meta.activeMonth));
+  const carryOver = sortActs(allActs.filter(x=>isOpenAct(x) && actionMonthOf(x) < DB.meta.activeMonth));
+  // اگر فیلتر «مانده از ماه‌های قبل» روشن مانده بود ولی در ماه انتخابی چیزی مانده نیست، به «باز» برمی‌گردیم
+  const filterStatus = (filters.actionStatus==='carry' && !carryOver.length) ? 'open' : (filters.actionStatus || 'open');
   const today = todayJalaliStr();
-  const filtered = list.filter(x=>{
-    if(filterStatus==='open') return x.status!=='انجام‌شده' && x.status!=='لغو شده';
-    if(filterStatus==='overdue') return (x.status!=='انجام‌شده' && x.status!=='لغو شده') && x.dueDate && x.dueDate<today;
+  const filtered = filterStatus==='carry' ? carryOver : list.filter(x=>{
+    if(filterStatus==='open') return isOpenAct(x);
+    if(filterStatus==='overdue') return isOpenAct(x) && x.dueDate && x.dueDate<today;
     if(filterStatus==='done') return x.status==='انجام‌شده';
     return true; // 'all'
   });
-  const openCount = list.filter(x=>x.status!=='انجام‌شده' && x.status!=='لغو شده').length;
-  const overdueCount = list.filter(x=>(x.status!=='انجام‌شده' && x.status!=='لغو شده') && x.dueDate && x.dueDate<today).length;
-  const doneThisMonth = list.filter(x=>x.status==='انجام‌شده' && x.resolvedDate && monthKeyOf(x.resolvedDate)===DB.meta.activeMonth).length;
+  const openCount = list.filter(isOpenAct).length;
+  const overdueCount = list.filter(x=>isOpenAct(x) && x.dueDate && x.dueDate<today).length;
+  const doneThisMonth = allActs.filter(x=>x.status==='انجام‌شده' && x.resolvedDate && monthKeyOf(x.resolvedDate)===DB.meta.activeMonth).length;
 
   // ---- پیشنهادهای خودکار: کسری قطعات، ضایعات/دوباره‌کاری، توقفات — «متصدی» هرکدام از همان
   // نگاشت علت/منشأ → واحد گرفته می‌شود (همان جدول جعبه «هشدارهای مدیریتی» صفحه‌کاور)؛ شما فقط
@@ -5175,6 +5184,12 @@ function renderActionCenter(){
     ${kpiCard('سررسیدگذشته','عدد', fmt(overdueCount,0), null, overdueCount>0?'#ff5d6c':'#2fd9c4')}
     ${kpiCard('انجام‌شده در ماه فعال','عدد', fmt(doneThisMonth,0), null, '#4c8dff')}
   </div>
+
+  ${carryOver.length? `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(255,207,92,.08); border:1px solid rgba(255,207,92,.35); border-radius:12px; padding:10px 14px; margin-bottom:16px;">
+    <span style="font-size:16px;">⚠️</span>
+    <span style="flex:1; min-width:200px; font-size:13px; color:#ffe08a;"><b>${fmt(carryOver.length,0)} اقدام باز از ماه‌های قبل</b> هنوز بسته نشده — این لیست برای ${esc(monthLabel(DB.meta.activeMonth))} از نو شروع شده، ولی اقدام‌های ناتمام گم نمی‌شوند.</span>
+    <button class="btn btn-ghost btn-sm" data-af="carry">مشاهده‌ی مانده‌ها</button>
+  </div>` : ''}
 
   ${allSuggestions.length? `
   <div class="card" style="margin-bottom:16px;">
@@ -5215,6 +5230,7 @@ function renderActionCenter(){
         <button class="pill ${filterStatus==='overdue'?'active':''}" data-af="overdue">سررسیدگذشته (${overdueCount})</button>
         <button class="pill ${filterStatus==='done'?'active':''}" data-af="done">انجام‌شده</button>
         <button class="pill ${filterStatus==='all'?'active':''}" data-af="all">همه</button>
+        ${carryOver.length? `<button class="pill ${filterStatus==='carry'?'active':''}" data-af="carry">مانده از ماه‌های قبل (${carryOver.length})</button>` : ''}
       </div>
     </div>
     <div class="table-wrap"><table>
@@ -5225,7 +5241,7 @@ function renderActionCenter(){
         const isOverdue = (x.status!=='انجام‌شده' && x.status!=='لغو شده') && x.dueDate && x.dueDate<today;
         const stColor = x.status==='انجام‌شده'?'#2fd9c4':x.status==='لغو شده'?'#7c8aa5':isOverdue?'#ff5d6c':x.status==='در حال انجام'?'#4c8dff':'#ffcf5c';
         return `<tr>
-          <td>${esc(x.title)}${x.description?`<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>`:''}</td>
+          <td>${esc(x.title)}${filterStatus==='carry'?`<div class="muted" style="font-size:11.5px; margin-top:2px; color:#ffcf5c;">ثبت‌شده در ${esc(monthLabel(actionMonthOf(x)))}</div>`:''}${x.description?`<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>`:''}</td>
           <td>${esc(x.dept)||'—'}</td>
           <td style="${isOverdue?'color:#ff5d6c; font-weight:700;':''}">${esc(x.dueDate)||'—'}${isOverdue?' ⚠️':''}</td>
           <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span></td>
@@ -5260,6 +5276,7 @@ function renderActionCenter(){
       dueDate: readDatePicker('ac_due'), status,
       description: document.getElementById('ac_desc').value.trim(),
       sourceType: editing.action?.sourceType || null, sourceKey: editing.action?.sourceKey || null,
+      month: isRealEdit? (editing.action.month || actionMonthOf(editing.action)) : DB.meta.activeMonth,
       createdDate: isRealEdit? editing.action.createdDate : todayJalaliStr(),
       resolvedDate: status==='انجام‌شده' ? (editing.action?.resolvedDate && !wasNotDone ? editing.action.resolvedDate : todayJalaliStr()) : (editing.action?.resolvedDate||''),
     };
