@@ -5138,10 +5138,9 @@ function renderActionCenter(){
   const allActs = DB.actions||[];
   const list = sortActs(allActs.filter(x=>actionMonthOf(x)===DB.meta.activeMonth));
   const carryOver = sortActs(allActs.filter(x=>isOpenAct(x) && actionMonthOf(x) < DB.meta.activeMonth));
-  // اگر فیلتر «مانده از ماه‌های قبل» روشن مانده بود ولی در ماه انتخابی چیزی مانده نیست، به «باز» برمی‌گردیم
-  const filterStatus = (filters.actionStatus==='carry' && !carryOver.length) ? 'open' : (filters.actionStatus || 'open');
+  const filterStatus = filters.actionStatus || 'open';
   const today = todayJalaliStr();
-  const filtered = filterStatus==='carry' ? carryOver : list.filter(x=>{
+  const filtered = list.filter(x=>{
     if(filterStatus==='open') return isOpenAct(x);
     if(filterStatus==='overdue') return isOpenAct(x) && x.dueDate && x.dueDate<today;
     if(filterStatus==='done') return x.status==='انجام‌شده';
@@ -5185,11 +5184,32 @@ function renderActionCenter(){
     ${kpiCard('انجام‌شده در ماه فعال','عدد', fmt(doneThisMonth,0), null, '#4c8dff')}
   </div>
 
-  ${carryOver.length? `<div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(255,207,92,.08); border:1px solid rgba(255,207,92,.35); border-radius:12px; padding:10px 14px; margin-bottom:16px;">
-    <span style="font-size:16px;">⚠️</span>
-    <span style="flex:1; min-width:200px; font-size:13px; color:#ffe08a;"><b>${fmt(carryOver.length,0)} اقدام باز از ماه‌های قبل</b> هنوز بسته نشده — این لیست برای ${esc(monthLabel(DB.meta.activeMonth))} از نو شروع شده، ولی اقدام‌های ناتمام گم نمی‌شوند.</span>
-    <button class="btn btn-ghost btn-sm" data-af="carry">مشاهده‌ی مانده‌ها</button>
-  </div>` : ''}
+  ${carryOver.length? `<details class="card" style="margin-bottom:16px;">
+    <summary style="cursor:pointer; font-weight:800; font-size:14px; list-style:none; display:flex; align-items:center; gap:8px;">
+      <span>⚠️</span><span>${fmt(carryOver.length,0)} اقدام باز از ماه‌های قبل</span>
+      <span class="hint" style="font-weight:400;">هنوز بسته نشده — برای دیدن کلیک کنید</span>
+    </summary>
+    <div class="table-wrap" style="margin-top:10px;"><table>
+      <thead><tr><th>شرح اقدام</th><th>مسئول</th><th>موعد</th><th>وضعیت</th><th></th></tr></thead>
+      <tbody>
+      ${carryOver.map(x=>{
+        const isOverdue = x.dueDate && x.dueDate<today;
+        const stColor = x.status==='در حال انجام'?'#4c8dff':isOverdue?'#ff5d6c':'#ffcf5c';
+        return `<tr>
+          <td>${esc(x.title)}<div class="muted" style="font-size:11.5px; margin-top:2px; color:#ffcf5c;">ثبت‌شده در ${esc(monthLabel(actionMonthOf(x)))}</div>${x.description?`<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>`:''}</td>
+          <td>${esc(x.dept)||'—'}</td>
+          <td style="${isOverdue?'color:#ff5d6c; font-weight:700;':''}">${esc(x.dueDate)||'—'}${isOverdue?' ⚠️':''}</td>
+          <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span></td>
+          <td><div style="display:flex; gap:6px;">
+            <button class="icon-btn" data-adone="${x.id}" title="علامت‌گذاری به‌عنوان انجام‌شده">✅</button>
+            <button class="icon-btn" data-aedit="${x.id}" title="ویرایش">✏️</button>
+            <button class="icon-btn" data-adel="${x.id}" title="حذف">🗑️</button>
+          </div></td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table></div>
+  </details>` : ''}
 
   ${allSuggestions.length? `
   <div class="card" style="margin-bottom:16px;">
@@ -5230,7 +5250,6 @@ function renderActionCenter(){
         <button class="pill ${filterStatus==='overdue'?'active':''}" data-af="overdue">سررسیدگذشته (${overdueCount})</button>
         <button class="pill ${filterStatus==='done'?'active':''}" data-af="done">انجام‌شده</button>
         <button class="pill ${filterStatus==='all'?'active':''}" data-af="all">همه</button>
-        ${carryOver.length? `<button class="pill ${filterStatus==='carry'?'active':''}" data-af="carry">مانده از ماه‌های قبل (${carryOver.length})</button>` : ''}
       </div>
     </div>
     <div class="table-wrap"><table>
@@ -5241,7 +5260,7 @@ function renderActionCenter(){
         const isOverdue = (x.status!=='انجام‌شده' && x.status!=='لغو شده') && x.dueDate && x.dueDate<today;
         const stColor = x.status==='انجام‌شده'?'#2fd9c4':x.status==='لغو شده'?'#7c8aa5':isOverdue?'#ff5d6c':x.status==='در حال انجام'?'#4c8dff':'#ffcf5c';
         return `<tr>
-          <td>${esc(x.title)}${filterStatus==='carry'?`<div class="muted" style="font-size:11.5px; margin-top:2px; color:#ffcf5c;">ثبت‌شده در ${esc(monthLabel(actionMonthOf(x)))}</div>`:''}${x.description?`<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>`:''}</td>
+          <td>${esc(x.title)}${x.description?`<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>`:''}</td>
           <td>${esc(x.dept)||'—'}</td>
           <td style="${isOverdue?'color:#ff5d6c; font-weight:700;':''}">${esc(x.dueDate)||'—'}${isOverdue?' ⚠️':''}</td>
           <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span></td>
