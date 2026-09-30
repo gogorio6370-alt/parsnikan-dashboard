@@ -536,6 +536,11 @@ let LINES = []; // [{id, name}] — registry of all production lines/units shari
 let currentLineId = null;
 let ORG = { managerPhone: '' }; // organization-wide settings (shared across all lines)
 let cloudOK = true;
+// وقتی بارگذاری اولیه واقعاً شکست بخورد (نه اینکه صرفاً هنوز به فضای ابری وصل نشده‌اید)، این پرچم ست
+// می‌شود تا ذخیره‌سازی خودکار قفل شود — وگرنه دقیقاً همان باگی که داده‌های مرداد-مهر را پاک کرد، این‌بار
+// از طریق یک ذخیرهٔ بعدی (نه فقط بارگذاری) دوباره تکرار می‌شد: نسخهٔ پیش‌فرض/قدیمی که موقتاً در حافظه
+// نشسته، روی داده‌ی واقعیِ گوگل‌شیت نوشته می‌شد. با رفرش موفق صفحه، این پرچم خودش پاک می‌شود.
+let dataLoadFailed = false;
 let dirty = { daily:false, waste:false, stop:false, short:false, meta:false };
 let currentTab = 'dash';
 let charts = {};
@@ -1209,12 +1214,24 @@ async function saveOrgSettings(){ await cloudSet('tmst_org_settings', ORG); }
 
 async function loadAll(){
   setSync('busy','در حال بارگذاری از فضای ابری…');
+  // این نشانه‌گذاری برای جلوگیری از یک باگ جدی است: قبلاً اگر درخواست به گوگل‌شیت با خطا مواجه می‌شد
+  // (مثلاً بلافاصله بعد از یک دیپلوی جدید، قبل از اینکه مجوزهای اجرا کامل تنظیم شوند)، داده‌ها به‌اشتباه
+  // «خالی» به نظر می‌رسیدند و کد آن را با «این خط برای اولین‌بار است» اشتباه می‌گرفت — و نسخهٔ قدیمیِ
+  // پشتیبان را به‌جای داده‌های واقعی شما در گوگل‌شیت ذخیره می‌کرد (دقیقاً همان اتفاقی که باعث شد داده‌های
+  // مرداد تا مهر پاک شود). الان با استفاده از lastSyncError (که هرجا یک خطای واقعی از سرور برگردد ثبت
+  // می‌شود) این دو حالت را از هم تشخیص می‌دهیم.
+  const syncErrBefore = lastSyncError;
   try{
     await loadLinesRegistry();
     // ONE batched round-trip for all 7 collections instead of 7 separate requests
     // (this is what was making Google Sheets sync feel slow/stuck)
     const keys = ['daily','waste','stop','short','meta','trash','stationHourly','productOutput','dailyProgram','actions'].map(p=>lineKey(currentLineId,p));
     const got = await cloudBatchGet(keys);
+    if(lastSyncError !== syncErrBefore){
+      // یک خطای واقعی از سرور برگشته (نه اینکه واقعاً چیزی برای این خط ثبت نشده) — هرگز نباید این را
+      // با «اولین بار» اشتباه بگیریم و چیزی را بازنویسی کنیم؛ می‌رویم به حالت امن آفلاین (پایین همین تابع).
+      throw new Error('sync error during load — ' + (lastSyncError && lastSyncError.message));
+    }
     const d = got[lineKey(currentLineId,'daily')], w = got[lineKey(currentLineId,'waste')],
           s = got[lineKey(currentLineId,'stop')], sh = got[lineKey(currentLineId,'short')],
           m = got[lineKey(currentLineId,'meta')], tr = got[lineKey(currentLineId,'trash')],
@@ -1234,7 +1251,10 @@ async function loadAll(){
       DB.productOutput = po || [];
       DB.dailyProgram = dp || [];
       DB.actions = ac || [];
-      if(!d && !w && !s && !sh && !m) await saveAll(true);
+      // عمداً دیگر اینجا saveAll خودکار صدا زده نمی‌شود — حتی اگر این واقعاً اولین بار باشد، همین‌که
+      // داده‌ی پیش‌فرض در حافظه بارگذاری شد کافی است؛ اولین ذخیره‌ی واقعی، خودش با اولین ثبت/ویرایش شما
+      // (که همه‌جای برنامه scheduleSave را صدا می‌زند) اتفاق می‌افتد. اینجوری هیچ نوشتن خودکاری روی گوگل‌شیت
+      // بدون یک اقدام واقعی از طرف شما رخ نمی‌دهد.
     } else {
       DB.daily = normalizeDailyArray(d || []);
       DB.waste = w || [];
@@ -1250,6 +1270,7 @@ async function loadAll(){
     if(!DB.meta.stations || !DB.meta.stations.length){ DB.meta.stations = currentLineId==='thermostat' ? seedStations() : []; }
     setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت شما — به‌روز' : 'متصل به فضای ابری Claude — به‌روز'));
     cloudOK = true;
+    dataLoadFailed = false;
   }catch(e){
     cloudOK = false;
     if(!LINES.length){ LINES=[{id:'thermostat',name:'واحد ترموستات'}]; currentLineId='thermostat'; }
@@ -1259,7 +1280,13 @@ async function loadAll(){
     DB.dailyProgram = [];
     DB.actions = [];
     DB.meta = cloneEmbedded('meta');
-    setSync('off', 'حالت آفلاین — تغییرات فقط در همین نشست ذخیره می‌شود');
+    // اگر GSHEET.url تنظیم شده (یعنی قبلاً وصل بوده‌اید) ولی همین حالا خطا خورده، این با «هیچ‌وقت وصل
+    // نشده» فرق دارد — مهم است که مطمئن شوید نگران «پاک‌شدن» داده نباشید: داده‌ی واقعی شما در گوگل‌شیت
+    // دست‌نخورده مانده، فقط همین حالا قابل‌خواندن نبوده (چیزی که اینجا می‌بینید فقط نسخهٔ پیش‌فرض محلی است).
+    if(GSHEET.url) dataLoadFailed = true;
+    setSync('off', GSHEET.url
+      ? 'اتصال به گوگل‌شیت شما الان برقرار نشد — داده‌ی واقعی شما در گوگل‌شیت دست‌نخورده است، فقط موقتاً نمایش داده نمی‌شود. صفحه را رفرش کنید؛ اگر ادامه داشت، دیپلوی Apps Script را بررسی کنید.'
+      : 'حالت آفلاین — تغییرات فقط در همین نشست ذخیره می‌شود');
   }
   if(!DB.meta.months) DB.meta.months = [];
   if(!DB.meta.activeMonth){
@@ -1368,6 +1395,13 @@ let lastSavedAt = null;
 let savingNow = false;
 let saveQueued = false;
 async function saveAll(silent){
+  if(dataLoadFailed){
+    // بارگذاری اولیه از گوگل‌شیت شما شکست خورده و آنچه الان در حافظه است ممکن است نسخهٔ قدیمی/پیش‌فرض
+    // باشد، نه آخرین داده‌ی واقعی — پس اجازه نمی‌دهیم چیزی نوشته شود تا با یک رفرش موفق این وضعیت پاک شود.
+    setSync('off','اتصال با گوگل‌شیت شما هنوز برقرار نیست — برای جلوگیری از بازنویسی داده‌های واقعی‌تان، ذخیره‌سازی موقتاً متوقف شده. صفحه را رفرش کنید.');
+    if(!silent) toast('برای جلوگیری از خطر بازنویسی داده‌های واقعی، فعلاً ذخیره نمی‌شود — لطفاً صفحه را رفرش کنید تا اتصال برقرار شود.','err');
+    return false;
+  }
   if(savingNow){ saveQueued = true; return true; } // a save is already in flight — it'll pick up latest DB state right after
   savingNow = true;
   setSync('busy','در حال ذخیره…');
