@@ -280,6 +280,23 @@ td.num, th.num{ text-align:left; font-variant-numeric:tabular-nums; direction:lt
   table, th, td{ color:#000 !important; border-color:#999 !important; }
   select, input{ border:none !important; background:none !important; color:#000 !important; -webkit-appearance:none; appearance:none; }
 }
+
+/* ===== چاپ/PDF تب‌های تحلیلی جدید (تکت‌تایم، نفر-ساعت، روند ماهانه) ===== */
+.print-only{ display:none; }
+@media print{
+  @page{ size:A4 landscape; margin:8mm; }
+  body.an-printing, body.an-printing .app, body.an-printing .main{ background:#0c1220 !important; color:#eef2f9 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body.an-printing .view{ padding:0 !important; }
+  body.an-printing .card{ background:#141d31 !important; border:1px solid #243252 !important; box-shadow:none !important; break-inside:avoid; page-break-inside:avoid; }
+  body.an-printing table, body.an-printing th, body.an-printing td{ color:#c9d4e8 !important; border-color:#243252 !important; }
+  body.an-printing th{ background:#0f1729 !important; position:static !important; }
+  body.an-printing td[style*="sticky"], body.an-printing th[style*="sticky"]{ position:static !important; }
+  body.an-printing .table-wrap{ max-height:none !important; overflow:visible !important; }
+  body.an-printing .print-only{ display:block !important; }
+  body.an-printing .chart-box{ break-inside:avoid; }
+  body.an-printing .topbar, body.an-printing .sidebar{ display:none !important; }
+  body.an-printing *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
 </style>
 </head>
 <body>
@@ -504,6 +521,10 @@ const NAV = [
   {id:'stop',    label:'توقفات تولید',      group:'گزارش‌ها',    icon:'pause'},
   {id:'lean',    label:'شاخص‌های ناب (OEE)', group:'تحلیل',       icon:'gauge'},
   {id:'flowmap', label:'نقشه خط و گلوگاه‌ها', group:'تحلیل',       icon:'map'},
+  {id:'stdtime', label:'⏳ زمان استاندارد ساخت', group:'تحلیل', icon:'gauge'},
+  {id:'takt',    label:'⏱ تکت‌تایم و سایکل‌تایم', group:'تحلیل', icon:'clock'},
+  {id:'manhours',label:'👷 نفر-ساعت',          group:'تحلیل',       icon:'users'},
+  {id:'trend',   label:'📈 روند ماهانه',       group:'تحلیل',       icon:'chart'},
   {id:'target',  label:'🎯 هدف و پیشرفت تولید', group:'تحلیل',    icon:'target'},
   {id:'actions', label:'✅ مرکز اقدامات',      group:'تحلیل',    icon:'checklist'},
   {id:'dash',    label:'داشبورد مدیریتی',   group:'تحلیل',       icon:'chart'},
@@ -1629,9 +1650,13 @@ function goTo(tab){
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
-  const titles = {cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
+  const titles = {stdtime:'زمان استاندارد ساخت ترموستات', takt:'تکت‌تایم و سایکل‌تایم', manhours:'نفر-ساعت در اختیار و کارکرد', trend:'روند ماهانه تولید، ارسال و شاخص‌ها', cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
     waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', actions:'مرکز اقدامات', dash:'داشبورد مدیریتی'};
   const subs = {
+    stdtime:'از تولید قرص تا کنترل نهایی — استاندارد هر گروه محصول، قطعه‌ی هم‌زمان در جریان و میانگین وزنی',
+    takt:'سایکل‌تایم هر ایستگاه از آمار روزانه‌ی ثبت‌شده در برابر تکت‌تایم — گلوگاه‌ها و اتلاف توقفات',
+    manhours:'نفر-ساعت در اختیار (حاضرین × ساعت شیفت) در برابر نفر-ساعت کارکرد ثبت‌شده در ایستگاه‌ها',
+    trend:'سیر ماه‌به‌ماه تولید، ارسال، تحقق هدف، OEE، ضایعات، توقفات و نیروی انسانی',
     cover:'نمای کلی زنده برای مدیریت ارشد و مشتری — تاریخ، ساعت و شاخص‌های کلیدی',
     entry:'تنها فرمی که باید هر روز تکمیل شود — سایر گزارش‌ها به‌صورت خودکار محاسبه می‌شوند',
     stations:'ثبت تولید روزانه هر ایستگاه و مقایسه با استاندارد',
@@ -1652,7 +1677,7 @@ function goTo(tab){
   document.getElementById('pageTitle').textContent = titles[tab];
   document.getElementById('pageSub').textContent = subs[tab] + ' — ماه فعال: ' + monthLabel(DB.meta.activeMonth);
   destroyCharts();
-  const renderers = {cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
+  const renderers = {stdtime:renderStdTime, takt:renderTakt, manhours:renderManHours, trend:renderTrend, cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
   renderers[tab]();
   document.getElementById('view').dataset.hadContent = '1';
   document.getElementById('view').scrollTop = 0;
@@ -4416,6 +4441,914 @@ function renderCover(){
     });
   });
 }
+
+/* =========================================================================
+   تب‌های تحلیلی جدید: ⏱ تکت‌تایم و سایکل‌تایم • 👷 نفر-ساعت • 📈 روند ماهانه
+   همه‌ی اعداد مستقیماً از همان داده‌های ثبت‌شده (ورود داده روزانه + آمار روزانه ایستگاه‌ها
+   + ضایعات + توقفات + کسری) محاسبه می‌شوند؛ هیچ عدد دستی/فرضی جدیدی وجود ندارد، مگر
+   «زمان استراحت شیفت» که در خود تب تکت‌تایم قابل تنظیم است (پیش‌فرض صفر).
+   ========================================================================= */
+const AN = { teal:'#2fd9c4', amber:'#ff9d42', blue:'#4c8dff', red:'#ff5d6c', purple:'#b389ff', yellow:'#ffcf5c', green:'#6ee7b7', pink:'#f472b6', mute:'#7c8aa5' };
+
+/* ---------- helpers مشترک ---------- */
+function an_shiftHoursOf(e){ return (e && e.shiftHours) || DB.meta.normalShiftHours || 10; }
+function an_breakMin(){ const v = DB.meta.taktBreakMin; return (v===undefined || v===null || isNaN(v)) ? 0 : v; }
+function an_netShiftSec(hours){ return Math.max(hours*3600 - an_breakMin()*60, 0); }
+function an_opsOf(r){ return String((r && r.operator) || '').split(/[،,]/).map(s=>s.trim()).filter(Boolean); }
+function an_recHours(r){ const h = hoursBetweenTimes(r.shiftStart, r.shiftEnd); return (h && h>0) ? h : null; }
+function an_dayLabel(date){ return toEnDigits(date).split('/').slice(1).join('/'); }
+function an_dayNum(date){ return parseInt(toEnDigits(date).split('/')[2], 10) || 0; }
+function an_shortMonth(k){ const p = String(k).split('/'); return (FA_MONTH_NAMES[parseInt(p[1],10)] || p[1]) + ' ' + String(p[0]).slice(2); }
+function an_byDate(a,b){ return dateSortKey(a.date) - dateSortKey(b.date); }
+function an_median(arr){ const a = arr.filter(v=>v>0).sort((x,y)=>x-y); if(!a.length) return null; const m = Math.floor(a.length/2); return a.length%2 ? a[m] : (a[m-1]+a[m])/2; }
+function an_secFmt(sec, digits){ if(sec===null || sec===undefined || !isFinite(sec)) return '—'; return fmt(sec, digits ?? 1); }
+function an_hasShip(e){ return !!(e && e.ship); }
+function an_dayHasData(e){
+  if(!e || !e.lines) return false;
+  if(allLinesTotal(e) > 0) return true;
+  if(an_hasShip(e) && shipTotal(e) > 0) return true;
+  return ALL_LINE_KEYS.some(k => e.lines[k] && e.lines[k].status && e.lines[k].status !== 'run');
+}
+function an_monthM(mk){
+  return {
+    daily: DB.daily.filter(e=>monthKeyOf(e.date)===mk),
+    waste: DB.waste.filter(e=>monthKeyOf(e.date)===mk),
+    stop: DB.stop.filter(e=>monthKeyOf(e.date)===mk),
+    short: DB.short.filter(e=>monthKeyOf(e.date)===mk),
+    stationHourly: (DB.stationHourly||[]).filter(e=>monthKeyOf(e.date)===mk)
+  };
+}
+function an_ratioColor(r){
+  if(r===null || r===undefined || !isFinite(r)) return 'rgba(255,255,255,.03)';
+  if(r <= 0.9)  return 'rgba(47,217,196,.55)';
+  if(r <= 1.0)  return 'rgba(47,217,196,.28)';
+  if(r <= 1.15) return 'rgba(255,207,92,.45)';
+  if(r <= 1.4)  return 'rgba(255,157,66,.58)';
+  return 'rgba(255,93,108,.68)';
+}
+function an_statusOf(r){
+  if(r===null || r===undefined || !isFinite(r)) return {label:'—', cls:'badge-mute', color:AN.mute};
+  if(r <= 1.0)  return {label:'در محدوده تکت', cls:'badge-run', color:AN.teal};
+  if(r <= 1.15) return {label:'نزدیک مرز تکت', cls:'badge-warn', color:AN.yellow};
+  return {label:'خارج از تکت (گلوگاه)', cls:'badge-stop', color:AN.red};
+}
+function an_insightHtml(items){
+  return items.map(x=>`<div class="insight"><div class="ico" style="background:${x.color}22; color:${x.color};">${x.icon}</div><p>${x.text}</p></div>`).join('');
+}
+function an_emptyCard(msg){ return `<div class="card"><div class="tbl-empty">${msg}</div></div>`; }
+
+/* ---------- محاسبه‌ی سایکل‌تایم ایستگاه‌ها ---------- */
+function an_stationTakt(st){
+  if(st.hourlyStandard > 0) return 3600 / st.hourlyStandard;
+  if(st.dailyTarget > 0) return ((DB.meta.normalShiftHours || 10) * 3600) / st.dailyTarget;
+  return null;
+}
+function an_stationStats(M){
+  const stations = DB.meta.stations || [];
+  const out = []; let skippedNoTime = 0, skippedNoQty = 0;
+  const heat = {}; // stationId -> date -> {h, q}
+  stations.forEach(st=>{
+    if(st.noQty) return;
+    const takt = an_stationTakt(st);
+    const recs = M.stationHourly.filter(r=>r.stationId===st.id);
+    if(!recs.length) return;
+    let hrs = 0, qty = 0, n = 0; const dates = new Set();
+    recs.forEach(r=>{
+      if(!(r.total > 0)){ skippedNoQty++; return; }
+      const h = an_recHours(r);
+      if(!h){ skippedNoTime++; return; }
+      hrs += h; qty += r.total; n++; dates.add(r.date);
+      heat[st.id] = heat[st.id] || {};
+      const c = heat[st.id][r.date] || (heat[st.id][r.date] = {h:0, q:0});
+      c.h += h; c.q += r.total;
+    });
+    if(!qty) return;
+    const nName = normalizeForGrouping(st.name);
+    const stopHrsRaw = M.stop.filter(x=> dates.has(x.date) && normalizeForGrouping(x.station) === nName).reduce((s,x)=>s+(x.hours||0), 0);
+    const stopHrs = Math.min(stopHrsRaw, hrs*0.95);
+    const ct = hrs*3600/qty;
+    const netCt = Math.max(hrs - stopHrs, 0.0001)*3600/qty;
+    out.push({ id:st.id, name:st.name, stage:st.stage||'', takt, ct, netCt, ratio: takt? ct/takt : null, netRatio: takt? netCt/takt : null,
+      qty, hrs, stopHrs, n, days:dates.size, uph: qty/hrs, stdUph: st.hourlyStandard||null });
+  });
+  return { list: out, heat, skippedNoTime, skippedNoQty };
+}
+function an_unitTakt(M){
+  const rows = M.daily.filter(an_dayHasData).sort(an_byDate);
+  let availSec = 0, demand = 0, outQty = 0; const days = [];
+  rows.forEach(e=>{
+    const a = an_netShiftSec(an_shiftHoursOf(e)), d = dayCombinedTarget(e), o = allLinesTotal(e);
+    days.push({ date:e.date, e, takt: d>0 ? a/d : null, pace: o>0 ? a/o : null, out:o, demand:d });
+    if(o > 0){ availSec += a; demand += d; outQty += o; }
+  });
+  return { days, taktAvg: demand>0 ? availSec/demand : null, paceAvg: outQty>0 ? availSec/outQty : null, out:outQty, demand, availSec, n:days.length };
+}
+
+/* ---------- محاسبه‌ی نفر-ساعت ---------- */
+function an_manHours(M){
+  const rosterN = (DB.meta.personnel || []).length;
+  const stdHC = DB.meta.standardHeadcount > 0 ? DB.meta.standardHeadcount : null;
+  const fb = stdHC || (rosterN || null);
+  const fbSrc = stdHC ? 'تعداد استاندارد' : 'فهرست پرسنل';
+  const byDate = {};
+  const get = d => byDate[d] || (byDate[d] = { date:d, hc:null, hcSrc:'', hrs:DB.meta.normalShiftHours||10, avail:null, worked:0, ops:new Set(), recs:0, out:0, e:null });
+  M.daily.forEach(e=>{
+    if(!an_dayHasData(e)) return;
+    const r = get(e.date); r.e = e; r.hrs = an_shiftHoursOf(e); r.out = allLinesTotal(e);
+    if(e.headcount > 0){ r.hc = e.headcount; r.hcSrc = 'ثبت‌شده'; }
+  });
+  const perStation = {}, perOp = {};
+  let noTime = 0, noOps = 0;
+  M.stationHourly.forEach(rec=>{
+    const h = an_recHours(rec), ops = an_opsOf(rec);
+    if(!h){ noTime++; return; }
+    if(!ops.length){ noOps++; return; }
+    const r = get(rec.date);
+    r.worked += h * ops.length; r.recs++; ops.forEach(o=>r.ops.add(o));
+    const st = stationById(rec.stationId); const nm = st ? st.name : '—';
+    const ps = perStation[nm] || (perStation[nm] = { name:nm, mh:0, qty:0, hrs:0 });
+    ps.mh += h * ops.length; ps.hrs += h; ps.qty += (rec.total||0);
+    ops.forEach(o=>{ perOp[o] = (perOp[o]||0) + h; });
+  });
+  const days = Object.values(byDate).sort(an_byDate);
+  let estDays = 0, recDays = 0;
+  days.forEach(r=>{
+    if(!r.hc && fb){ r.hc = fb; r.hcSrc = fbSrc; }
+    if(r.hc){ r.avail = r.hc * r.hrs; if(r.hcSrc==='ثبت‌شده') recDays++; else estDays++; }
+  });
+  const withAvail = days.filter(r=>r.avail > 0);
+  const availTotal = withAvail.reduce((s,r)=>s+r.avail, 0);
+  const workedOnAvail = withAvail.reduce((s,r)=>s+r.worked, 0);
+  const workedAll = days.reduce((s,r)=>s+r.worked, 0);
+  const outOnAvail = withAvail.reduce((s,r)=>s+r.out, 0);
+  const recordedHC = M.daily.map(e=>e.headcount).filter(v=>v>0);
+  const baseHC = an_median(recordedHC) || fb;
+  const wd = DB.meta.workingDaysPerMonth || 0;
+  const capMonth = (baseHC && wd) ? baseHC * (DB.meta.normalShiftHours||10) * wd : null;
+  return { days, availTotal, workedAll, workedOnAvail, util: availTotal>0 ? workedOnAvail/availTotal : null,
+    gap: Math.max(availTotal - workedOnAvail, 0), outOnAvail, pcsPerAvailMH: availTotal>0 ? outOnAvail/availTotal : null,
+    pcsPerWorkedMH: workedOnAvail>0 ? outOnAvail/workedOnAvail : null,
+    perStation: Object.values(perStation).sort((a,b)=>b.mh-a.mh), perOp: Object.entries(perOp).sort((a,b)=>b[1]-a[1]),
+    noTime, noOps, estDays, recDays, baseHC, capMonth, wd, fbSrc, hasFallback: estDays>0,
+    overDays: withAvail.filter(r=>r.worked > r.avail*1.001).length };
+}
+
+/* ---------- خلاصه‌ی ماهانه برای روند ---------- */
+function an_monthSummary(mk){
+  const Mm = an_monthM(mk);
+  const rows = Mm.daily.filter(an_dayHasData);
+  const prodAll = rows.reduce((s,e)=>s+allLinesTotal(e), 0);
+  const prod4 = rows.reduce((s,e)=>s+mainFourTotal(e), 0);
+  const ship = rows.reduce((s,e)=>s+(an_hasShip(e) ? shipTotal(e) : 0), 0);
+  const target = rows.filter(e=>allLinesTotal(e)>0 || (an_hasShip(e) && shipTotal(e)>0)).reduce((s,e)=>s+dayCombinedTarget(e), 0);
+  const oee = computeOEE(rows, Mm);
+  const scrapOnly = Mm.waste.filter(x=>x.eventType!=='دوباره‌کاری');
+  const reworkCount = Mm.waste.filter(x=>x.eventType==='دوباره‌کاری').reduce((s,x)=>s+(x.wasteCount||0), 0);
+  const mh = an_manHours(Mm);
+  return { mk, label: an_shortMonth(mk), days: rows.length, prodAll, prod4, ship, target,
+    ach: target>0 ? prodAll/target : null, shipRatio: prodAll>0 ? ship/prodAll : null,
+    oee: oee.oee, avail: oee.availability, perf: oee.performance, qual: oee.quality,
+    scrapCount: oee.totalWaste, scrapRate: (oee.totalProduced>0) ? oee.totalWaste/oee.totalProduced : null,
+    reworkCount, stopHrs: oee.totalStopHours, stopEvents: oee.stopEvents, shortEvents: Mm.short.length,
+    workedMH: mh.workedAll, availMH: mh.availTotal, util: mh.util, pcsPerMH: mh.pcsPerWorkedMH,
+    hasData: rows.length>0 || scrapOnly.length>0 || Mm.stop.length>0 };
+}
+function an_monthsWithData(){
+  return allMonthKeys().slice().reverse().filter(k=>{ const s = an_monthSummary(k); return s.hasData; }).slice(-12);
+}
+
+/* ---------- پلاگین‌های نمودار ---------- */
+const anTaktMarks = {
+  id:'anTaktMarks',
+  afterDatasetsDraw(chart, args, opts){
+    const vals = (opts && opts.values) || []; const x = chart.scales.x; if(!x) return;
+    const meta = chart.getDatasetMeta(0); const ctx = chart.ctx; ctx.save();
+    meta.data.forEach((bar,i)=>{
+      const t = vals[i]; if(t===null || t===undefined) return;
+      const px = x.getPixelForValue(t); const h = (bar.height || 14) * 0.9;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(px, bar.y-h); ctx.lineTo(px, bar.y+h); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.beginPath();
+      ctx.moveTo(px, bar.y-h-5); ctx.lineTo(px+4.5, bar.y-h); ctx.lineTo(px, bar.y-h+5); ctx.lineTo(px-4.5, bar.y-h); ctx.closePath(); ctx.fill();
+    });
+    ctx.restore();
+  }
+};
+const anGaugeText = {
+  id:'anGaugeText',
+  afterDraw(chart, args, opts){
+    const m = chart.getDatasetMeta(0); if(!m.data.length) return;
+    const arc = m.data[0]; const ctx = chart.ctx; ctx.save();
+    ctx.textAlign = 'center'; ctx.fillStyle = (opts && opts.color) || '#eef2f9';
+    ctx.font = '900 30px Vazirmatn'; ctx.fillText((opts && opts.text) || '', arc.x, arc.y - 6);
+    ctx.fillStyle = '#7c8aa5'; ctx.font = '600 11px Vazirmatn'; ctx.fillText((opts && opts.sub) || '', arc.x, arc.y + 16);
+    ctx.restore();
+  }
+};
+
+
+function an_addPrintBtn(title){
+  const view = document.getElementById('view'); if(!view) return;
+  const bar = view.querySelector('.card.tight'); if(!bar) return;
+  bar.classList.add('no-print');
+  const head = document.createElement('div');
+  head.className = 'print-only';
+  head.style.cssText = 'margin-bottom:10px;';
+  head.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #ff9d42; padding-bottom:8px;">
+    <div style="font-size:18px; font-weight:900;">${esc(title)}</div>
+    <div style="font-size:12px; color:#aab4c8;">${esc(currentLineName())} — ${esc(monthLabel(DB.meta.activeMonth))}</div></div>`;
+  view.insertBefore(head, view.firstChild);
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-ghost btn-sm no-print'; btn.type = 'button';
+  btn.innerHTML = '🖨 چاپ / ذخیره PDF (A4 افقی)';
+  btn.addEventListener('click', ()=>{
+    document.body.classList.add('an-printing');
+    const done = ()=>{ document.body.classList.remove('an-printing'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done);
+    Object.values(charts).forEach(c=>{ try{ c.resize(); }catch(e){} });
+    setTimeout(()=>window.print(), 250);
+  });
+  const slot = bar.lastElementChild;
+  if(slot && slot.parentNode===bar){ const wrap = document.createElement('div'); wrap.style.cssText='display:flex; gap:8px; align-items:center;'; bar.replaceChild(wrap, slot); wrap.appendChild(btn); wrap.appendChild(slot); }
+  else bar.appendChild(btn);
+}
+
+/* =========================================================================
+   TAB: ⏳ زمان استاندارد ساخت ترموستات (از تولید قرص تا کنترل نهایی)
+   زمان استاندارد توسط مدیر تعریف می‌شود (اندازه‌گیری‌شده روی خط)؛ بقیه‌ی اعداد از
+   قانون لیتل (WIP = زمان فرایند × نرخ خروجی) و آمار روزانه‌ی تولید محاسبه می‌شوند.
+   ========================================================================= */
+const AN_STD_DEFAULT = { normal:{min:115,max:120}, diesel:{min:150,max:160}, ckd:{min:150,max:160}, se206:{min:90,max:90}, darpoosh:{min:90,max:90} };
+const AN_FAMS = [
+  { key:'normal', label:'ترموستات عادی', sub:'۴ خط اصلی (پراید، پژو، پیکان، 206، نیسان…)', color:AN.teal },
+  { key:'diesel', label:'ترموستات دیزل', sub:'بنز، چری، کاپرا و…', color:AN.amber },
+  { key:'ckd',    label:'ترموستات CKD', sub:'خط CKD', color:AN.purple },
+  { key:'se206', label:'سه‌راهی ۲۰۶', sub:'۶۰ ث ساخت + ۳۰ ث پین‌زنی (هدف روزانه ۶۰۰)', color:AN.blue, thermo:false },
+  { key:'darpoosh', label:'درپوش', sub:'۶۰ ث ساخت + ۳۰ ث پین‌زنی (هدف روزانه ۶۰۰)', color:AN.pink||'#ec6fa8', thermo:false }
+];
+function an_stdCfg(){
+  const saved = DB.meta.stdProcess || {}; const out = {};
+  AN_FAMS.forEach(f=>{
+    const v = Object.assign({}, AN_STD_DEFAULT[f.key], saved[f.key] || {});
+    v.min = +v.min || AN_STD_DEFAULT[f.key].min; v.max = Math.max(+v.max || v.min, v.min);
+    v.std = (+v.std > 0) ? +v.std : (v.min + v.max) / 2;
+    out[f.key] = v;
+  });
+  return out;
+}
+function an_dieselMatcher(){
+  const raw = (DB.meta.stdDieselKeywords === undefined || DB.meta.stdDieselKeywords === null) ? 'بنز,چری,کاپرا,دیزل' : DB.meta.stdDieselKeywords;
+  const kws = String(raw).split(/[,،]/).map(s=>normalizeForGrouping(s)).filter(Boolean);
+  return txt => { const n = normalizeForGrouping(txt); return !!n && kws.some(k=>n.includes(k)); };
+}
+function an_familyStats(M){
+  const isDiesel = an_dieselMatcher(); const lt = DB.meta.lineTarget || LINE_TARGET_DEFAULT;
+  const fam = { normal:{out:0,target:0,sec:0,days:0}, diesel:{out:0,target:0,sec:0,days:0}, ckd:{out:0,target:0,sec:0,days:0}, se206:{out:0,target:0,sec:0,days:0}, darpoosh:{out:0,target:0,sec:0,days:0} };
+  let movedDays = 0;
+  M.daily.filter(an_dayHasData).forEach(e=>{
+    const f = dayShiftFactor(e), secs = an_shiftHoursOf(e)*3600;
+    const d = { normal:{o:0,t:0}, diesel:{o:0,t:0}, ckd:{o:0,t:0}, se206:{o:0,t:0}, darpoosh:{o:0,t:0} }; let moved = false;
+    ['line1','line2','line3','line4'].forEach(k=>{
+      const L = e.lines[k] || {}; const key = isDiesel(L.product) ? 'diesel' : 'normal';
+      if(key==='diesel' && (L.qty||0) > 0) moved = true;
+      d[key].o += L.qty||0; d[key].t += lt*f;
+    });
+    d.diesel.o += (e.lines.diesel && e.lines.diesel.qty) || 0; d.diesel.t += (DB.meta.dieselTarget || DIESEL_TARGET_DEFAULT)*f;
+    d.ckd.o += (e.lines.ckd && e.lines.ckd.qty) || 0; d.ckd.t += (DB.meta.ckdTarget || 0)*f;
+    d.se206.o += (e.lines.se206 && e.lines.se206.qty) || 0; d.se206.t += (DB.meta.se206Target || 600)*f;
+    d.darpoosh.o += (e.lines.darpoosh && e.lines.darpoosh.qty) || 0; d.darpoosh.t += (DB.meta.darpooshTarget || 600)*f;
+    if(moved) movedDays++;
+    Object.keys(d).forEach(k=>{ if(d[k].o > 0){ fam[k].out += d[k].o; fam[k].target += d[k].t; fam[k].sec += secs; fam[k].days++; } });
+  });
+  return { fam, movedDays };
+}
+
+function renderStdTime(){
+  const M = monthData();
+  const cfg = an_stdCfg();
+  const FS = an_familyStats(M);
+  const view = document.getElementById('view');
+  const rows = AN_FAMS.map(f=>{
+    const c = cfg[f.key], s = FS.fam[f.key];
+    const rate = s.sec>0 ? s.out/s.sec : null;                       // قطعه بر ثانیه (خروجی واقعی)
+    const need = s.sec>0 ? s.target/s.sec : null;                    // قطعه بر ثانیه (لازم برای هدف)
+    return Object.assign({}, f, c, { out:s.out, days:s.days,
+      pace: rate ? 1/rate : null, takt: need ? 1/need : null,
+      wipAct: rate ? c.std*rate : null, wipReq: need ? c.std*need : null });
+  });
+  const thermoRows = rows.filter(r=>r.thermo!==false);
+  const totOut = thermoRows.reduce((a,r)=>a+r.out,0);
+  const wAvg = totOut>0 ? thermoRows.reduce((a,r)=>a + r.out*r.std, 0)/totOut : null;
+  const active = rows.filter(r=>r.out>0);
+
+  const insights = [];
+  rows.forEach(r=>{
+    if(r.wipAct===null || r.wipReq===null) return;
+    const gap = r.wipReq - r.wipAct;
+    if(gap > 0.5){
+      insights.push({ icon:'🔻', color:AN.red, text:`<b>${esc(r.label)}</b>: با زمان فرایند <b>${fmt(r.std,1)}</b> ثانیه، برای رسیدن به هدف باید هم‌زمان حدود <b>${fmt(r.wipReq,1)}</b> قطعه در جریان ساخت باشد، ولی خروجی واقعی این ماه معادل حدود <b>${fmt(r.wipAct,1)}</b> قطعه هم‌زمان است (کسری ≈ <b>${fmt(gap,1)}</b> قطعه). یعنی یا باید جریان پرتر/موازی‌تر شود یا زمان فرایند کوتاه‌تر.` });
+    } else {
+      insights.push({ icon:'✅', color:AN.teal, text:`<b>${esc(r.label)}</b>: جریان واقعی (≈ ${fmt(r.wipAct,1)} قطعه هم‌زمان) به نیاز هدف (≈ ${fmt(r.wipReq,1)}) رسیده یا از آن بیشتر بوده است.` });
+    }
+  });
+  if(FS.movedDays){
+    insights.push({ icon:'🔀', color:AN.blue, text:`در <b>${fmt(FS.movedDays,0)}</b> روز، محصول ثبت‌شده روی یکی از ۴ خط اصلی دیزل بوده (طبق کلیدواژه‌های پایین صفحه) و تولید و هدف آن خط به «دیزل» منتقل شد، نه «عادی».` });
+  }
+  if(!active.length){
+    insights.push({ icon:'ℹ️', color:AN.amber, text:'برای این ماه تولیدی ثبت نشده؛ فقط زمان‌های استاندارد نمایش داده می‌شوند.' });
+  }
+
+  const inp = 'width:78px; background:#0e1626; border:1px solid var(--panel-border); color:var(--text); border-radius:8px; padding:7px 8px; font-family:inherit; font-size:12.5px; text-align:center; direction:ltr;';
+  view.innerHTML = renderMonthBar() + `
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${rows.map(r=>kpiCard(esc(r.label)+' — بازه '+fmt(r.min,0)+' تا '+fmt(r.max,0), 'ثانیه', fmt(r.std,1), null, r.color)).join('')}
+    ${kpiCard('میانگین وزنی ترموستات‌ها این ماه (بر اساس سهم تولید)','ثانیه', wAvg===null?'—':fmt(wAvg,1), null, AN.blue)}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>⚙️ تعریف زمان استاندارد <span class="muted">(از «تولید قرص» تا «کنترل نهایی» برای یک قطعه)</span></h3>
+    <div class="table-wrap" style="margin-top:10px;"><table style="min-width:520px;">
+      <thead><tr><th>گروه محصول</th><th class="num">حداقل (ث)</th><th class="num">حداکثر (ث)</th><th class="num">استاندارد (ث)</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td><b style="color:${r.color};">${esc(r.label)}</b> <span class="muted">${esc(r.sub)}</span></td>
+        <td class="num"><input style="${inp}" id="stdMin_${r.key}" type="text" inputmode="numeric" value="${r.min}"></td>
+        <td class="num"><input style="${inp}" id="stdMax_${r.key}" type="text" inputmode="numeric" value="${r.max}"></td>
+        <td class="num"><input style="${inp}" id="stdStd_${r.key}" type="text" inputmode="numeric" value="${(DB.meta.stdProcess && DB.meta.stdProcess[r.key] && DB.meta.stdProcess[r.key].std) || ''}" placeholder="${fmt(r.std,1)}"></td></tr>`).join('')}</tbody>
+    </table></div>
+    <div class="hint" style="line-height:1.9;">اگر «استاندارد» را خالی بگذاری، وسط بازه (حداقل و حداکثر) استفاده می‌شود. برای برنامه‌ریزی محافظه‌کارانه می‌توانی حداکثر بازه را به‌عنوان استاندارد وارد کنی.</div>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card"><h3>بازه‌ی زمان ساخت هر گروه <span class="muted">(الماس سفید = استاندارد)</span></h3><div class="chart-box" style="height:250px;"><canvas id="chAnStdRange"></canvas></div></div>
+    <div class="card"><h3>سهم تولید این ماه و میانگین وزنی زمان ساخت</h3>${totOut>0? '<div class="chart-box" style="height:250px;"><canvas id="chAnStdMix"></canvas></div>' : '<div class="tbl-empty">تولیدی ثبت نشده است.</div>'}</div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>قطعه‌ی هم‌زمان در جریان: لازم برای هدف در برابر واقعی <span class="muted">(قانون لیتل: زمان فرایند × نرخ خروجی)</span></h3>
+    ${active.length? '<div class="chart-box" style="height:280px;"><canvas id="chAnStdWip"></canvas></div>' : '<div class="tbl-empty">برای محاسبه، تولید روزانه‌ی این ماه لازم است.</div>'}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">${an_insightHtml(insights)}</div>
+
+  <div class="card" style="margin-bottom:16px;"><h3>جدول خلاصه</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>گروه</th><th class="num">استاندارد (ث)</th><th class="num">تولید ماه</th><th class="num">روز دارای تولید</th><th class="num">ریتم خروجی واقعی (ث/قطعه)</th><th class="num">ریتم لازم برای هدف (ث/قطعه)</th><th class="num">قطعه در جریان — واقعی</th><th class="num">قطعه در جریان — لازم</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td style="color:${r.color}; font-weight:800;">${esc(r.label)}</td><td class="num">${fmt(r.std,1)}</td><td class="num">${fmt(r.out,0)}</td><td class="num">${fmt(r.days,0)}</td>
+        <td class="num">${an_secFmt(r.pace,2)}</td><td class="num">${an_secFmt(r.takt,2)}</td><td class="num">${r.wipAct===null?'—':fmt(r.wipAct,1)}</td><td class="num">${r.wipReq===null?'—':fmt(r.wipReq,1)}</td></tr>`).join('')}</tbody>
+    </table></div>
+    <div class="hint" style="line-height:1.9; margin-top:8px;">«ریتم خروجی» یعنی هر چند ثانیه یک قطعه از مجموعه‌ی خطوط آن گروه خارج می‌شود (غیر از «زمان ساخت یک قطعه»). «قطعه در جریان» فرض می‌کند زمان فرایند همان استاندارد بالا و جریان تقریباً پایدار است؛ تخمین مدیریتی است نه شمارش واقعی روی خط. سه‌راهی ۲۰۶ و درپوش هرکدام = ۶۰ ثانیه ساخت + ۳۰ ثانیه پین‌زنی (قابل ویرایش در جدول بالا)؛ این دو در میانگین وزنی ترموستات‌ها نیستند.</div>
+  </div>
+
+  <div class="card">
+    <h3>🔀 تشخیص ترموستات دیزل در ۴ خط اصلی</h3>
+    <div class="field" style="max-width:520px;"><label>کلیدواژه‌های نام محصول (با ویرگول جدا کن)</label>
+      <input id="stdKeywords" type="text" value="${esc(DB.meta.stdDieselKeywords===undefined||DB.meta.stdDieselKeywords===null ? 'بنز,چری,کاپرا,دیزل' : DB.meta.stdDieselKeywords)}"></div>
+    <div class="hint">اگر در «ورود داده روزانه» نام محصول یکی از ۴ خط اصلی شامل این کلمه‌ها باشد (مثلاً «بنز 71» روی خط ۴)، تولید آن خط در گروه دیزل شمرده می‌شود.</div>
+  </div>`;
+
+  bindMonthBar(); an_addPrintBtn('زمان استاندارد ساخت ترموستات');
+
+  const save = ()=>{
+    const sp = {};
+    AN_FAMS.forEach(f=>{
+      const mn = num(document.getElementById('stdMin_'+f.key).value), mx = num(document.getElementById('stdMax_'+f.key).value), sd = num(document.getElementById('stdStd_'+f.key).value);
+      sp[f.key] = { min: mn>0?mn:AN_STD_DEFAULT[f.key].min, max: mx>0?mx:AN_STD_DEFAULT[f.key].max, std: sd>0?sd:null };
+    });
+    DB.meta.stdProcess = sp; scheduleSave(); goTo('stdtime');
+  };
+  AN_FAMS.forEach(f=>['Min','Max','Std'].forEach(p=>{ const el = document.getElementById('std'+p+'_'+f.key); if(el) el.addEventListener('change', save); }));
+  const kw = document.getElementById('stdKeywords');
+  if(kw) kw.addEventListener('change', ()=>{ DB.meta.stdDieselKeywords = kw.value.trim(); scheduleSave(); goTo('stdtime'); });
+
+  mkChart('chAnStdRange', {
+    type:'bar',
+    data:{ labels: rows.map(r=>r.label), datasets:[{ data: rows.map(r=>[r.min, r.max]), backgroundColor: rows.map(r=>r.color+'cc'), borderRadius:8, borderSkipped:false, barPercentage:.55, noLabel:true }] },
+    plugins:[anTaktMarks],
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, anTaktMarks:{ values: rows.map(r=>r.std) },
+        tooltip:{ callbacks:{ label:c=>{ const r = rows[c.dataIndex]; return fmt(r.min,0)+' تا '+fmt(r.max,0)+' ثانیه — استاندارد '+fmt(r.std,1); } } } },
+      scales:{ x:{ min:Math.max(0, Math.floor(Math.min(...rows.map(r=>r.min))/20)*20-20), title:{display:true, text:'ثانیه'}, grid:{color:'#1a2540'} }, y:{ grid:{display:false} } } }
+  });
+  if(totOut > 0){
+    mkChart('chAnStdMix', {
+      type:'doughnut',
+      data:{ labels: thermoRows.map(r=>r.label), datasets:[{ data: thermoRows.map(r=>r.out), backgroundColor: thermoRows.map(r=>r.color), borderColor:'#141d31', borderWidth:3, cutout:'66%' }] },
+      plugins:[anGaugeText],
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} },
+        anGaugeText:{ text: wAvg===null?'':fmt(wAvg,1), sub:'ثانیه — میانگین وزنی', color:'#eef2f9' },
+        tooltip:{ callbacks:{ label:c=> c.label+': '+fmt(c.raw,0)+' قطعه ('+fmt(c.raw/totOut*100,1)+'٪)' } } } }
+    });
+  }
+  if(active.length){
+    mkChart('chAnStdWip', {
+      type:'bar',
+      data:{ labels: active.map(r=>r.label), datasets:[
+        { label:'لازم برای رسیدن به هدف', data: active.map(r=>+r.wipReq.toFixed(1)), backgroundColor:'rgba(255,255,255,.28)', borderColor:'#ffffff', borderWidth:1.5, borderRadius:6, forceLabels:true, labelDigits:1 },
+        { label:'واقعی (از خروجی این ماه)', data: active.map(r=>+r.wipAct.toFixed(1)), backgroundColor: active.map(r=>r.color), borderRadius:6, forceLabels:true, labelDigits:1 }
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} } },
+        scales:{ y:{ grid:{color:'#1a2540'}, title:{display:true, text:'قطعه‌ی هم‌زمان در جریان'}, beginAtZero:true }, x:{ grid:{display:false} } } }
+    });
+  }
+}
+
+
+/* =========================================================================
+   TAB: ⏱ تکت‌تایم و سایکل‌تایم
+   ========================================================================= */
+function renderTakt(){
+  const M = monthData();
+  const S = an_stationStats(M);
+  const U = an_unitTakt(M);
+  const list = S.list.slice().sort((a,b)=>(b.ratio||0)-(a.ratio||0));
+  const view = document.getElementById('view');
+
+  const over = list.filter(x=>x.ratio>1.0);
+  const crit = list.filter(x=>x.ratio>1.15);
+  const worst = list[0];
+  const biggestStop = list.slice().sort((a,b)=>(b.ct-b.netCt)-(a.ct-a.netCt))[0];
+  const unitEff = (U.taktAvg && U.paceAvg) ? U.taktAvg / U.paceAvg : null;
+
+  const insights = [];
+  if(worst){
+    const st = an_statusOf(worst.ratio);
+    insights.push({ icon:'🎯', color:st.color, text:`<b>${esc(worst.name)}</b> بالاترین نسبت سایکل به تکت را دارد: سایکل مؤثر <b>${an_secFmt(worst.ct)}</b> ثانیه در برابر تکت <b>${an_secFmt(worst.takt)}</b> ثانیه (نسبت <b>${fmt(worst.ratio,2)}</b>) — ${st.label}.` });
+  }
+  if(over.length){
+    insights.push({ icon:'⚠️', color:AN.amber, text:`<b>${fmt(over.length,0)}</b> از <b>${fmt(list.length,0)}</b> ایستگاه در این ماه به‌طور میانگین کندتر از تکت خود کار کرده‌اند${crit.length? ` که <b>${fmt(crit.length,0)}</b> مورد بیش از ۱۵٪ فراتر است`:''}.` });
+  } else if(list.length){
+    insights.push({ icon:'✅', color:AN.teal, text:'همه‌ی ایستگاه‌های دارای آمار، میانگین سایکل‌شان در محدوده‌ی تکت است.' });
+  }
+  if(biggestStop && (biggestStop.ct - biggestStop.netCt) > 0.5){
+    insights.push({ icon:'⏸️', color:AN.red, text:`بیشترین اتلاف سایکل ناشی از توقفات ثبت‌شده در <b>${esc(biggestStop.name)}</b> است: توقفات <b>${fmt(biggestStop.stopHrs,1)}</b> ساعت، یعنی سایکل از <b>${an_secFmt(biggestStop.netCt)}</b> (خالص) به <b>${an_secFmt(biggestStop.ct)}</b> ثانیه (مؤثر) رسیده است.` });
+  }
+  if(S.skippedNoTime){
+    insights.push({ icon:'🕒', color:AN.blue, text:`<b>${fmt(S.skippedNoTime,0)}</b> ثبت ایستگاه بدون «ساعت شروع/پایان» در محاسبه نیامد. برای دقیق‌ترشدن سایکل‌تایم، ساعت شروع و پایان را در «آمار روزانه ایستگاه‌ها» وارد کنید.` });
+  }
+
+  view.innerHTML = renderMonthBar() + `
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${kpiCard('تکت‌تایم خط (بر مبنای هدف روزانه)','ثانیه/قطعه', an_secFmt(U.taktAvg), null, AN.teal)}
+    ${kpiCard('سایکل‌تایم واقعی خط (ریتم تولید)','ثانیه/قطعه', an_secFmt(U.paceAvg), null, AN.amber)}
+    ${kpiCard('نسبت تکت به سایکل خط','', unitEff===null?'—':pct(unitEff,1), null, unitEff===null?AN.mute:(unitEff>=1?AN.teal:AN.red))}
+    ${kpiCard('ایستگاه‌های خارج از تکت','از '+fmt(list.length,0), fmt(over.length,0), null, over.length? AN.red : AN.teal)}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <div>
+        <h3 style="margin:0 0 4px;">نحوه‌ی محاسبه</h3>
+        <div class="hint" style="margin:0; line-height:1.9;">
+          <b>تکت خط</b> = زمان مفید شیفت ÷ هدف تولید همان روز (تقاضا) • <b>سایکل واقعی خط</b> = زمان مفید شیفت ÷ تولید واقعی همان روز.<br>
+          <b>تکت ایستگاه</b> = ۳۶۰۰ ÷ استاندارد ساعتی ایستگاه • <b>سایکل مؤثر</b> = (مجموع ساعت شروع تا پایان ÷ مجموع تولید) • <b>سایکل خالص</b> = همان بدون توقفات ثبت‌شده‌ی همان ایستگاه در همان روزها.
+        </div>
+      </div>
+      <div class="field" style="min-width:200px; margin:0;">
+        <label>استراحت/ناهار/نماز در هر شیفت (دقیقه) <span class="muted">— فقط برای تکت خط</span></label>
+        <input id="anBreakMin" type="text" inputmode="numeric" placeholder="مثلاً 45" value="${an_breakMin() || ''}">
+      </div>
+    </div>
+  </div>
+
+  ${list.length || U.n ? '' : an_emptyCard('برای این ماه هنوز داده‌ای ثبت نشده است.')}
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>یامازومی ایستگاه‌ها — سایکل در برابر تکت <span class="muted">(خط سفید = تکت ایستگاه)</span></h3>
+    ${list.length ? `<div class="chart-box" style="height:${Math.max(280, list.length*30+80)}px;"><canvas id="chAnYama"></canvas></div>
+    <div class="legend-row">
+      <span class="legend-dot"><i style="width:10px;height:10px;border-radius:3px;background:${AN.teal};display:inline-block"></i>سایکل خالص (در محدوده تکت)</span>
+      <span class="legend-dot"><i style="width:10px;height:10px;border-radius:3px;background:${AN.amber};display:inline-block"></i>سایکل خالص (فراتر از تکت)</span>
+      <span class="legend-dot"><i style="width:10px;height:10px;border-radius:3px;background:${AN.red};display:inline-block"></i>اتلاف ناشی از توقفات</span>
+    </div>` : '<div class="tbl-empty">آمار روزانه ایستگاه‌ها (با ساعت شروع/پایان) برای این ماه ثبت نشده است.</div>'}
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card"><h3>تکت در برابر سایکل واقعی خط — روزانه</h3>
+      ${U.days.length? `<div class="chart-box"><canvas id="chAnUnit"></canvas></div>` : '<div class="tbl-empty">داده‌ی روزانه‌ی تولید ثبت نشده است.</div>'}
+    </div>
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+        <h3 style="margin:0;">روند سایکل یک ایستگاه</h3>
+        ${list.length? `<select id="anStSel" style="background:#0e1626; border:1px solid var(--panel-border); color:var(--text); border-radius:9px; padding:7px 10px; font-size:12px; font-family:inherit; max-width:210px;">
+          ${list.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select>` : ''}
+      </div>
+      ${list.length? `<div class="chart-box" style="margin-top:10px;"><canvas id="chAnStTrend"></canvas></div>` : '<div class="tbl-empty">ایستگاهی با آمار کامل نیست.</div>'}
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>نقشه‌ی حرارتی سایکل ÷ تکت <span class="muted">(ایستگاه × روز)</span></h3>
+    <div id="anHeat">${an_heatHtml(S)}</div>
+    <div class="legend-row">
+      ${[['≤ ۰٫۹ سریع‌تر از تکت',0.8],['≤ ۱٫۰ در تکت',0.95],['≤ ۱٫۱۵ نزدیک مرز',1.1],['≤ ۱٫۴ کند',1.3],['> ۱٫۴ بحرانی',1.6]].map(a=>`<span class="legend-dot"><i style="width:14px;height:10px;border-radius:3px;background:${an_ratioColor(a[1])};display:inline-block"></i>${a[0]}</span>`).join('')}
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">${an_insightHtml(insights) || '<div class="tbl-empty">تحلیلی برای نمایش وجود ندارد.</div>'}</div>
+
+  <div class="card">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+      <h3 style="margin:0;">جدول تکت و سایکل ایستگاه‌ها</h3>
+      <button class="btn btn-ghost btn-sm" id="anTaktCsv">خروجی CSV</button>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ایستگاه</th><th class="num">تکت (ث)</th><th class="num">سایکل مؤثر (ث)</th><th class="num">سایکل خالص (ث)</th><th class="num">نسبت سایکل/تکت</th><th class="num">تولید</th><th class="num">ساعت</th><th class="num">توقف (ساعت)</th><th class="num">قطعه/ساعت</th><th>وضعیت</th></tr></thead>
+      <tbody>${list.length? list.map(x=>{ const st = an_statusOf(x.ratio); return `<tr>
+        <td>${esc(x.name)}</td><td class="num">${an_secFmt(x.takt)}</td><td class="num">${an_secFmt(x.ct)}</td><td class="num">${an_secFmt(x.netCt)}</td>
+        <td class="num" style="color:${st.color}; font-weight:800;">${fmt(x.ratio,2)}</td><td class="num">${fmt(x.qty,0)}</td><td class="num">${fmt(x.hrs,1)}</td>
+        <td class="num">${fmt(x.stopHrs,1)}</td><td class="num">${fmt(x.uph,0)}${x.stdUph?` <span class="muted">/ ${fmt(x.stdUph,0)}</span>`:''}</td>
+        <td><span class="badge ${st.cls}">${st.label}</span></td></tr>`; }).join('') : '<tr><td colspan="10"><div class="tbl-empty">داده‌ای نیست.</div></td></tr>'}</tbody>
+    </table></div>
+  </div>`;
+
+  bindMonthBar(); an_addPrintBtn('تکت‌تایم و سایکل‌تایم ایستگاه‌ها');
+
+  /* ورودی استراحت شیفت */
+  const bm = document.getElementById('anBreakMin');
+  if(bm) bm.addEventListener('change', ()=>{ DB.meta.taktBreakMin = Math.max(0, num(bm.value) || 0); scheduleSave(); goTo('takt'); });
+
+  /* خروجی CSV */
+  const csvBtn = document.getElementById('anTaktCsv');
+  if(csvBtn) csvBtn.addEventListener('click', ()=>{
+    const headers = ['ایستگاه','تکت (ثانیه)','سایکل مؤثر (ثانیه)','سایکل خالص (ثانیه)','نسبت سایکل به تکت','تولید','ساعت','ساعت توقف','قطعه در ساعت'];
+    const rows = list.map(x=>[x.name, x.takt?x.takt.toFixed(2):'', x.ct.toFixed(2), x.netCt.toFixed(2), x.ratio?x.ratio.toFixed(3):'', x.qty, x.hrs.toFixed(2), x.stopHrs.toFixed(2), x.uph.toFixed(1)]);
+    downloadFile('takt-cycle-' + String(DB.meta.activeMonth).replace('/','-') + '.csv', toCSV(headers, rows), 'text/csv;charset=utf-8');
+  });
+
+  /* نمودار یامازومی */
+  if(list.length){
+    const ordered = list.slice().sort((a,b)=>(b.ratio||0)-(a.ratio||0));
+    const base = ordered.map(x=> Math.min(x.netCt, x.takt || x.netCt));
+    const baseOver = ordered.map(x=> x.takt ? Math.max(x.netCt - x.takt, 0) : 0);
+    const loss = ordered.map(x=> Math.max(x.ct - x.netCt, 0));
+    mkChart('chAnYama', {
+      type:'bar',
+      data:{ labels: ordered.map(x=>x.name), datasets:[
+        { label:'سایکل خالص (در تکت)', data: base, backgroundColor: AN.teal, borderRadius:3, stack:'s', noLabel:true },
+        { label:'سایکل خالص (فراتر از تکت)', data: baseOver, backgroundColor: AN.amber, borderRadius:3, stack:'s', noLabel:true },
+        { label:'اتلاف توقفات', data: loss, backgroundColor: AN.red, borderRadius:3, stack:'s', noLabel:true }
+      ]},
+      plugins:[anTaktMarks],
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, anTaktMarks:{ values: ordered.map(x=>x.takt) },
+          tooltip:{ callbacks:{ title:(it)=>ordered[it[0].dataIndex].name,
+            afterBody:(it)=>{ const x = ordered[it[0].dataIndex]; return ['تکت: '+an_secFmt(x.takt)+' ث','سایکل مؤثر: '+an_secFmt(x.ct)+' ث','نسبت: '+fmt(x.ratio,2)]; } } } },
+        scales:{ x:{ stacked:true, title:{display:true, text:'ثانیه در هر قطعه'}, grid:{color:'#1a2540'} }, y:{ stacked:true, grid:{display:false}, ticks:{ font:{size:11} } } } }
+    });
+    drawStationTrend(list[0].id);
+    const sel = document.getElementById('anStSel');
+    if(sel) sel.addEventListener('change', ()=>{ drawStationTrend(sel.value); });
+  }
+
+  /* خط: تکت و سایکل واقعی روزانه */
+  if(U.days.length){
+    const dm = dailyByDateMap_(M.daily);
+    const labels = U.days.map(d=>an_dayLabel(d.date) + moonSuffix_(dm[d.date]));
+    mkChart('chAnUnit', {
+      type:'line',
+      data:{ labels, datasets:[
+        { label:'سایکل واقعی خط', data: U.days.map(d=>d.pace!==null? +d.pace.toFixed(2):null), borderColor:AN.amber, backgroundColor:'rgba(255,157,66,.22)', fill:'+1', tension:.35, pointRadius:3, borderWidth:2.4, spanGaps:true },
+        { label:'تکت‌تایم خط', data: U.days.map(d=>d.takt!==null? +d.takt.toFixed(2):null), borderColor:AN.teal, borderDash:[6,4], borderWidth:2, pointRadius:0, tension:.2, spanGaps:true, noLabel:true, fill:false }
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+        plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} } },
+        scales:{ y:{ title:{display:true, text:'ثانیه/قطعه'}, grid:{color:'#1a2540'} }, x:{ grid:{display:false} } } }
+    });
+  }
+
+  function drawStationTrend(stId){
+    if(charts.chAnStTrend){ try{ charts.chAnStTrend.destroy(); }catch(e){} delete charts.chAnStTrend; }
+    const x = S.list.find(a=>a.id===stId); if(!x) return;
+    const cells = S.heat[stId] || {};
+    const dates = Object.keys(cells).sort((a,b)=>dateSortKey(a)-dateSortKey(b));
+    const vals = dates.map(d=> +(cells[d].h*3600/cells[d].q).toFixed(2));
+    const tr = linearTrend(vals);
+    mkChart('chAnStTrend', {
+      type:'line',
+      data:{ labels: dates.map(an_dayLabel), datasets:[
+        { label:'سایکل مؤثر', data: vals, borderColor:AN.amber, backgroundColor:'rgba(255,157,66,.15)', fill:true, tension:.3, borderWidth:2.4, pointRadius:4,
+          pointBackgroundColor: vals.map(v=> (x.takt && v > x.takt) ? AN.red : AN.teal), pointBorderColor:'#0c1220' },
+        { label:'تکت ایستگاه', data: dates.map(()=> x.takt ? +x.takt.toFixed(2) : null), borderColor:AN.teal, borderDash:[6,4], borderWidth:2, pointRadius:0, noLabel:true },
+        { label:'روند', data: vals.map((_,i)=> +(tr.intercept + tr.slope*i).toFixed(2)), borderColor:AN.purple, borderDash:[2,4], borderWidth:1.6, pointRadius:0, noLabel:true }
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+        plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} } },
+        scales:{ y:{ title:{display:true, text:'ثانیه/قطعه'}, grid:{color:'#1a2540'} }, x:{ grid:{display:false} } } }
+    });
+  }
+}
+
+function an_heatHtml(S){
+  const ids = S.list.slice().sort((a,b)=>(b.ratio||0)-(a.ratio||0));
+  if(!ids.length) return '<div class="tbl-empty">برای ساخت نقشه حرارتی، آمار روزانه ایستگاه‌ها با ساعت شروع/پایان لازم است.</div>';
+  const dateSet = new Set(); ids.forEach(x=>Object.keys(S.heat[x.id]||{}).forEach(d=>dateSet.add(d)));
+  const dates = [...dateSet].sort((a,b)=>dateSortKey(a)-dateSortKey(b));
+  const head = `<tr><th style="position:sticky; right:0; z-index:2; background:#0f1729;">ایستگاه</th>${dates.map(d=>`<th class="num" style="padding:6px 4px; text-align:center; font-size:10px;">${an_dayNum(d)}</th>`).join('')}</tr>`;
+  const body = ids.map(x=>`<tr><td style="position:sticky; right:0; background:#101827; font-weight:700; color:var(--text);">${esc(x.name)}</td>${dates.map(d=>{
+    const c = (S.heat[x.id]||{})[d];
+    if(!c) return `<td style="padding:0;"><div style="height:24px; min-width:24px; background:rgba(255,255,255,.03); margin:1px; border-radius:4px;"></div></td>`;
+    const ct = c.h*3600/c.q; const r = x.takt ? ct/x.takt : null;
+    return `<td style="padding:0;"><div title="${esc(x.name)} — ${d}\nسایکل: ${an_secFmt(ct)} ث | تکت: ${an_secFmt(x.takt)} ث | نسبت: ${fmt(r,2)}" style="height:24px; min-width:24px; margin:1px; border-radius:4px; background:${an_ratioColor(r)}; font-size:9.5px; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700;">${r===null?'':fmt(r,1)}</div></td>`;
+  }).join('')}</tr>`).join('');
+  return `<div class="table-wrap" style="max-height:520px; overflow:auto;"><table style="min-width:0; width:auto; border-collapse:separate; border-spacing:0;"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+}
+
+/* =========================================================================
+   TAB: 👷 نفر-ساعت
+   ========================================================================= */
+function renderManHours(){
+  const M = monthData();
+  const H = an_manHours(M);
+  const view = document.getElementById('view');
+  const utilColor = H.util===null ? AN.mute : (H.util>=0.85 ? AN.teal : H.util>=0.7 ? AN.yellow : AN.red);
+  const notes = [];
+  if(H.hasFallback){
+    notes.push({ icon:'ℹ️', color:AN.blue, text:`برای <b>${fmt(H.estDays,0)}</b> روز، «تعداد پرسنل حاضر» در «ورود داده روزانه» ثبت نشده بود و از <b>${esc(H.fbSrc)}</b> (${fmt(H.baseHC||0,0)} نفر) به‌عنوان برآورد استفاده شد. ${H.recDays? `فقط ${fmt(H.recDays,0)} روز مقدار واقعی ثبت‌شده داشت.`:''} برای دقت کامل، تعداد حاضرین را هر روز وارد کنید.` });
+  }
+  if(!H.days.some(r=>r.avail>0)){
+    notes.push({ icon:'⚠️', color:AN.amber, text:'هیچ روزی «تعداد پرسنل حاضر» ندارد و تعداد استاندارد/فهرست پرسنلی هم موجود نیست؛ برای محاسبه‌ی نفر-ساعت در اختیار، تعداد حاضرین را در «ورود داده روزانه» وارد کنید.' });
+  }
+  if(H.noOps || H.noTime){
+    notes.push({ icon:'🕒', color:AN.blue, text:`${H.noTime? `<b>${fmt(H.noTime,0)}</b> ثبت ایستگاه بدون ساعت شروع/پایان`:''}${H.noTime && H.noOps?' و ':''}${H.noOps? `<b>${fmt(H.noOps,0)}</b> ثبت بدون نام اپراتور`:''} در نفر-ساعت کارکرد حساب نشد.` });
+  }
+  if(H.overDays){
+    notes.push({ icon:'📈', color:AN.yellow, text:`در <b>${fmt(H.overDays,0)}</b> روز، نفر-ساعت کارکردِ ثبت‌شده در ایستگاه‌ها از نفر-ساعت در اختیار بیشتر شده است (اضافه‌کاری یا کم‌ثبت‌بودن تعداد حاضرین).` });
+  }
+
+  view.innerHTML = renderMonthBar() + `
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${kpiCard('نفر-ساعت در اختیار (روزهای ثبت‌شده)','نفر-ساعت', fmt(H.availTotal,0), null, AN.blue)}
+    ${kpiCard('نفر-ساعت کارکرد (ایستگاه‌ها)','نفر-ساعت', fmt(H.workedOnAvail,0), null, AN.amber)}
+    ${kpiCard('بهره‌گیری از نیرو','', H.util===null?'—':pct(H.util,1), null, utilColor)}
+    ${kpiCard('نفر-ساعت بدون ثبت در ایستگاه','نفر-ساعت', fmt(H.gap,0), null, H.gap>0?AN.red:AN.teal)}
+  </div>
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${kpiCard('ظرفیت کل ماه (برنامه‌ای)','نفر-ساعت', H.capMonth? fmt(H.capMonth,0):'—', null, AN.purple)}
+    ${kpiCard('قطعه به‌ازای هر نفر-ساعت کارکرد','قطعه', H.pcsPerWorkedMH===null?'—':fmt(H.pcsPerWorkedMH,1), null, AN.teal)}
+    ${kpiCard('قطعه به‌ازای هر نفر-ساعت در اختیار','قطعه', H.pcsPerAvailMH===null?'—':fmt(H.pcsPerAvailMH,1), null, AN.green)}
+    ${kpiCard('میانگین حاضرین در روز','نفر', (()=>{ const d = H.days.filter(r=>r.hc); return d.length? fmt(d.reduce((s,r)=>s+r.hc,0)/d.length,1):'—'; })(), null, AN.pink)}
+  </div>
+
+  <div class="grid grid-3" style="margin-bottom:16px;">
+    <div class="card"><h3>بهره‌گیری از نیرو</h3>${H.util!==null? '<div class="chart-box" style="height:230px;"><canvas id="chAnGauge"></canvas></div>' : '<div class="tbl-empty">داده کافی نیست.</div>'}</div>
+    <div class="card span-2" style="grid-column:span 2;"><h3>آبشار نفر-ساعت: از «در اختیار» تا «کارکرد»</h3>${H.availTotal>0? '<div class="chart-box" style="height:230px;"><canvas id="chAnWater"></canvas></div>' : '<div class="tbl-empty">داده کافی نیست.</div>'}</div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px;"><h3>روزانه: در اختیار در برابر کارکرد <span class="muted">(خط = بهره‌گیری ٪)</span></h3>
+    ${H.days.length? '<div class="chart-box" style="height:320px;"><canvas id="chAnDailyMH"></canvas></div>' : '<div class="tbl-empty">برای این ماه داده‌ای نیست.</div>'}
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card"><h3>نفر-ساعت کارکرد به‌تفکیک ایستگاه</h3>${H.perStation.length? `<div class="chart-box" style="height:${Math.max(260, Math.min(H.perStation.length,14)*28+60)}px;"><canvas id="chAnStMH"></canvas></div>` : '<div class="tbl-empty">آمار ایستگاهی ثبت نشده است.</div>'}</div>
+    <div class="card"><h3>ساعت کار ثبت‌شده‌ی هر نفر <span class="muted">(۲۰ مورد اول)</span></h3>${H.perOp.length? `<div class="chart-box" style="height:${Math.max(260, Math.min(H.perOp.length,20)*24+60)}px;"><canvas id="chAnOpMH"></canvas></div>` : '<div class="tbl-empty">نام اپراتورها در آمار ایستگاه‌ها ثبت نشده است.</div>'}</div>
+  </div>
+
+  ${notes.length? `<div class="card" style="margin-bottom:16px;">${an_insightHtml(notes)}</div>`:''}
+
+  <div class="card"><h3>جدول ایستگاه‌ها — نفر-ساعت و بهره‌وری نیرو</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>ایستگاه</th><th class="num">نفر-ساعت</th><th class="num">ساعت ایستگاه</th><th class="num">میانگین نفر</th><th class="num">تولید</th><th class="num">قطعه/نفر-ساعت</th></tr></thead>
+      <tbody>${H.perStation.length? H.perStation.map(x=>`<tr><td>${esc(x.name)}</td><td class="num">${fmt(x.mh,1)}</td><td class="num">${fmt(x.hrs,1)}</td><td class="num">${x.hrs? fmt(x.mh/x.hrs,1):'—'}</td><td class="num">${fmt(x.qty,0)}</td><td class="num">${x.mh? fmt(x.qty/x.mh,1):'—'}</td></tr>`).join('') : '<tr><td colspan="6"><div class="tbl-empty">داده‌ای نیست.</div></td></tr>'}</tbody>
+    </table></div></div>`;
+
+  bindMonthBar(); an_addPrintBtn('نفر-ساعت در اختیار و کارکرد');
+
+  if(H.util !== null){
+    const u = Math.min(H.util, 1);
+    mkChart('chAnGauge', {
+      type:'doughnut',
+      data:{ labels:['کارکرد','بدون ثبت'], datasets:[{ data:[u, 1-u], backgroundColor:[utilColor, '#1a2540'], borderWidth:0, cutout:'74%', circumference:180, rotation:270, noLabel:true }] },
+      plugins:[anGaugeText],
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{enabled:false}, anGaugeText:{ text: pct(H.util,0), sub:'کارکرد ÷ در اختیار', color: utilColor } } }
+    });
+  }
+  if(H.availTotal > 0){
+    mkChart('chAnWater', {
+      type:'bar',
+      data:{ labels:['در اختیار','بدون ثبت در ایستگاه','کارکرد ایستگاه‌ها'], datasets:[{
+        data:[[0,H.availTotal],[H.workedOnAvail, H.availTotal],[0,H.workedOnAvail]],
+        backgroundColor:[AN.blue, AN.red, AN.amber], borderRadius:8, borderSkipped:false, barPercentage:.62, noLabel:true }] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(c)=>{ const v = c.raw; return fmt(v[1]-v[0],0)+' نفر-ساعت'; } } } },
+        scales:{ y:{ grid:{color:'#1a2540'}, title:{display:true, text:'نفر-ساعت'} }, x:{ grid:{display:false} } } },
+      plugins:[{ id:'anWaterLbl', afterDatasetsDraw(chart){ const ctx = chart.ctx; ctx.save(); ctx.fillStyle='#eef2f9'; ctx.font='800 12px Vazirmatn'; ctx.textAlign='center';
+        chart.getDatasetMeta(0).data.forEach((bar,i)=>{ const v = chart.data.datasets[0].data[i]; ctx.fillText(fmt(v[1]-v[0],0), bar.x, Math.min(bar.y, bar.base) - 8); }); ctx.restore(); } }]
+    });
+  }
+  if(H.days.length){
+    const dm = dailyByDateMap_(M.daily);
+    mkChart('chAnDailyMH', {
+      type:'bar',
+      data:{ labels: H.days.map(r=>an_dayLabel(r.date)+moonSuffix_(dm[r.date])), datasets:[
+        { label:'در اختیار', data: H.days.map(r=>r.avail), backgroundColor:'rgba(76,141,255,.45)', borderRadius:4, yAxisID:'y', noLabel:true },
+        { label:'کارکرد ایستگاه‌ها', data: H.days.map(r=>r.worked||null), backgroundColor:AN.amber, borderRadius:4, yAxisID:'y', noLabel:true },
+        { label:'بهره‌گیری ٪', type:'line', data: H.days.map(r=> r.avail>0 ? +(r.worked/r.avail*100).toFixed(1) : null), borderColor:AN.teal, backgroundColor:AN.teal, tension:.35, pointRadius:3, borderWidth:2.4, yAxisID:'y1', spanGaps:true, labelFmt:v=>fmt(v,0)+'٪' }
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+        plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} } },
+        scales:{ y:{ grid:{color:'#1a2540'}, title:{display:true, text:'نفر-ساعت'} }, y1:{ position:'right', grid:{display:false}, min:0, suggestedMax:120, title:{display:true, text:'٪'} }, x:{ grid:{display:false} } } }
+    });
+  }
+  if(H.perStation.length){
+    const top = H.perStation.slice(0,14);
+    mkChart('chAnStMH', {
+      type:'bar',
+      data:{ labels: top.map(x=>x.name), datasets:[{ label:'نفر-ساعت', data: top.map(x=>+x.mh.toFixed(1)), backgroundColor: top.map((_,i)=>PALETTE[i%PALETTE.length]), borderRadius:5, labelDigits:0, forceLabels:true }] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ grid:{color:'#1a2540'} }, y:{ grid:{display:false}, ticks:{font:{size:11}} } } }
+    });
+  }
+  if(H.perOp.length){
+    const top = H.perOp.slice(0,20);
+    mkChart('chAnOpMH', {
+      type:'bar',
+      data:{ labels: top.map(x=>x[0]), datasets:[{ label:'ساعت', data: top.map(x=>+x[1].toFixed(1)), backgroundColor:'rgba(47,217,196,.75)', borderRadius:5, labelDigits:0, forceLabels:true }] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ grid:{color:'#1a2540'} }, y:{ grid:{display:false}, ticks:{font:{size:11}} } } }
+    });
+  }
+}
+
+/* =========================================================================
+   TAB: 📈 روند ماهانه
+   ========================================================================= */
+function renderTrend(){
+  const view = document.getElementById('view');
+  const keys = an_monthsWithData();
+  const S = keys.map(an_monthSummary);
+  if(!S.length){ view.innerHTML = renderMonthBar() + an_emptyCard('هنوز داده‌ای برای ساخت روند ماهانه ثبت نشده است.'); bindMonthBar(); return; }
+  const cur = S.find(s=>s.mk===DB.meta.activeMonth) || S[S.length-1];
+  const curIdx = S.indexOf(cur);
+  const prev = curIdx>0 ? S[curIdx-1] : null;
+  const delta = (a,b)=> (a===null||b===null||a===undefined||b===undefined||!b) ? null : (a-b)/Math.abs(b);
+
+  /* کاشی‌های KPI با اسپارک‌لاین */
+  const tiles = [
+    { id:'prod', title:'تولید (همه خطوط)', val:s=>s.prodAll, f:v=>fmt(v,0), unit:'قطعه', color:AN.amber, good:'up' },
+    { id:'ship', title:'ارسال به انبار', val:s=>s.ship, f:v=>fmt(v,0), unit:'قطعه', color:AN.blue, good:'up' },
+    { id:'ach',  title:'تحقق هدف', val:s=>s.ach!==null? s.ach*100:null, f:v=>fmt(v,1), unit:'٪', color:AN.teal, good:'up' },
+    { id:'oee',  title:'OEE', val:s=>s.oee!==null? s.oee*100:null, f:v=>fmt(v,1), unit:'٪', color:AN.purple, good:'up' },
+    { id:'scrap',title:'نرخ ضایعات', val:s=>s.scrapRate!==null? s.scrapRate*100:null, f:v=>fmt(v,2), unit:'٪', color:AN.red, good:'down' },
+    { id:'stop', title:'توقفات', val:s=>s.stopHrs, f:v=>fmt(v,1), unit:'ساعت', color:AN.yellow, good:'down' },
+    { id:'mh',   title:'نفر-ساعت کارکرد', val:s=>s.workedMH||null, f:v=>fmt(v,0), unit:'نفر-ساعت', color:AN.green, good:'up' },
+    { id:'ppm',  title:'قطعه به‌ازای نفر-ساعت', val:s=>s.pcsPerMH, f:v=>fmt(v,1), unit:'قطعه', color:AN.pink, good:'up' }
+  ];
+  const tileHtml = tiles.map(t=>{
+    const cv = t.val(cur), pv = prev ? t.val(prev) : null;
+    const isPct = t.unit==='٪';
+    const d = (cv===null||pv===null||cv===undefined||pv===undefined) ? null : (isPct ? (cv-pv) : delta(cv, pv));
+    const isGood = d===null ? null : (t.good==='up' ? d>=0 : d<=0);
+    const dcol = d===null ? AN.mute : (Math.abs(d)<(isPct?0.05:0.005) ? AN.mute : (isGood ? AN.teal : AN.red));
+    return `<div class="card kpi"><div class="glow" style="background:${t.color};"></div>
+      <div class="tag">${t.title}</div>
+      <div class="val">${cv===null||cv===undefined? '—' : t.f(cv)}<span class="unit">${t.unit}</span></div>
+      <div style="height:44px; margin-top:8px;"><canvas id="anSp_${t.id}"></canvas></div>
+      <div class="delta" style="background:${dcol}1f; color:${dcol};">${d===null? 'بدون ماه قبل' : (d>=0?'▲ ':'▼ ') + (isPct ? fmt(Math.abs(d),1) + ' واحد درصد' : fmt(Math.abs(d)*100,1) + '٪') + ' نسبت به ماه قبل'}</div></div>`;
+  }).join('');
+
+  /* امتیازنامه ماه × شاخص */
+  const rowsDef = [
+    { l:'تولید (قطعه)', v:s=>s.prodAll, f:v=>fmt(v,0), good:'up' },
+    { l:'ارسال (قطعه)', v:s=>s.ship, f:v=>fmt(v,0), good:'up' },
+    { l:'ارسال ÷ تولید', v:s=>s.shipRatio, f:v=>pct(v,0), good:'up', pp:true },
+    { l:'تحقق هدف', v:s=>s.ach, f:v=>pct(v,1), good:'up', pp:true },
+    { l:'OEE', v:s=>s.oee, f:v=>pct(v,1), good:'up', pp:true },
+    { l:'دسترس‌پذیری', v:s=>s.avail, f:v=>pct(v,1), good:'up', pp:true },
+    { l:'عملکرد', v:s=>s.perf, f:v=>pct(v,1), good:'up', pp:true },
+    { l:'کیفیت', v:s=>s.qual, f:v=>pct(v,2), good:'up', pp:true },
+    { l:'نرخ ضایعات', v:s=>s.scrapRate, f:v=>pct(v,2), good:'down', pp:true },
+    { l:'دوباره‌کاری (عدد)', v:s=>s.reworkCount, f:v=>fmt(v,0), good:'down' },
+    { l:'توقفات (ساعت)', v:s=>s.stopHrs, f:v=>fmt(v,1), good:'down' },
+    { l:'رویداد کسری قطعه', v:s=>s.shortEvents, f:v=>fmt(v,0), good:'down' },
+    { l:'نفر-ساعت کارکرد', v:s=>s.workedMH||null, f:v=>fmt(v,0), good:'up' },
+    { l:'بهره‌گیری از نیرو', v:s=>s.util, f:v=>pct(v,0), good:'up', pp:true }
+  ];
+  const cellColor = (vals, v, good)=>{
+    const a = vals.filter(x=>x!==null && x!==undefined); if(v===null||v===undefined||a.length<2) return 'transparent';
+    const mn = Math.min(...a), mx = Math.max(...a); if(mx===mn) return 'transparent';
+    let t = (v-mn)/(mx-mn); if(good==='down') t = 1-t;
+    return t>=.5 ? `rgba(47,217,196,${(.08+(t-.5)*.6).toFixed(2)})` : `rgba(255,93,108,${(.08+(.5-t)*.6).toFixed(2)})`;
+  };
+  const scoreHtml = `<div class="table-wrap"><table style="min-width:0;">
+    <thead><tr><th style="position:sticky; right:0; background:#0f1729;">شاخص</th>${S.map(s=>`<th class="num" style="text-align:center;">${s.label}${s.mk===cur.mk?' •':''}</th>`).join('')}<th class="num" style="text-align:center;">تغییر آخرین ماه</th></tr></thead>
+    <tbody>${rowsDef.map(r=>{
+      const vals = S.map(r.v); const last = vals[vals.length-1], pv = vals.length>1 ? vals[vals.length-2] : null; const d = r.pp ? ((last===null||pv===null||last===undefined||pv===undefined)? null : (last-pv)) : delta(last, pv);
+      const ok = d===null ? null : (r.good==='up' ? d>=0 : d<=0);
+      return `<tr><td style="position:sticky; right:0; background:#101827; font-weight:700; color:var(--text);">${r.l}</td>${vals.map(v=>`<td class="num" style="text-align:center; background:${cellColor(vals,v,r.good)};">${v===null||v===undefined?'—':r.f(v)}</td>`).join('')}
+        <td class="num" style="text-align:center; font-weight:800; color:${d===null||Math.abs(d)<(r.pp?0.0005:0.005)?AN.mute:(ok?AN.teal:AN.red)};">${d===null?'—':(d>=0?'▲ ':'▼ ')+(r.pp? fmt(Math.abs(d)*100,1)+' واحد٪' : fmt(Math.abs(d)*100,1)+'٪')}</td></tr>`; }).join('')}</tbody></table></div>`;
+
+  view.innerHTML = renderMonthBar() + `
+  <div class="grid grid-4" style="margin-bottom:16px;">${tileHtml}</div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <h3>تولید و ارسال ماهانه، هدف و تحقق <span class="muted">(ستون‌ها = قطعه، خط = تحقق هدف ٪)</span></h3>
+    <div class="chart-box" style="height:360px;"><canvas id="chAnHero"></canvas></div>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card"><h3>انباشت روزانه تولید و ارسال — ماه فعال <span class="muted">(خط‌چین = ماه قبل)</span></h3><div class="chart-box" style="height:340px;"><canvas id="chAnCum"></canvas></div></div>
+    <div class="card"><h3>رادار عملکرد: ماه فعال، ماه قبل و بهترین ماه</h3><div class="chart-box" style="height:340px;"><canvas id="chAnRadar"></canvas></div></div>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card"><h3>توقفات (ساعت) و نرخ ضایعات (٪)</h3><div class="chart-box"><canvas id="chAnLoss"></canvas></div></div>
+    <div class="card"><h3>OEE و اجزای آن</h3><div class="chart-box"><canvas id="chAnOee"></canvas></div></div>
+  </div>
+
+  <div class="card"><h3>امتیازنامه ماهانه <span class="muted">(سبز = بهترین ماه هر شاخص، قرمز = ضعیف‌ترین)</span></h3>${scoreHtml}
+    ${S.length<3? '<div class="hint" style="margin-top:10px;">با ثبت ماه‌های بیشتر، خط روند و مقایسه‌ها دقیق‌تر می‌شوند.</div>':''}</div>`;
+
+  bindMonthBar(); an_addPrintBtn('روند ماهانه تولید، ارسال و شاخص‌ها');
+
+  /* اسپارک‌لاین‌ها */
+  tiles.forEach(t=>{
+    const data = S.map(s=>{ const v = t.val(s); return (v===null||v===undefined)? null : +(+v).toFixed(3); });
+    mkChart('anSp_'+t.id, {
+      type:'line',
+      data:{ labels:S.map(s=>s.label), datasets:[{ data, borderColor:t.color, backgroundColor:t.color+'33', fill:true, tension:.4, borderWidth:2, pointRadius:S.map((_,i)=>i===curIdx?4:0), pointBackgroundColor:t.color, spanGaps:true, noLabel:true }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=> t.f(c.parsed.y)+' '+t.unit } } }, scales:{ x:{display:false}, y:{display:false} }, layout:{padding:2} }
+    });
+  });
+
+  /* نمودار اصلی */
+  const prodTrend = linearTrend(S.map(s=>s.prodAll));
+  mkChart('chAnHero', {
+    type:'bar',
+    data:{ labels:S.map(s=>s.label), datasets:[
+      { label:'تولید', data:S.map(s=>s.prodAll), backgroundColor:AN.amber, borderRadius:6, yAxisID:'y', forceLabels:true },
+      { label:'ارسال', data:S.map(s=>s.ship), backgroundColor:AN.blue, borderRadius:6, yAxisID:'y', forceLabels:true },
+      { label:'هدف', type:'line', data:S.map(s=>s.target||null), borderColor:'#ffffff', borderDash:[6,4], borderWidth:1.8, pointStyle:'rectRot', pointRadius:5, yAxisID:'y', noLabel:true, tension:0 },
+      { label:'تحقق هدف ٪', type:'line', data:S.map(s=>s.ach!==null? +(s.ach*100).toFixed(1):null), borderColor:AN.teal, backgroundColor:AN.teal, borderWidth:2.6, tension:.35, pointRadius:4, yAxisID:'y1', labelFmt:v=>fmt(v,0)+'٪' },
+      ...(S.length>=3 ? [{ label:'روند تولید', type:'line', data:S.map((_,i)=> Math.max(0,Math.round(prodTrend.intercept+prodTrend.slope*i))), borderColor:AN.purple, borderDash:[2,4], borderWidth:1.6, pointRadius:0, yAxisID:'y', noLabel:true }] : [])
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} },
+        tooltip:{ callbacks:{ footer:(it)=>{ const s = S[it[0].dataIndex]; return ['روزهای دارای داده: '+fmt(s.days,0), 'ارسال÷تولید: '+pct(s.shipRatio,0)]; } } } },
+      scales:{ y:{ grid:{color:'#1a2540'}, title:{display:true, text:'قطعه'} }, y1:{ position:'right', grid:{display:false}, suggestedMin:0, suggestedMax:120, title:{display:true, text:'تحقق ٪'} }, x:{ grid:{display:false} } } }
+  });
+
+  /* انباشت روزانه (ماه فعال در برابر ماه قبل) */
+  const cumOf = (mk, fn)=>{
+    const days = DB.daily.filter(e=>monthKeyOf(e.date)===mk && an_dayHasData(e)); const arr = new Array(31).fill(0);
+    days.forEach(e=>{ const d = an_dayNum(e.date); if(d>=1 && d<=31) arr[d-1] += fn(e); });
+    const lastDay = Math.max(0, ...days.map(e=>an_dayNum(e.date)));
+    let run = 0; return arr.map((v,i)=>{ run += v; return (i+1<=lastDay) ? run : null; });
+  };
+  const cprod = cumOf(cur.mk, allLinesTotal), cship = cumOf(cur.mk, e=>an_hasShip(e)?shipTotal(e):0);
+  const pprod = prev ? cumOf(prev.mk, allLinesTotal) : null, pship = prev ? cumOf(prev.mk, e=>an_hasShip(e)?shipTotal(e):0) : null;
+  mkChart('chAnCum', {
+    type:'line',
+    data:{ labels:Array.from({length:31},(_,i)=>i+1), datasets:[
+      { label:'تولید — '+cur.label, data:cprod, borderColor:AN.amber, backgroundColor:'rgba(255,157,66,.18)', fill:'+1', tension:.25, borderWidth:2.6, pointRadius:0, spanGaps:false },
+      { label:'ارسال — '+cur.label, data:cship, borderColor:AN.blue, backgroundColor:'rgba(76,141,255,.0)', fill:false, tension:.25, borderWidth:2.6, pointRadius:0, spanGaps:false },
+      ...(prev ? [
+        { label:'تولید — '+prev.label, data:pprod, borderColor:'rgba(255,157,66,.55)', borderDash:[5,4], borderWidth:1.6, pointRadius:0, noLabel:true, fill:false, tension:.25 },
+        { label:'ارسال — '+prev.label, data:pship, borderColor:'rgba(76,141,255,.55)', borderDash:[5,4], borderWidth:1.6, pointRadius:0, noLabel:true, fill:false, tension:.25 }
+      ] : [])
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8, font:{size:10.5}} } },
+      scales:{ y:{ grid:{color:'#1a2540'}, title:{display:true, text:'انباشت (قطعه)'} }, x:{ grid:{display:false}, title:{display:true, text:'روز ماه'} } } }
+  });
+
+  /* رادار */
+  const rv = s=>[ s.ach, s.oee, s.avail, s.qual, s.shipRatio, s.util ].map(v=> v===null||v===undefined ? 0 : Math.min(100, +(v*100).toFixed(1)));
+  const score = s=>{ const a = rv(s); return a.reduce((x,y)=>x+y,0)/a.length; };
+  const best = S.reduce((b,s)=> score(s)>score(b)?s:b, S[0]);
+  const rds = [{ label:cur.label+' (فعال)', data:rv(cur), borderColor:AN.amber, backgroundColor:'rgba(255,157,66,.25)', borderWidth:2.4 }];
+  if(prev) rds.push({ label:prev.label+' (قبل)', data:rv(prev), borderColor:AN.blue, backgroundColor:'rgba(76,141,255,.12)', borderWidth:1.8, borderDash:[4,3] });
+  if(best.mk!==cur.mk && (!prev || best.mk!==prev.mk)) rds.push({ label:best.label+' (بهترین)', data:rv(best), borderColor:AN.teal, backgroundColor:'rgba(47,217,196,.08)', borderWidth:1.8 });
+  rds.forEach(d=>{ d.noLabel = true; d.pointRadius = 3; });
+  mkChart('chAnRadar', {
+    type:'radar',
+    data:{ labels:['تحقق هدف','OEE','دسترس‌پذیری','کیفیت','ارسال÷تولید','بهره‌گیری نیرو'], datasets:rds },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} } },
+      scales:{ r:{ min:0, max:100, ticks:{ stepSize:25, backdropColor:'transparent', color:'#7c8aa5', font:{size:9} }, grid:{color:'#1f2b45'}, angleLines:{color:'#1f2b45'}, pointLabels:{ color:'#aab4c8', font:{size:11, family:'Vazirmatn'} } } } }
+  });
+
+  /* توقفات و ضایعات */
+  mkChart('chAnLoss', {
+    type:'bar',
+    data:{ labels:S.map(s=>s.label), datasets:[
+      { label:'توقفات (ساعت)', data:S.map(s=>+s.stopHrs.toFixed(1)), backgroundColor:'rgba(255,207,92,.8)', borderRadius:6, yAxisID:'y', labelDigits:0 },
+      { label:'نرخ ضایعات ٪', type:'line', data:S.map(s=>s.scrapRate!==null? +(s.scrapRate*100).toFixed(2):null), borderColor:AN.red, backgroundColor:AN.red, tension:.35, borderWidth:2.4, pointRadius:4, yAxisID:'y1', labelFmt:v=>fmt(v,2)+'٪' }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} } },
+      scales:{ y:{ grid:{color:'#1a2540'}, title:{display:true, text:'ساعت'} }, y1:{ position:'right', grid:{display:false}, beginAtZero:true, title:{display:true, text:'٪'} }, x:{ grid:{display:false} } } }
+  });
+
+  /* OEE */
+  mkChart('chAnOee', {
+    type:'line',
+    data:{ labels:S.map(s=>s.label), datasets:[
+      { label:'OEE', data:S.map(s=>s.oee!==null?+(s.oee*100).toFixed(1):null), borderColor:AN.purple, backgroundColor:'rgba(179,137,255,.2)', fill:true, tension:.35, borderWidth:3, pointRadius:4, labelFmt:v=>fmt(v,0)+'٪' },
+      { label:'دسترس‌پذیری', data:S.map(s=>s.avail!==null?+(s.avail*100).toFixed(1):null), borderColor:AN.teal, tension:.35, borderWidth:1.8, pointRadius:2, noLabel:true, fill:false },
+      { label:'عملکرد', data:S.map(s=>s.perf!==null?+(s.perf*100).toFixed(1):null), borderColor:AN.amber, tension:.35, borderWidth:1.8, pointRadius:2, noLabel:true, fill:false },
+      { label:'کیفیت', data:S.map(s=>s.qual!==null?+(s.qual*100).toFixed(1):null), borderColor:AN.blue, tension:.35, borderWidth:1.8, pointRadius:2, noLabel:true, fill:false }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} } },
+      scales:{ y:{ min:0, max:105, grid:{color:'#1a2540'}, ticks:{ callback:v=>v+'٪' } }, x:{ grid:{display:false} } } }
+  });
+}
+
 
 function renderLean(){
   const M = monthData();
