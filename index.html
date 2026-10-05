@@ -1133,16 +1133,36 @@ async function rawBatchSetFallback(rawItems){
 }
 
 /* ---- app layer: JSON encode/decode + transparent chunking on top of raw ---- */
+// شماره‌ی آخرین تعداد تکه‌ای که برای هر کلید دیدیم — برای پاک‌کردن تکه‌های یتیم وقتی بعداً مقدار
+// کوچک‌تر می‌شود یا دیگر تکه‌تکه نیست (نگاه کنید به cloudBatchSet پایین همین فایل).
+let knownChunkCounts = {};
 async function decodeValue(key, raw){
   if(raw===null || raw===undefined || raw==='') return null;
   let parsed;
-  try{ parsed = JSON.parse(raw); }catch(e){ return null; }
+  try{ parsed = JSON.parse(raw); }catch(e){
+    // یک JSON خراب را هرگز نباید «یعنی چیزی نیست» تفسیر کرد — این با خالی‌بودن واقعی فرق دارد و باید
+    // به‌عنوان خطای واقعی علامت بخورد (lastSyncError) تا در loadAll با حالت امن مدیریت شود، نه با
+    // بازنویسی خاموش.
+    lastSyncError = { action:'decode:'+key, status:null, time:new Date().toISOString(), message:'مقدار ذخیره‌شده برای «'+key+'» قابل‌خواندن نبود (JSON نامعتبر)' };
+    return null;
+  }
   if(parsed && typeof parsed==='object' && parsed.__chunked){
+    knownChunkCounts[key] = parsed.count;
     const chunkKeys = Array.from({length: parsed.count}, (_,i)=> key+'__c'+i);
     const rawChunks = await rawBatchGet(chunkKeys);
+    const missing = chunkKeys.filter(ck => rawChunks[ck]===null || rawChunks[ck]===undefined);
+    if(missing.length){
+      // دقیقاً همان مشکلی که یک‌بار واقعاً اتفاق افتاد: فهرست می‌گوید N تکه هست ولی بعضی از آن‌ها
+      // پیدا نشدند. به‌جای سرهم‌کردن یک نتیجه‌ی ناقص و／یا خالی نشان‌دادنش، این را خطای واقعی می‌دانیم.
+      lastSyncError = { action:'decode:'+key, status:null, time:new Date().toISOString(), message:'برای «'+key+'» باید '+parsed.count+' تکه می‌بود ولی '+missing.length+' تکه از آن پیدا نشد' };
+      return null;
+    }
     let full = '';
     for(let i=0;i<parsed.count;i++){ full += (rawChunks[key+'__c'+i] || ''); }
-    try{ return JSON.parse(full); }catch(e){ return null; }
+    try{ return JSON.parse(full); }catch(e){
+      lastSyncError = { action:'decode:'+key, status:null, time:new Date().toISOString(), message:'تکه‌های «'+key+'» سرهم شدند ولی نتیجه قابل‌خواندن نبود (JSON نامعتبر)' };
+      return null;
+    }
   }
   return parsed;
 }
@@ -1163,14 +1183,22 @@ async function cloudBatchSet(pairs){
   const rawItems = {};
   for(const key of Object.keys(pairs)){
     const jsonStr = JSON.stringify(pairs[key]);
+    let newCount = 0;
     if(jsonStr.length > GS_CHUNK_LIMIT){
       const chunks = [];
       for(let i=0;i<jsonStr.length;i+=GS_CHUNK_LIMIT) chunks.push(jsonStr.slice(i, i+GS_CHUNK_LIMIT));
       chunks.forEach((c,i)=>{ rawItems[key+'__c'+i] = c; });
       rawItems[key] = JSON.stringify({ __chunked:true, count:chunks.length });
+      newCount = chunks.length;
     } else {
       rawItems[key] = jsonStr;
     }
+    // اگر این کلید قبلاً با تعداد تکه‌ی بیشتری ذخیره شده بود، تکه‌های اضافیِ قدیمی را خالی می‌کنیم —
+    // وگرنه یک فهرست/مقدار جدید کنار داده‌های یتیمِ قدیمی باقی می‌ماند، و اگر بعداً خودِ فهرست خراب
+    // شود (همان اتفاقی که افتاد)، آن داده‌های یتیم گمراه‌کننده می‌شوند.
+    const prevCount = knownChunkCounts[key] || 0;
+    for(let i=newCount; i<prevCount; i++){ rawItems[key+'__c'+i] = ''; }
+    knownChunkCounts[key] = newCount;
   }
   return await rawBatchSet(rawItems);
 }
@@ -1271,6 +1299,7 @@ async function loadAll(){
     setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت شما — به‌روز' : 'متصل به فضای ابری Claude — به‌روز'));
     cloudOK = true;
     dataLoadFailed = false;
+    snapshotKnownCounts(); // مبنای «قبلاً چقدر بود» را از همین بارگذاری موفق می‌گیریم
   }catch(e){
     cloudOK = false;
     if(!LINES.length){ LINES=[{id:'thermostat',name:'واحد ترموستات'}]; currentLineId='thermostat'; }
@@ -1394,7 +1423,19 @@ function enrichPersonnelCodes(){
 let lastSavedAt = null;
 let savingNow = false;
 let saveQueued = false;
-async function saveAll(silent){
+// آخرین تعداد ردیفِ شناخته‌شده‌ی هر مجموعه — بلافاصله بعد از یک بارگذاری یا ذخیره‌ی موفق به‌روز می‌شود.
+// اگر یکی از این مجموعه‌ها در حافظه ناگهان صفر شد ولی قبلاً چیزی داشت، به‌جای نوشتن خاموشِ این صفر
+// روی گوگل‌شیت (دقیقاً همان اتفاقی که یک‌بار باعث شد داده‌های مرداد-مهر پاک شود)، همان مجموعه را از
+// این یک ذخیره کنار می‌گذاریم (نسخه‌ی قبلی‌اش روی گوگل‌شیت دست‌نخورده می‌ماند) و به شما خبر می‌دهیم.
+let lastKnownCounts = {};
+const SHRINK_GUARDED_KEYS = [
+  ['daily','ورود داده روزانه'], ['waste','ضایعات/دوباره‌کاری'], ['stop','توقفات تولید'], ['short','کسری قطعات'],
+  ['stationHourly','آمار روزانه ایستگاه‌ها'], ['productOutput','ارسال به‌تفکیک محصول'], ['dailyProgram','برنامه تولید روزانه'], ['actions','مرکز اقدامات'],
+];
+function snapshotKnownCounts(){
+  SHRINK_GUARDED_KEYS.forEach(([k])=>{ lastKnownCounts[k] = (DB[k]||[]).length; });
+}
+async function saveAll(silent, allowShrink){
   if(dataLoadFailed){
     // بارگذاری اولیه از گوگل‌شیت شما شکست خورده و آنچه الان در حافظه است ممکن است نسخهٔ قدیمی/پیش‌فرض
     // باشد، نه آخرین داده‌ی واقعی — پس اجازه نمی‌دهیم چیزی نوشته شود تا با یک رفرش موفق این وضعیت پاک شود.
@@ -1416,8 +1457,28 @@ async function saveAll(silent){
   pairs[lineKey(currentLineId,'productOutput')] = DB.productOutput;
   pairs[lineKey(currentLineId,'dailyProgram')] = DB.dailyProgram;
   pairs[lineKey(currentLineId,'actions')] = DB.actions;
+  const skippedLabels = [];
+  if(!allowShrink){
+    SHRINK_GUARDED_KEYS.forEach(([k,label])=>{
+      const cur = (DB[k]||[]).length;
+      if(cur===0 && (lastKnownCounts[k]||0) > 0){
+        delete pairs[lineKey(currentLineId,k)]; // نسخه‌ی قبلی‌اش روی گوگل‌شیت دست‌نخورده می‌ماند
+        skippedLabels.push(label+' (قبلاً '+lastKnownCounts[k]+' ردیف)');
+      }
+    });
+  }
   const allOk = await cloudBatchSet(pairs);
-  if(allOk){ lastSavedAt = new Date(); setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت — ذخیره شد' : 'متصل به فضای ابری — ذخیره شد')); if(!silent) toast('اطلاعات با موفقیت ذخیره شد.','ok'); }
+  if(allOk){
+    lastSavedAt = new Date();
+    SHRINK_GUARDED_KEYS.forEach(([k])=>{ if(pairs[lineKey(currentLineId,k)]!==undefined) lastKnownCounts[k] = (DB[k]||[]).length; });
+    if(skippedLabels.length){
+      setSync('ok', 'ذخیره شد، به‌جز: '+skippedLabels.join('، ')+' — برای جلوگیری از پاک‌شدن ناخواسته ذخیره نشدند.');
+      toast('این بخش(ها) چون ناگهان خالی به‌نظر رسیدند ذخیره نشدند: '+skippedLabels.join('، ')+'. اگر عمدی بوده، از «پاک‌سازی کامل» در تنظیمات استفاده کنید؛ اگر نه، صفحه را رفرش کنید.', 'err');
+    } else {
+      setSync('ok', (GSHEET.url? 'متصل به گوگل‌شیت — ذخیره شد' : 'متصل به فضای ابری — ذخیره شد'));
+      if(!silent) toast('اطلاعات با موفقیت ذخیره شد.','ok');
+    }
+  }
   else{
     if(!hasCloudBackend()){
       setSync('off','به هیچ فضای ابری وصل نیستید — روی این نوار بزنید');
@@ -6343,7 +6404,7 @@ function openSettings(){
     confirmDeleteModal('پاک‌سازی کامل داده‌های این خط', 'همه ردیف‌های ثبت‌شده (تولید، ارسال، ضایعات، توقفات، کسری، برنامه تولید روزانه) برای خط «' + esc(DB.meta.unitName||'') + '» برای همیشه حذف می‌شود. این عمل قابل بازگشت نیست.', async ()=>{
       DB.daily.forEach(r=>moveToTrash('daily', r)); DB.waste.forEach(r=>moveToTrash('waste', r)); DB.stop.forEach(r=>moveToTrash('stop', r)); DB.short.forEach(r=>moveToTrash('short', r)); DB.stationHourly.forEach(r=>moveToTrash('stationHourly', r)); (DB.productOutput||[]).forEach(r=>moveToTrash('productOutput', r));
       DB = { daily:[], waste:[], stop:[], short:[], trash: DB.trash, stationHourly:[], productOutput:[], risks: DB.risks, dailyProgram: [], actions: DB.actions, meta: DB.meta };
-      await saveAll(true); toast('همه داده‌های این خط پاک شد.','ok'); goTo(currentTab);
+      await saveAll(true, true); toast('همه داده‌های این خط پاک شد.','ok'); goTo(currentTab); // allowShrink=true: این پاک‌سازی عمدی است، نه یک باگ
     });
   });
   document.getElementById('changePinBtn').addEventListener('click', openChangePinModal);
