@@ -4728,7 +4728,7 @@ function an_familyStats(M){
   const fam = { normal:{out:0,target:0,sec:0,days:0}, diesel:{out:0,target:0,sec:0,days:0}, ckd:{out:0,target:0,sec:0,days:0}, se206:{out:0,target:0,sec:0,days:0}, darpoosh:{out:0,target:0,sec:0,days:0} };
   let movedDays = 0;
   M.daily.filter(an_dayHasData).forEach(e=>{
-    const f = dayShiftFactor(e), secs = an_shiftHoursOf(e)*3600;
+    const f = dayShiftFactor(e), secs = an_netShiftSec(an_shiftHoursOf(e));
     const d = { normal:{o:0,t:0}, diesel:{o:0,t:0}, ckd:{o:0,t:0}, se206:{o:0,t:0}, darpoosh:{o:0,t:0} }; let moved = false;
     ['line1','line2','line3','line4'].forEach(k=>{
       const L = e.lines[k] || {}; const key = isDiesel(L.product) ? 'diesel' : 'normal';
@@ -4908,34 +4908,92 @@ function renderTakt(){
     insights.push({ icon:'🕒', color:AN.blue, text:`<b>${fmt(S.skippedNoTime,0)}</b> ثبت ایستگاه بدون «ساعت شروع/پایان» در محاسبه نیامد. برای دقیق‌ترشدن سایکل‌تایم، ساعت شروع و پایان را در «آمار روزانه ایستگاه‌ها» وارد کنید.` });
   }
 
+  /* ---- زمان ساخت یک قطعه (استاندارد تعریف‌شده) در برابر تکت، به‌تفکیک گروه ---- */
+  const cfgS = an_stdCfg(); const FS = an_familyStats(M);
+  const FR = AN_FAMS.map(f=>{
+    const c = cfgS[f.key], q = FS.fam[f.key];
+    const rate = q.sec>0 ? q.out/q.sec : null, need = q.sec>0 ? q.target/q.sec : null;
+    return Object.assign({}, f, c, { out:q.out, days:q.days, pace: rate? 1/rate : null, takt: need? 1/need : null,
+      wipAct: rate? c.std*rate : null, wipReq: need? c.std*need : null });
+  });
+  const FRa = FR.filter(r=>r.out>0);
+  const sumReq = FRa.reduce((a,r)=>a+(r.wipReq||0),0), sumAct = FRa.reduce((a,r)=>a+(r.wipAct||0),0);
+  const thermoA = FR.filter(r=>r.thermo!==false && r.out>0); const tOut = thermoA.reduce((a,r)=>a+r.out,0);
+  const wAvgT = tOut>0 ? thermoA.reduce((a,r)=>a+r.out*r.std,0)/tOut : null;
+  const wipBar = (v,color)=>{
+    if(v===null || v===undefined || !isFinite(v)) return '';
+    const full = Math.floor(v), frac = v-full, cap = 70; let h = '';
+    for(let i=0;i<Math.min(full,cap);i++) h += `<i style="width:11px;height:15px;border-radius:3px;background:${color};display:inline-block;"></i>`;
+    if(frac>0.05 && full<cap) h += `<i style="width:${(11*frac).toFixed(1)}px;height:15px;border-radius:3px;background:${color};display:inline-block;opacity:.8;"></i>`;
+    return `<div style="display:flex; flex-wrap:wrap; gap:2px; align-items:center;">${h}</div>`;
+  };
+  const metric = (t,v,u,sub)=>`<div style="background:#0e1626; border:1px solid var(--panel-border); border-radius:10px; padding:9px 12px;">
+      <div class="hint" style="margin:0 0 3px;">${t}</div>
+      <div style="font-size:22px; font-weight:900; color:var(--text);">${v}<span class="muted" style="font-size:11px; font-weight:600; margin-right:4px;">${u}</span></div>
+      ${sub?`<div class="hint" style="margin:2px 0 0;">${sub}</div>`:''}</div>`;
+  const famHtml = FR.map(r=>{
+    const active = r.out>0 && r.takt && r.pace;
+    const ratio = (r.wipReq>0 && r.wipAct!==null) ? r.wipAct/r.wipReq : null;
+    const rc = ratio===null ? AN.mute : (ratio>=0.98 ? AN.teal : (ratio>=0.85 ? AN.yellow : AN.red));
+    return `<div style="border:1px solid var(--panel-border); border-right:4px solid ${r.color}; border-radius:12px; padding:12px 14px; margin-bottom:10px;">
+      <div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+        <b style="color:${r.color}; font-size:14px;">${esc(r.label)}</b><span class="hint" style="margin:0;">${r.sub}</span></div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px;">
+        ${metric('زمان ساخت یک قطعه', fmt(r.std,1), 'ثانیه', 'بازه: '+fmt(r.min,0)+' تا '+fmt(r.max,0))}
+        ${metric('تکت (لازم برای هدف)', active? an_secFmt(r.takt,1):'—', 'ثانیه', 'هر این‌قدر یک قطعه باید تمام شود' + (active && r.key==='normal' ? ' (۴ خط با هم؛ هر خط تنها ≈ '+an_secFmt(r.takt*4,1)+' ث)' : ''))}
+        ${metric('ریتم واقعی', active? an_secFmt(r.pace,1):'—', 'ثانیه', 'هر این‌قدر یک قطعه تمام شده' + (active && r.key==='normal' ? ' (۴ خط با هم؛ هر خط تنها ≈ '+an_secFmt(r.pace*4,1)+' ث)' : ''))}
+      </div>
+      ${active ? `<div style="margin-top:10px; line-height:2;">
+        <div class="hint" style="margin:0;">در مدتی که <b>یک قطعه</b> ساخته می‌شود (${fmt(r.std,1)} ثانیه)، برای رسیدن به هدف باید <b style="color:${AN.teal};">${fmt(r.wipReq,1)}</b> قطعه تمام شود؛ در واقع <b style="color:${rc};">${fmt(r.wipAct,1)}</b> قطعه تمام شده است${ratio!==null? ` (${fmt(ratio*100,0)}٪ نیاز)`:''}.</div>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:4px;"><span class="hint" style="margin:0; min-width:44px;">لازم</span>${wipBar(r.wipReq, AN.teal)}</div>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:4px;"><span class="hint" style="margin:0; min-width:44px;">واقعی</span>${wipBar(r.wipAct, rc)}</div>
+      </div>` : `<div class="hint" style="margin-top:8px;">برای این ماه تولیدی ثبت نشده؛ فقط زمان استاندارد نمایش داده می‌شود.</div>`}
+    </div>`;
+  }).join('');
   view.innerHTML = renderMonthBar() + `
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('تکت‌تایم خط (بر مبنای هدف روزانه)','ثانیه/قطعه', an_secFmt(U.taktAvg), null, AN.teal)}
-    ${kpiCard('سایکل‌تایم واقعی خط (ریتم تولید)','ثانیه/قطعه', an_secFmt(U.paceAvg), null, AN.amber)}
-    ${kpiCard('نسبت تکت به سایکل خط','', unitEff===null?'—':pct(unitEff,1), null, unitEff===null?AN.mute:(unitEff>=1?AN.teal:AN.red))}
-    ${kpiCard('ایستگاه‌های خارج از تکت','از '+fmt(list.length,0), fmt(over.length,0), null, over.length? AN.red : AN.teal)}
+    ${kpiCard('زمان ساخت یک ترموستات (میانگین وزنی)','ثانیه', wAvgT===null?'—':fmt(wAvgT,1), null, AN.blue)}
+    ${kpiCard('تکت: هر چند ثانیه یک قطعه باید از خط خارج شود','ثانیه/قطعه', an_secFmt(U.taktAvg), null, AN.teal)}
+    ${kpiCard('ریتم واقعی: هر چند ثانیه یک قطعه خارج شده','ثانیه/قطعه', an_secFmt(U.paceAvg), null, AN.amber)}
+    ${kpiCard('قطعه‌ی هم‌زمان در جریان (واقعی از لازم)','قطعه', FRa.length? fmt(sumAct,1)+' از '+fmt(sumReq,1) : '—', null, FRa.length && sumAct>=sumReq*0.98 ? AN.teal : AN.red)}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+      <h3 style="margin:0;">زمان ساخت یک ترموستات در برابر تکت <span class="muted">(زمان ساخت = از تولید قرص تا کنترل نهایی، طبق استاندارد خودتان)</span></h3>
+      <button class="btn btn-ghost btn-sm no-print" id="anGoStd">ویرایش زمان‌های استاندارد ←</button>
+    </div>
+    ${famHtml}
+    <div class="hint" style="margin-top:4px;">هر مربع = یک قطعه. تعداد مربع‌ها یعنی «در مدتی که یک قطعه ساخته می‌شود چند قطعه از خط خارج می‌شود».</div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
     <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-      <div>
-        <h3 style="margin:0 0 4px;">نحوه‌ی محاسبه</h3>
-        <div class="hint" style="margin:0; line-height:1.9;">
-          <b>تکت خط</b> = زمان مفید شیفت ÷ هدف تولید همان روز (تقاضا) • <b>سایکل واقعی خط</b> = زمان مفید شیفت ÷ تولید واقعی همان روز.<br>
-          <b>تکت ایستگاه</b> = ۳۶۰۰ ÷ استاندارد ساعتی ایستگاه • <b>سایکل مؤثر</b> = (مجموع ساعت شروع تا پایان ÷ مجموع تولید) • <b>سایکل خالص</b> = همان بدون توقفات ثبت‌شده‌ی همان ایستگاه در همان روزها.
+      <div style="flex:1; min-width:280px;">
+        <h3 style="margin:0 0 6px;">این تب چه می‌گوید؟</h3>
+        <div class="hint" style="margin:0; line-height:2;">
+          <b>زمان ساخت</b>: یک قطعه از شروع تا کنترل نهایی چقدر طول می‌کشد (۱۱۵ تا ۱۶۰ ثانیه، عدد استاندارد شما).<br>
+          <b>تکت</b>: برای رسیدن به هدف روزانه، هر چند ثانیه یک قطعه باید از خط بیرون بیاید = زمان مفید شیفت ÷ هدف.<br>
+          <b>ریتم واقعی</b>: هر چند ثانیه یک قطعه واقعاً بیرون آمده = زمان مفید شیفت ÷ تولید واقعی.<br>
+          <b>قطعه‌ی هم‌زمان</b> = زمان ساخت ÷ تکت. اگر واقعی از لازم کمتر باشد، خط به هدف نمی‌رسد.
         </div>
       </div>
       <div class="field" style="min-width:200px; margin:0;">
-        <label>استراحت/ناهار/نماز در هر شیفت (دقیقه) <span class="muted">— فقط برای تکت خط</span></label>
+        <label>استراحت/ناهار/نماز در هر شیفت (دقیقه) <span class="muted">— روی زمان مفید شیفت اثر می‌گذارد</span></label>
         <input id="anBreakMin" type="text" inputmode="numeric" placeholder="مثلاً 45" value="${an_breakMin() || ''}">
       </div>
     </div>
+    <details style="margin-top:10px;"><summary style="cursor:pointer; color:var(--text); font-weight:700;">محاسبه‌ی بخش «ایستگاه‌ها» (پایین‌تر)</summary>
+      <div class="hint" style="margin:8px 0 0; line-height:1.9;">
+        <b>تکت ایستگاه</b> = ۳۶۰۰ ÷ استاندارد ساعتی ایستگاه • <b>سایکل مؤثر</b> = (مجموع ساعت شروع تا پایان ÷ مجموع تولید) • <b>سایکل خالص</b> = همان بدون توقفات ثبت‌شده‌ی همان ایستگاه در همان روزها. این‌ها سایکل ثبت‌شده‌ی هر ایستگاه‌اند، نه زمان کل ساخت یک قطعه.
+      </div>
+    </details>
   </div>
 
   ${list.length || U.n ? '' : an_emptyCard('برای این ماه هنوز داده‌ای ثبت نشده است.')}
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>یامازومی ایستگاه‌ها — سایکل در برابر تکت <span class="muted">(خط سفید = تکت ایستگاه)</span></h3>
+    <h3>ایستگاه به ایستگاه: سایکل در برابر تکت <span class="muted">(خط سفید = تکت ایستگاه؛ ${fmt(over.length,0)} از ${fmt(list.length,0)} ایستگاه کندتر از تکت)</span></h3>
     ${list.length ? `<div class="chart-box" style="height:${Math.max(280, list.length*30+80)}px;"><canvas id="chAnYama"></canvas></div>
     <div class="legend-row">
       <span class="legend-dot"><i style="width:10px;height:10px;border-radius:3px;background:${AN.teal};display:inline-block"></i>سایکل خالص (در محدوده تکت)</span>
@@ -4984,6 +5042,8 @@ function renderTakt(){
   </div>`;
 
   bindMonthBar(); an_addPrintBtn('تکت‌تایم و سایکل‌تایم ایستگاه‌ها');
+
+  const goStd = document.getElementById('anGoStd'); if(goStd) goStd.addEventListener('click', ()=>goTo('stdtime'));
 
   /* ورودی استراحت شیفت */
   const bm = document.getElementById('anBreakMin');
