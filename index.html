@@ -2629,7 +2629,7 @@ function renderProductOutput(){
   // برای نشانه‌ی 🌙 (پنجشنبه/جمعه/تعطیل) روی تاریخ ثبت‌ها
   const dMapPo = dailyByDateMap_(M.daily);
   const targets = DB.meta.productMonthlyTargets || {};
-  const productNames = [...new Set([...Object.keys(targets), ...list.map(x=>x.product)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fa'));
+  const productNames = [...new Set([...Object.keys(targets), ...poCustomProducts_().map(x=>x.name), ...list.map(x=>x.product)])].filter(Boolean).sort((a,b)=>a.localeCompare(b,'fa'));
 
   const report = productNames.map(name=>{
     const target = targets[name] || 0;
@@ -2699,10 +2699,24 @@ function renderProductOutput(){
   </div>
 
   <div class="card" style="margin-bottom:16px;">
+    <h3>🏷️ افزودن محصول / کد کالا به فهرست</h3>
+    <div class="hint" style="margin-bottom:10px;">محصول تازه را اینجا اضافه کنید تا در لیست انتخاب «ثبت ارسال» و جدول پایش بیاید. اگر نام از قبل در فهرست باشد، کد/هدف همان به‌روزرسانی می‌شود. هدف ماه اختیاری است.</div>
+    <div class="form-grid">
+      <div class="field span-2"><label>نام محصول</label><input id="poNewName" placeholder="مثلاً ترموستات سمند — ۸۵ درجه"></div>
+      <div class="field"><label>کد کالا <span class="muted">(اختیاری)</span></label><input id="poNewCode" placeholder="مثلاً 1234567"></div>
+      <div class="field"><label>هدف این ماه <span class="muted">(اختیاری)</span></label><input id="poNewTarget" type="text" inputmode="numeric" placeholder="تعداد"></div>
+    </div>
+    <div class="modal-actions" style="justify-content:flex-start; margin-top:12px;">
+      <button class="btn btn-primary btn-sm" id="poAddProductBtn">➕ افزودن به فهرست</button>
+    </div>
+    ${poCustomProducts_().length ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">${poCustomProducts_().map(x=>`<span class="badge" style="display:flex; align-items:center; gap:6px;">${esc(x.name)}${x.code?' <span class="muted">· کد '+esc(x.code)+'</span>':''} <button data-podelprod="${esc(x.name)}" title="حذف از فهرست" style="background:none; border:none; color:inherit; cursor:pointer; font-size:14px; line-height:1;">×</button></span>`).join('')}</div>` : ''}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
     <h3>${editing.productOutput? '✏️ ویرایش ثبت ارسال محصول':'➕ ثبت ارسال یک محصول'}</h3>
     <div class="form-grid">
       <div class="field"><label>تاریخ</label>${datePickerHtml('po_date', editing.productOutput?.date)}</div>
-      <div class="field span-2"><label>محصول / کد کالا</label>${productSelectHtml('po_product', editing.productOutput?.product||'')}</div>
+      <div class="field span-2"><label>محصول / کد کالا</label>${poProductSelectHtml('po_product', editing.productOutput?.product || filters.poPick || '')}</div>
       <div class="field"><label>تعداد ارسال</label><input id="po_qty" type="text" inputmode="numeric" value="${editing.productOutput?.qty ?? ''}"></div>
       <div class="field"><label>شماره ردیابی</label><input id="po_traceId" value="${esc(editing.productOutput?.traceId||'')}"></div>
     </div>
@@ -2731,11 +2745,12 @@ function renderProductOutput(){
       </select>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>محصول / کد کالا</th><th class="num">هدف ماه</th><th class="num">ارسال تاکنون</th><th class="num">مانده ارسال</th><th class="num">درصد تحقق</th><th class="num">درصد انحراف</th></tr></thead>
+      <thead><tr><th>محصول</th><th>کد کالا</th><th class="num">هدف ماه</th><th class="num">ارسال تاکنون</th><th class="num">مانده ارسال</th><th class="num">درصد تحقق</th><th class="num">درصد انحراف</th></tr></thead>
       <tbody>
-      ${sortedReport.length===0? `<tr><td colspan="6"><div class="tbl-empty">هنوز برنامه یا ارسالی برای این ماه ثبت نشده.</div></td></tr>` :
+      ${sortedReport.length===0? `<tr><td colspan="7"><div class="tbl-empty">هنوز برنامه یا ارسالی برای این ماه ثبت نشده.</div></td></tr>` :
       sortedReport.map(r=>`<tr>
         <td>${esc(r.name)}</td>
+        <td>${poCodeOf_(r.name) ? esc(poCodeOf_(r.name)) : '<span class="muted">—</span>'}</td>
         <td class="num">${r.target? fmt(r.target,0) : '<span class="muted">—</span>'}</td>
         <td class="num">${fmt(r.produced,0)}</td>
         <td class="num" style="color:${r.remaining===null?'var(--text-mute)':r.remaining>0?'#ffb0b8':'#8ff0c8'}; font-weight:800;">${r.remaining===null?'—':fmt(r.remaining,0)}</td>
@@ -2756,7 +2771,7 @@ function renderProductOutput(){
       <thead><tr><th>تاریخ</th><th>محصول / کد کالا</th><th class="num">تعداد</th><th>شماره ردیابی</th><th></th></tr></thead>
       <tbody>
       ${filteredList.length===0?`<tr><td colspan="5"><div class="tbl-empty">موردی ثبت نشده.</div></td></tr>`:
-      filteredList.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapPo)}</td><td>${esc(x.product)}</td><td class="num">${fmt(x.qty,0)}</td><td>${esc(x.traceId)||'—'}</td>
+      filteredList.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapPo)}</td><td>${esc(x.product)}${poCodeOf_(x.product)?' <span class="muted">· کد '+esc(poCodeOf_(x.product))+'</span>':''}</td><td class="num">${fmt(x.qty,0)}</td><td>${esc(x.traceId)||'—'}</td>
         <td><div style="display:flex; gap:6px;">
           <button class="icon-btn" data-poedit="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
           <button class="icon-btn" data-podel="${x.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
@@ -2778,6 +2793,27 @@ function renderProductOutput(){
     e.target.value = '';
   });
 
+  document.getElementById('poAddProductBtn').addEventListener('click', ()=>{
+    const name = document.getElementById('poNewName').value.trim().replace(/\s+/g,' ');
+    const code = document.getElementById('poNewCode').value.trim();
+    const tg = num(document.getElementById('poNewTarget').value);
+    if(!name){ toast('نام محصول را وارد کنید.','err'); return; }
+    const arr = poCustomProducts_();
+    const known = [...new Set([...LINE_PRODUCT_LIST_DEFAULT, ...Object.keys(DB.meta.productMonthlyTargets||{}), ...arr.map(x=>x.name)])];
+    const canon = known.find(n=>n.trim().toLowerCase()===name.toLowerCase()) || name;
+    const ex = arr.find(x=>x.name===canon);
+    if(ex){ if(code) ex.code = code; } else { arr.push({ name: canon, code }); }
+    if(tg!==null && tg>0) DB.meta.productMonthlyTargets = Object.assign({}, DB.meta.productMonthlyTargets||{}, { [canon]: Math.round(tg) });
+    filters.poPick = canon; scheduleSave();
+    toast(ex ? 'محصول به‌روزرسانی شد.' : 'محصول به فهرست اضافه شد و در لیست انتخاب انتخاب شده است.','ok');
+    renderProductOutput();
+  });
+  document.querySelectorAll('[data-podelprod]').forEach(b=> b.addEventListener('click', ()=>{
+    DB.meta.customProducts = poCustomProducts_().filter(x=>x.name!==b.dataset.podelprod);
+    if(filters.poPick===b.dataset.podelprod) filters.poPick = '';
+    scheduleSave(); renderProductOutput(); toast('از فهرست حذف شد (ثبت‌های ارسال قبلی دست‌نخورده ماند).','ok');
+  }));
+
   document.getElementById('savePoBtn').addEventListener('click', ()=>{
     const date = readDatePicker('po_date');
     const product = document.getElementById('po_product').value;
@@ -2787,7 +2823,7 @@ function renderProductOutput(){
     const isNew = !editing.productOutput;
     if(editing.productOutput){ DB.productOutput = DB.productOutput.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
     else{ DB.productOutput.push(rec); toast('تولید محصول ثبت شد.','ok'); }
-    editing.productOutput = null; scheduleSave(); renderProductOutput();
+    editing.productOutput = null; filters.poPick = ''; scheduleSave(); renderProductOutput();
   });
   const cancelPoBtn = document.getElementById('cancelPoBtn');
   if(cancelPoBtn) cancelPoBtn.addEventListener('click', ()=>{ editing.productOutput = null; renderProductOutput(); });
@@ -7101,6 +7137,17 @@ function wireComboAddSelects(){
   });
 }
 // همان الگو، ولی از فهرست محصول/قطعهٔ رسمی برنامه تولید (LINE_PRODUCT_LIST_DEFAULT) — برای «تولید به‌تفکیک محصول»
+/* ---------- فهرست محصول/کد کالا در «ارسال به‌تفکیک محصول» ---------- */
+function poCustomProducts_(){ if(!Array.isArray(DB.meta.customProducts)) DB.meta.customProducts = []; return DB.meta.customProducts; }
+function poCodeOf_(name){ const c = poCustomProducts_().find(x=>x.name===name); return (c && c.code) ? c.code : ''; }
+function poProductSelectHtml(id, currentVal){
+  const targets = Object.keys(DB.meta.productMonthlyTargets || {});
+  const names = [...new Set([...LINE_PRODUCT_LIST_DEFAULT, ...targets, ...poCustomProducts_().map(x=>x.name)])].filter(Boolean);
+  const label = n => n + (poCodeOf_(n) ? ' — کد ' + poCodeOf_(n) : '');
+  const opts = ['<option value="">— انتخاب —</option>'].concat(names.map(n=>`<option value="${esc(n)}" ${currentVal===n?'selected':''}>${esc(label(n))}</option>`));
+  if(currentVal && !names.includes(currentVal)) opts.push(`<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`);
+  return `<select id="${id}">${opts.join('')}</select>`;
+}
 function productSelectHtml(id, currentVal){
   const names = LINE_PRODUCT_LIST_DEFAULT;
   let opts = ['<option value="">— انتخاب —</option>'].concat(names.map(n=>`<option value="${esc(n)}" ${currentVal===n?'selected':''}>${esc(n)}</option>`));
