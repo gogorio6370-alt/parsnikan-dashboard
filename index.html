@@ -2699,20 +2699,6 @@ function renderProductOutput(){
   </div>
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>🏷️ افزودن محصول / کد کالا به فهرست</h3>
-    <div class="hint" style="margin-bottom:10px;">محصول تازه را اینجا اضافه کنید تا در لیست انتخاب «ثبت ارسال» و جدول پایش بیاید. اگر نام از قبل در فهرست باشد، کد/هدف همان به‌روزرسانی می‌شود. هدف ماه اختیاری است.</div>
-    <div class="form-grid">
-      <div class="field span-2"><label>نام محصول</label><input id="poNewName" placeholder="مثلاً ترموستات سمند — ۸۵ درجه"></div>
-      <div class="field"><label>کد کالا <span class="muted">(اختیاری)</span></label><input id="poNewCode" placeholder="مثلاً 1234567"></div>
-      <div class="field"><label>هدف این ماه <span class="muted">(اختیاری)</span></label><input id="poNewTarget" type="text" inputmode="numeric" placeholder="تعداد"></div>
-    </div>
-    <div class="modal-actions" style="justify-content:flex-start; margin-top:12px;">
-      <button class="btn btn-primary btn-sm" id="poAddProductBtn">➕ افزودن به فهرست</button>
-    </div>
-    ${poCustomProducts_().length ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">${poCustomProducts_().map(x=>`<span class="badge" style="display:flex; align-items:center; gap:6px;">${esc(x.name)}${x.code?' <span class="muted">· کد '+esc(x.code)+'</span>':''} <button data-podelprod="${esc(x.name)}" title="حذف از فهرست" style="background:none; border:none; color:inherit; cursor:pointer; font-size:14px; line-height:1;">×</button></span>`).join('')}</div>` : ''}
-  </div>
-
-  <div class="card" style="margin-bottom:16px;">
     <h3>${editing.productOutput? '✏️ ویرایش ثبت ارسال محصول':'➕ ثبت ارسال یک محصول'}</h3>
     <div class="form-grid">
       <div class="field"><label>تاریخ</label>${datePickerHtml('po_date', editing.productOutput?.date)}</div>
@@ -2793,26 +2779,11 @@ function renderProductOutput(){
     e.target.value = '';
   });
 
-  document.getElementById('poAddProductBtn').addEventListener('click', ()=>{
-    const name = document.getElementById('poNewName').value.trim().replace(/\s+/g,' ');
-    const code = document.getElementById('poNewCode').value.trim();
-    const tg = num(document.getElementById('poNewTarget').value);
-    if(!name){ toast('نام محصول را وارد کنید.','err'); return; }
-    const arr = poCustomProducts_();
-    const known = [...new Set([...LINE_PRODUCT_LIST_DEFAULT, ...Object.keys(DB.meta.productMonthlyTargets||{}), ...arr.map(x=>x.name)])];
-    const canon = known.find(n=>n.trim().toLowerCase()===name.toLowerCase()) || name;
-    const ex = arr.find(x=>x.name===canon);
-    if(ex){ if(code) ex.code = code; } else { arr.push({ name: canon, code }); }
-    if(tg!==null && tg>0) DB.meta.productMonthlyTargets = Object.assign({}, DB.meta.productMonthlyTargets||{}, { [canon]: Math.round(tg) });
-    filters.poPick = canon; scheduleSave();
-    toast(ex ? 'محصول به‌روزرسانی شد.' : 'محصول به فهرست اضافه شد و در لیست انتخاب انتخاب شده است.','ok');
-    renderProductOutput();
-  });
-  document.querySelectorAll('[data-podelprod]').forEach(b=> b.addEventListener('click', ()=>{
-    DB.meta.customProducts = poCustomProducts_().filter(x=>x.name!==b.dataset.podelprod);
-    if(filters.poPick===b.dataset.podelprod) filters.poPick = '';
-    scheduleSave(); renderProductOutput(); toast('از فهرست حذف شد (ثبت‌های ارسال قبلی دست‌نخورده ماند).','ok');
-  }));
+  { const sel = document.getElementById('po_product'); let prevVal = sel.value;
+    sel.addEventListener('change', ()=>{
+      if(sel.value === '__add__'){ sel.value = prevVal; poOpenAddProduct_(canon=>{ if(canon) renderProductOutput(); }); }
+      else prevVal = sel.value;
+    }); }
 
   document.getElementById('savePoBtn').addEventListener('click', ()=>{
     const date = readDatePicker('po_date');
@@ -7146,7 +7117,50 @@ function poProductSelectHtml(id, currentVal){
   const label = n => n + (poCodeOf_(n) ? ' — کد ' + poCodeOf_(n) : '');
   const opts = ['<option value="">— انتخاب —</option>'].concat(names.map(n=>`<option value="${esc(n)}" ${currentVal===n?'selected':''}>${esc(label(n))}</option>`));
   if(currentVal && !names.includes(currentVal)) opts.push(`<option value="${esc(currentVal)}" selected>${esc(currentVal)}</option>`);
+  opts.push('<option value="__add__">➕ افزودن محصول جدید…</option>');
   return `<select id="${id}">${opts.join('')}</select>`;
+}
+// پنجره‌ی کوچک افزودن محصول/کد کالا (از انتهای لیست انتخاب باز می‌شود)
+function poOpenAddProduct_(onDone){
+  const root = document.getElementById('modalRoot');
+  const chips = () => poCustomProducts_().map(x=>`<span class="badge" style="display:inline-flex; align-items:center; gap:6px; margin:3px;">${esc(x.name)}${x.code?' <span class="muted">· '+esc(x.code)+'</span>':''} <button data-pomdel="${esc(x.name)}" title="حذف از فهرست" style="background:none; border:none; color:inherit; cursor:pointer; font-size:14px; line-height:1;">×</button></span>`).join('');
+  const draw = () => {
+    root.innerHTML = `<div class="modal-bg" id="mbg"><div class="modal">
+      <h3>➕ افزودن محصول جدید</h3>
+      <div class="field" style="margin-top:10px;"><label>نام محصول</label><input id="poNewName" placeholder="مثلاً ترموستات سمند — ۸۵ درجه" autocomplete="off"></div>
+      <div class="form-grid" style="margin-top:6px;">
+        <div class="field"><label>کد کالا <span class="muted">(اختیاری)</span></label><input id="poNewCode" autocomplete="off"></div>
+        <div class="field"><label>هدف این ماه <span class="muted">(اختیاری)</span></label><input id="poNewTarget" type="text" inputmode="numeric" autocomplete="off"></div>
+      </div>
+      ${poCustomProducts_().length ? `<div class="hint" style="margin-top:8px;">اضافه‌شده‌ها (برای حذف از فهرست، ×):</div><div>${chips()}</div>` : ''}
+      <div class="modal-actions"><button class="btn btn-ghost" id="mCancel">انصراف</button><button class="btn btn-primary" id="poAddOk">افزودن</button></div>
+    </div></div>`;
+    const close = () => { root.innerHTML = ''; if(onDone) onDone(null); };
+    document.getElementById('mCancel').addEventListener('click', close);
+    document.getElementById('mbg').addEventListener('click', e=>{ if(e.target.id==='mbg') close(); });
+    root.querySelectorAll('[data-pomdel]').forEach(b=> b.addEventListener('click', ()=>{
+      DB.meta.customProducts = poCustomProducts_().filter(x=>x.name!==b.dataset.pomdel);
+      if(filters.poPick===b.dataset.pomdel) filters.poPick = '';
+      scheduleSave(); draw();
+    }));
+    document.getElementById('poAddOk').addEventListener('click', ()=>{
+      const name = document.getElementById('poNewName').value.trim().replace(/\s+/g,' ');
+      const code = document.getElementById('poNewCode').value.trim();
+      const tg = num(document.getElementById('poNewTarget').value);
+      if(!name){ toast('نام محصول را وارد کنید.','err'); return; }
+      const arr = poCustomProducts_();
+      const known = [...new Set([...LINE_PRODUCT_LIST_DEFAULT, ...Object.keys(DB.meta.productMonthlyTargets||{}), ...arr.map(x=>x.name)])];
+      const canon = known.find(n=>n.trim().toLowerCase()===name.toLowerCase()) || name;
+      const ex = arr.find(x=>x.name===canon);
+      if(ex){ if(code) ex.code = code; } else { arr.push({ name: canon, code }); }
+      if(tg!==null && tg>0) DB.meta.productMonthlyTargets = Object.assign({}, DB.meta.productMonthlyTargets||{}, { [canon]: Math.round(tg) });
+      filters.poPick = canon; scheduleSave(); root.innerHTML = '';
+      toast(ex ? 'محصول به‌روزرسانی شد.' : 'محصول اضافه شد و انتخاب شد.','ok');
+      if(onDone) onDone(canon);
+    });
+    setTimeout(()=>{ const n = document.getElementById('poNewName'); if(n) n.focus(); }, 30);
+  };
+  draw();
 }
 function productSelectHtml(id, currentVal){
   const names = LINE_PRODUCT_LIST_DEFAULT;
