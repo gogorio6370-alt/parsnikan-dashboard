@@ -521,9 +521,8 @@ const NAV = [
   {id:'stop',    label:'توقفات تولید',      group:'گزارش‌ها',    icon:'pause'},
   {id:'lean',    label:'شاخص‌های ناب (OEE)', group:'تحلیل',       icon:'gauge'},
   {id:'flowmap', label:'نقشه خط و گلوگاه‌ها', group:'تحلیل',       icon:'map'},
-  {id:'stdtime', label:'⏳ زمان استاندارد ساخت', group:'تحلیل', icon:'gauge'},
-  {id:'takt',    label:'⏱ تکت‌تایم و سایکل‌تایم', group:'تحلیل', icon:'clock'},
-  {id:'manhours',label:'👷 نفر-ساعت',          group:'تحلیل',       icon:'users'},
+  {id:'takt',    label:'⏱ تکت‌تایم و زمان ساخت', group:'تحلیل', icon:'clock'},
+  {id:'manhours',label:'👷 نفر-ساعت و ظرفیت نیرو', group:'تحلیل',    icon:'users'},
   {id:'trend',   label:'📈 روند ماهانه',       group:'تحلیل',       icon:'chart'},
   {id:'target',  label:'🎯 هدف و پیشرفت تولید', group:'تحلیل',    icon:'target'},
   {id:'actions', label:'✅ مرکز اقدامات',      group:'تحلیل',    icon:'checklist'},
@@ -1662,7 +1661,33 @@ function promptAnalyticsPin_(pendingTab){
   document.getElementById('aPin').addEventListener('keydown', e=>{ if(e.key==='Enter') doConfirm(); });
   setTimeout(()=>{ const el=document.getElementById('aPin'); if(el) el.focus(); }, 30);
 }
+// تب‌های مشترک یکی شده‌اند: «زمان استاندارد ساخت» داخل «تکت‌تایم» و «ظرفیت و نیاز نیرو» داخل «نفر-ساعت» (با کلید بالای صفحه)
+let an_subTab = { takt:'takt', manhours:'mh' };
+function an_subBar_(tab, items){
+  const view = document.getElementById('view'); if(!view) return;
+  const bar = view.querySelector('.card.tight'); if(!bar) return;
+  const div = document.createElement('div'); div.className = 'no-print';
+  div.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px;';
+  items.forEach(it=>{
+    const b = document.createElement('button'); b.type = 'button';
+    b.className = 'btn btn-sm ' + (an_subTab[tab]===it[0] ? 'btn-primary' : 'btn-ghost');
+    b.textContent = it[1];
+    b.addEventListener('click', ()=>{ an_subTab[tab] = it[0]; goTo(tab); });
+    div.appendChild(b);
+  });
+  bar.parentNode.insertBefore(div, bar.nextSibling);
+}
+function renderTaktMerged(){
+  if(an_subTab.takt === 'std') renderStdTime(); else renderTakt();
+  an_subBar_('takt', [['takt','⏱ تکت‌تایم و سایکل‌تایم'], ['std','⏳ زمان استاندارد ساخت']]);
+}
+function renderManHoursMerged(){
+  if(an_subTab.manhours === 'cap') renderCapacity(); else renderManHours();
+  an_subBar_('manhours', [['mh','👷 نفر-ساعت و بهره‌گیری'], ['cap','🧮 برنامه در برابر ظرفیت و نیرو']]);
+}
 function goTo(tab){
+  if(tab === 'stdtime'){ an_subTab.takt = 'std'; tab = 'takt'; }
+  else if(tab === 'capacity'){ an_subTab.manhours = 'cap'; tab = 'manhours'; }
   // اپراتور اگر (مثلاً از طریق لینک قدیمی/کلیک از نمایشگر) به تبی خارج از دسترسی مجازش برسد، به «ورود داده» برمی‌گردد
   if(currentSessionRole()!=='admin' && !STAFF_ALLOWED_TABS.includes(tab)) tab = 'entry';
   // دسترسی مستقیم به تب‌های قفل‌شده (مثلاً از راه‌های دیگری غیر از منو) هم رمز می‌خواهد
@@ -1673,12 +1698,11 @@ function goTo(tab){
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
-  const titles = {stdtime:'زمان استاندارد ساخت ترموستات', takt:'تکت‌تایم و سایکل‌تایم', manhours:'نفر-ساعت در اختیار و کارکرد', trend:'روند ماهانه تولید، ارسال و شاخص‌ها', cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
+  const titles = {stdtime:'زمان استاندارد ساخت ترموستات', takt:'تکت‌تایم، سایکل‌تایم و زمان استاندارد ساخت', manhours:'نفر-ساعت، ظرفیت و نیاز نیرو', trend:'روند ماهانه تولید، ارسال و شاخص‌ها', cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
     waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', actions:'مرکز اقدامات', dash:'داشبورد مدیریتی'};
   const subs = {
-    stdtime:'از تولید قرص تا کنترل نهایی — استاندارد هر گروه محصول، قطعه‌ی هم‌زمان در جریان و میانگین وزنی',
-    takt:'سایکل‌تایم هر ایستگاه از آمار روزانه‌ی ثبت‌شده در برابر تکت‌تایم — گلوگاه‌ها و اتلاف توقفات',
-    manhours:'نفر-ساعت در اختیار (حاضرین × ساعت شیفت) در برابر نفر-ساعت کارکرد ثبت‌شده در ایستگاه‌ها',
+    takt:'تکت‌تایم و سایکل‌تایم ایستگاه‌ها، و زمان استاندارد ساخت هر گروه محصول — با کلید بالای صفحه جابه‌جا شوید',
+    manhours:'نفر-ساعت در اختیار و کارکرد، و برنامه در برابر ظرفیت واقعی (نفر لازم، اضافه‌کاری، دوباره‌کاری و جداسازی)',
     trend:'سیر ماه‌به‌ماه تولید، ارسال، تحقق هدف، OEE، ضایعات، توقفات و نیروی انسانی',
     cover:'نمای کلی زنده برای مدیریت ارشد و مشتری — تاریخ، ساعت و شاخص‌های کلیدی',
     entry:'تنها فرمی که باید هر روز تکمیل شود — سایر گزارش‌ها به‌صورت خودکار محاسبه می‌شوند',
@@ -1700,7 +1724,7 @@ function goTo(tab){
   document.getElementById('pageTitle').textContent = titles[tab];
   document.getElementById('pageSub').textContent = subs[tab] + ' — ماه فعال: ' + monthLabel(DB.meta.activeMonth);
   destroyCharts();
-  const renderers = {stdtime:renderStdTime, takt:renderTakt, manhours:renderManHours, trend:renderTrend, cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
+  const renderers = {takt:renderTaktMerged, manhours:renderManHoursMerged, trend:renderTrend, cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
   renderers[tab]();
   document.getElementById('view').dataset.hadContent = '1';
   document.getElementById('view').scrollTop = 0;
@@ -5257,6 +5281,459 @@ function renderManHours(){
       options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false} }, scales:{ x:{ grid:{color:'#1a2540'} }, y:{ grid:{display:false}, ticks:{font:{size:11}} } } }
     });
   }
+}
+
+/* =========================================================================
+   TAB: 🧮 ظرفیت و نیاز نیرو — برنامه تولید در برابر ظرفیت واقعی (بخشی از تب «نفر-ساعت و ظرفیت نیرو»)
+   قواعد: ساعت عادی ۸ و با اضافه‌کاری ۱۰ ساعت در روز؛ کار در پنجشنبه/جمعه کلاً اضافه‌کاری است؛
+   فرایندهای خارج از زمان‌سنجی = دوباره‌کاری + جداسازی (از «زمان دقیقه» ثبت‌شده در ضایعات/دوباره‌کاری).
+   ========================================================================= */
+function cap_cfg(){
+  if(!DB.meta.capCfg) DB.meta.capCfg = { basis:'prod' };
+  const c = DB.meta.capCfg;
+  c.hc = c.hc || {}; c.days = c.days || {}; c.off = c.off || {}; c.prod = c.prod || {};
+  return c;
+}
+// تعطیلات رسمی ۱۴۰۵ (تقویم رسمی کشور — گردآوری‌شده از چند منبع آنلاین در ۲۲ مهر ۱۴۰۵). پنجشنبه‌ها و جمعه‌ها جداگانه از روی روز هفته تشخیص داده می‌شوند.
+// تعطیلی‌های دیگر (مثلاً تعطیلی ادارات یا شرکت) را در کادر «تعطیلی‌های اضافه» وارد کنید.
+const IR_HOLIDAYS = {
+  '1405/01/01':'نوروز و عید فطر', '1405/01/02':'عید نوروز', '1405/01/03':'عید نوروز', '1405/01/04':'عید نوروز',
+  '1405/01/12':'روز جمهوری اسلامی', '1405/01/13':'روز طبیعت', '1405/01/25':'شهادت امام جعفر صادق (ع)',
+  '1405/03/06':'عید قربان', '1405/03/14':'عید غدیر و رحلت امام خمینی', '1405/03/15':'قیام ۱۵ خرداد',
+  '1405/04/03':'تاسوعا', '1405/04/04':'عاشورا',
+  '1405/05/13':'اربعین', '1405/05/21':'رحلت پیامبر (ص) و شهادت امام حسن (ع)', '1405/05/22':'شهادت امام رضا (ع)', '1405/05/30':'شهادت امام حسن عسکری (ع)',
+  '1405/06/08':'میلاد پیامبر (ص) و امام صادق (ع)',
+  '1405/08/22':'شهادت حضرت فاطمه (س)',
+  '1405/10/02':'ولادت امام علی (ع)', '1405/10/16':'مبعث پیامبر (ص)',
+  '1405/11/04':'نیمه شعبان', '1405/11/22':'پیروزی انقلاب اسلامی',
+  '1405/12/09':'شهادت امام علی (ع)', '1405/12/19':'عید فطر', '1405/12/20':'تعطیل به مناسبت عید فطر', '1405/12/29':'ملی شدن صنعت نفت'
+};
+function cap_normDate(d){ const p = toEnDigits(String(d||'')).trim().split('/'); return p.length === 3 ? p[0] + '/' + String(p[1]).padStart(2,'0') + '/' + String(p[2]).padStart(2,'0') : String(d||'').trim(); }
+function cap_holidayOf(date){
+  const k = cap_normDate(date);
+  if(IR_HOLIDAYS[k]) return IR_HOLIDAYS[k];
+  if((cap_cfg().extraHolidays || []).indexOf(k) >= 0) return 'تعطیلی ثبت‌شده توسط شما';
+  return null;
+}
+// روز غیرعادی = پنجشنبه، جمعه یا تعطیل رسمی؛ کار در این روزها کلاً اضافه‌کاری حساب می‌شود
+function cap_dayNum(date){ const p = toEnDigits(String(date)).split('/'); const g = jalaliToGregorian(+p[0], +p[1], +p[2]); return Math.round(Date.UTC(g[0], g[1]-1, g[2]) / 86400000); }
+function cap_isOff(date){ const w = weekdayFromJalali(date); return w === 'پنجشنبه' || w === 'جمعه' || !!cap_holidayOf(date); }
+// تقویم ماه: روزهای عادی، پنجشنبه/جمعه/تعطیل، و فهرست تعطیلات رسمیِ روزهای عادی
+function cap_calendar(mk){
+  const p = toEnDigits(mk).split('/'), y = +p[0], m = +p[1];
+  let reg = 0, off = 0, days = 0; const list = [], hols = [];
+  for(let d=1; d<=31; d++){
+    let g; try{ g = jalaliToGregorian(y, m, d); }catch(e){ break; }
+    if(!g) break;
+    const back = gregorianToJalali(g[0], g[1], g[2]);
+    if(+back[1] !== m) break;
+    days++;
+    const date = y + '/' + String(m).padStart(2,'0') + '/' + String(d).padStart(2,'0');
+    const wd = new Date(g[0], g[1]-1, g[2]).getDay();      // ۴ = پنجشنبه، ۵ = جمعه
+    const hol = cap_holidayOf(date), thuFri = (wd === 4 || wd === 5);
+    const isOff = thuFri || !!hol;
+    if(isOff) off++; else reg++;
+    if(hol && !thuFri) hols.push({ date, day:d, title:hol });
+    list.push({ date, off:isOff });
+  }
+  return { days, reg, off, hols, list };
+}
+// ساعت واقعی هر نفر در هر روز از روی ثبت ایستگاه‌ها → اضافه‌کاری واقعیِ ثبت‌شده
+// (روز عادی: ساعت بیش از ساعت عادی — پنجشنبه/جمعه: کل ساعت). بازه‌های هم‌پوشان یک نفر ادغام می‌شوند.
+function cap_toMin(t){ const m = toEnDigits(String(t||'')).match(/(\d{1,2})\s*[:٫.]\s*(\d{2})/); return m ? (+m[1])*60 + (+m[2]) : null; }
+function cap_actualOT(M, reg){
+  const byOpDay = {};
+  (M.stationHourly||[]).forEach(rec=>{
+    const ops = an_opsOf(rec); if(!ops.length) return;
+    const s0 = cap_toMin(rec.shiftStart); let e0 = cap_toMin(rec.shiftEnd);
+    if(s0 === null || e0 === null) return;
+    if(e0 <= s0) e0 += 1440;
+    ops.forEach(o=>{ const k = o + '|' + rec.date; (byOpDay[k] = byOpDay[k] || []).push([s0, e0]); });
+  });
+  let ot = 0, otOff = 0, personDays = 0, n = 0, tot = 0, maxH = 0;
+  Object.keys(byOpDay).forEach(k=>{
+    const iv = byOpDay[k].sort((x,y)=>x[0]-y[0]);
+    let len = 0, cs = iv[0][0], ce = iv[0][1];
+    for(let i=1;i<iv.length;i++){ if(iv[i][0] <= ce){ ce = Math.max(ce, iv[i][1]); } else { len += ce - cs; cs = iv[i][0]; ce = iv[i][1]; } }
+    len += ce - cs;
+    const h = len / 60, off = cap_isOff(k.split('|')[1]);
+    n++; tot += h; if(h>maxH) maxH = h;
+    const add = off ? h : Math.max(h - reg, 0);
+    if(add > 0.01){ ot += add; personDays++; if(off) otOff += add; }
+  });
+  return { ot, otOff, personDays, n, avgHours: n ? tot/n : null, maxH };
+}
+// دوباره‌کاری و جداسازی (ورودی مشروط) — دو گروه جدا (یک ثبت فقط در یک گروه می‌آید تا دوبار شمرده نشود)
+function cap_rework(M){
+  const isSeg = x => x.category === 'ورودی مشروط' || /جداساز/.test(x.wasteType || '');
+  const mk = (label)=>({ label, rows:[], qty:0, min:0, noMin:0, causes:{} });
+  const G = { rework: mk('دوباره‌کاری'), seg: mk('جداسازی') };
+  (M.waste||[]).forEach(x=>{
+    let g = null;
+    if(isSeg(x)) g = G.seg; else if(x.eventType === 'دوباره‌کاری') g = G.rework;
+    if(!g) return;
+    g.rows.push(x); g.qty += (x.wasteCount||0);
+    if(x.reworkMinutes > 0) g.min += x.reworkMinutes; else g.noMin++;
+    const k = x.wasteType || 'نامشخص';
+    const c = g.causes[k] || (g.causes[k] = { name:k, qty:0, min:0, n:0 });
+    c.qty += (x.wasteCount||0); c.min += (x.reworkMinutes||0); c.n++;
+  });
+  Object.values(G).forEach(g=>{ g.mh = g.min/60; g.top = Object.values(g.causes).sort((a,b)=> (b.min-a.min) || (b.qty-a.qty)).slice(0,5); });
+  return G;
+}
+// آمار یک ماه: نفر-ساعت در دسترس، تولید، ارسال و بهره‌وری (قطعه به‌ازای هر نفر-ساعت، پس از کسر دوباره‌کاری/جداسازی)
+function cap_monthStat(mk, basis){
+  const M = an_monthM(mk);
+  const rows = M.daily.filter(an_dayHasData);
+  const hcs = rows.filter(e=>e.headcount > 0 && (basis === 'ship' ? an_hasShip(e) : true));
+  const avail = hcs.reduce((s,e)=>s + e.headcount * an_shiftHoursOf(e), 0);
+  const out = hcs.reduce((s,e)=>s + (basis === 'ship' ? shipTotal(e) : allLinesTotal(e)), 0);
+  const RWm = cap_rework(M), Em = RWm.rework.mh + RWm.seg.mh;
+  const carve = rows.length ? Em * hcs.length / rows.length : 0;
+  let den = avail - carve; if(den <= 0) den = avail;
+  const prodAll = rows.reduce((s,e)=>s+allLinesTotal(e), 0);
+  const shipAll = rows.reduce((s,e)=>s+(an_hasShip(e) ? shipTotal(e) : 0), 0);
+  return { mk, label: an_shortMonth(mk), days: rows.length, hcDays: hcs.length, offDays: rows.filter(e=>cap_isOff(e.date)).length,
+    avgHC: hcs.length ? hcs.reduce((s,e)=>s+e.headcount,0)/hcs.length : null,
+    avgHCreg: (()=>{ const a = hcs.filter(e=>!cap_isOff(e.date)); return a.length ? a.reduce((s,e)=>s+e.headcount,0)/a.length : null; })(),
+    offHC: (()=>{ const a = hcs.filter(e=>cap_isOff(e.date)); return a.length ? a.reduce((s,e)=>s+e.headcount,0)/a.length : null; })(),
+    offN: hcs.filter(e=>cap_isOff(e.date)).length,
+    avgShift: hcs.length ? hcs.reduce((s,e)=>s+an_shiftHoursOf(e),0)/hcs.length : null,
+    avail, out, den, p: (den > 0 && out > 0) ? out/den : null, prodAll, shipAll, ratio: prodAll > 0 ? shipAll/prodAll : null, plan: an_planOf(mk) };
+}
+function cap_calc(){
+  const mk = DB.meta.activeMonth, M = monthData(), c = cap_cfg();
+  const H = an_manHours(M);
+  const basis = c.basis === 'ship' ? 'ship' : 'prod';   // پیش‌فرض: تولید همه خطوط (بار کاری واقعی؛ ارسال به انبار از تولید عقب می‌افتد)
+  const reg = c.reg > 0 ? c.reg : 8;                                              // ساعت عادی در روز
+  const shift = DB.meta.normalShiftHours || 10;
+  const ot = (typeof c.ot === 'number' && c.ot >= 0) ? c.ot : Math.max(shift - reg, 0);   // اضافه‌کاری مجاز در روز عادی (پیش‌فرض: ۸ → ۱۰ ساعت)
+  const offHrs = reg + ot;                                                        // ساعت هر نفر در روز پنجشنبه/جمعه‌ی کاری (همه اضافه‌کاری)
+  const cal = cap_calendar(mk);
+  const plan = an_planOf(mk);
+  const todayJ = todayJalaliStr(), isPast = mk < todayJ.slice(0,7);     // ماه گذشته: دیگر روز باقی‌مانده‌ای ندارد
+  const staff = c.staff > 0 ? c.staff : 35;                              // کل نیروی صف
+
+  // روزهای دارای ثبت: عادی و پنجشنبه/جمعه/تعطیل
+  const dayRows = H.days.filter(r=>r.e);
+  const nd = dayRows.length;
+  const ndOff = dayRows.filter(r=>cap_isOff(r.date)).length, ndReg = nd - ndOff;
+  const Dreg = c.days[mk] > 0 ? c.days[mk] : cal.reg;
+  // سابقه‌ی ماه‌های اخیر (مرجع بهره‌وری و الگوی کار)
+  const hist = an_monthsWithData().filter(k=>k <= mk).slice(-4).map(k=>cap_monthStat(k, basis));
+  const good = hist.filter(h=>h.hcDays >= 7 && h.p).slice(-3);
+  let pHist = null;
+  if(good.length){ const o = good.reduce((s,h)=>s+h.out,0), dd = good.reduce((s,h)=>s+h.den,0); pHist = dd > 0 ? o/dd : null; }
+  const prevH = hist.filter(h=>h.mk < mk).slice(-1)[0];
+  const prevOff = prevH ? prevH.offDays : 0;
+  // پیش‌فرض پنجشنبه/جمعه‌ی کاری: بیشینه‌ی «تا امروز کار شده» و «الگوی ماه قبل»، حداکثر به تعداد پنجشنبه/جمعه‌های همین ماه
+  const Doff = c.off[mk] >= 0 && c.off[mk] !== undefined ? c.off[mk] : Math.min(cal.off, Math.max(ndOff, prevOff));
+  const Dtot = Dreg + Doff;
+  // روزهای باقی‌مانده از روی تقویم واقعی، بعد از آخرین روز دارای ثبت (نه حدس از تعداد روزهای ثبت‌شده)
+  const lastDate = dayRows.length ? dayRows.map(r=>cap_normDate(r.date)).sort().slice(-1)[0] : null;
+  const after = cal.list.filter(x=>!lastDate || x.date > lastDate);
+  const remRegCal = after.filter(x=>!x.off).length, remOffCal = after.filter(x=>x.off).length;
+  const remRegDays = isPast ? 0 : (c.days[mk] > 0 ? Math.max(Dreg - ndReg, 0) : remRegCal);
+  const remOffDays = isPast ? 0 : Math.min(remOffCal, Math.max(Doff - ndOff, 0));
+  const remDays = remRegDays + remOffDays;
+
+  // تعداد نفرات: میانه‌ی حاضرین ثبت‌شده در روزهای عادی
+  const hcRec = H.days.filter(r=>r.e && r.hc && r.hcSrc === 'ثبت‌شده' && !cap_isOff(r.date)).map(r=>r.hc);
+  const hcAuto = (hcRec.length ? an_median(hcRec) : null) || H.baseHC || null;
+  const hc = c.hc[mk] > 0 ? c.hc[mk] : hcAuto;
+  const hcAvgReg = hcRec.length ? hcRec.reduce((a,b)=>a+b,0)/hcRec.length : hc;
+  // حاضرین پنجشنبه/جمعه‌ی کاری معمولاً کمتر از روزهای عادی است؛ از میانگین ماه‌های اخیر گرفته می‌شود
+  const offGood = good.filter(h=>h.offN > 0 && h.offHC > 0);
+  const hcOffAuto = offGood.length ? offGood.reduce((s,h)=>s+h.offHC*h.offN,0) / offGood.reduce((s,h)=>s+h.offN,0) : null;
+  const hcOff = (hc > 0 && hcOffAuto) ? Math.min(hcOffAuto, hc) : hc;
+
+  // دوباره‌کاری + جداسازی = فرایندهای خارج از زمان‌سنجی؛ با ریتم روزانه‌ی تا امروز تا پایان ماه برآورد می‌شود
+  const RW = cap_rework(M);
+  const Etd = RW.rework.mh + RW.seg.mh;
+  const Edaily = nd > 0 ? Etd / nd : 0;
+  const E = Edaily * Dtot;
+
+  const rows = dayRows.map(r=>{
+    const e = r.e;
+    const out = basis === 'ship' ? (an_hasShip(e) ? shipTotal(e) : null) : allLinesTotal(e);
+    return { date:r.date, avail:r.avail, hc:r.hc, out, off:cap_isOff(r.date) };
+  });
+  const outRows = rows.filter(r=>r.out !== null && r.out > 0);
+  const outToDate = outRows.reduce((s,r)=>s+r.out, 0);
+  const pairs = rows.filter(r=>r.avail > 0 && r.out !== null);
+  const availP = pairs.reduce((s,r)=>s+r.avail, 0);
+  const outP = pairs.reduce((s,r)=>s+r.out, 0);
+  // نفر-ساعت دوباره‌کاری/جداسازی از مخرج بهره‌وری کسر می‌شود و جدا به نیاز اضافه می‌شود تا دوبار شمرده نشود
+  const carve = Edaily * pairs.length;
+  let den = availP - carve; if(den <= 0) den = availP;
+  const pObs = (outP > 0 && den > 0) ? outP / den : null;
+  // بهره‌وری پایدار: میانگین وزنی ۳ ماه اخیر (نه فقط ماه جاری که ممکن است روزهای پرت داشته باشد)؛ دستی همیشه برنده است
+  const p = c.prod[mk] > 0 ? c.prod[mk] : (pHist || pObs);
+  const pSrc = c.prod[mk] > 0 ? 'دستی' : (pHist ? `میانگین وزنی ${fmt(good.length,0)} ماه اخیر` : `ماه جاری تا امروز (${fmt(pairs.length,0)} روز)`);
+  const recent = outRows.slice(-7);
+  const avgRecent = recent.length ? recent.reduce((s,r)=>s+r.out,0) / recent.length : null;
+
+  const K = { staff, isPast, lastDate, todayJ, hcAvgReg, hcOff, hcOffAuto, hist, good, pHist, pSrc, prevOff, mk, M, H, c, basis, reg, ot, offHrs, cal, Dreg, Doff, D:Dtot, ndReg, ndOff, plan, hc, hcAuto, E, Etd, Edaily, RW, rows, nd, outToDate, p, pObs, pDays:pairs.length,
+              remRegDays, remOffDays, remDays, avgRecent, ok: !!(plan > 0 && hc > 0 && p > 0) };
+  if(K.ok){
+    K.reqProd = plan / p; K.reqMH = K.reqProd + E;
+    K.regMH = hc * reg * Dreg;
+    K.otCapWeek = hc * ot * Dreg;                 // اضافه‌کاری مجاز در روزهای عادی
+    K.otCapOff = hcOff * offHrs * Doff;           // پنجشنبه/جمعه/تعطیلِ کاری با نفرات حاضر آن روزها (همه اضافه‌کاری)
+    K.otCap = K.otCapWeek + K.otCapOff;
+    K.maxMH = K.regMH + K.otCap;
+    K.otNeed = Math.max(K.reqMH - K.regMH, 0);
+    K.otGap = Math.max(K.otNeed - K.otCap, 0);
+    K.otPerPD = (hc*Dtot) > 0 ? K.otNeed / (hc*Dtot) : null;
+    K.needNoOT = (reg*Dreg) > 0 ? K.reqMH / (reg*Dreg) : null;
+    K.needMaxOT = K.maxMH > 0 ? K.reqMH * hc / K.maxMH : null;
+    K.shortNoOT = K.needNoOT === null ? null : Math.max(Math.ceil(K.needNoOT - hc - 1e-9), 0);
+    K.shortMaxOT = K.needMaxOT === null ? null : Math.max(Math.ceil(K.needMaxOT - hc - 1e-9), 0);
+    K.capReg = Math.max(K.regMH - E, 0) * p; K.capMax = Math.max(K.maxMH - E, 0) * p;
+    // اگر همه‌ی نیروی صف حاضر باشند (بدون مرخصی و غیبت)
+    K.attend = staff > 0 ? hcAvgReg / staff : null;
+    K.capFull = Math.max(staff * (reg + ot) * Dreg + staff * (hc > 0 ? hcOff / hc : 1) * offHrs * Doff - E, 0) * p;
+    // اهرم‌های رسیدن به برنامه با الگوی کاری فعلی (ساعت عادی + اضافه‌کاری مجاز + پنجشنبه/جمعه‌ی پیش‌بینی‌شده)
+    K.gapMH = Math.max(K.reqMH - K.maxMH, 0);
+    if(K.gapMH > 0){
+      K.extraPersons = Math.ceil(K.gapMH / (K.maxMH / hc) - 1e-9);
+      K.extraOffDays = K.gapMH / (hcOff * offHrs);
+      K.offDaysLeft = Math.max(cal.off - Doff, 0);
+      const dn = Math.max(K.maxMH - E, 0);
+      K.pNeeded = dn > 0 ? plan / dn : null; K.pUp = K.pNeeded ? K.pNeeded / p - 1 : null;
+    }
+    K.forecast = (avgRecent !== null) ? outToDate + remDays * avgRecent : null;
+    // از امروز تا پایان ماه
+    K.remPlan = Math.max(plan - outToDate, 0);
+    if(remDays > 0){
+      K.remE = Edaily * remDays;
+      K.remReq = K.remPlan / p + K.remE;
+      K.remRegMH = hc * reg * remRegDays;
+      K.remOtCap = hc * ot * remRegDays + hcOff * offHrs * remOffDays;
+      K.remMax = K.remRegMH + K.remOtCap;
+      K.remOT = Math.max(K.remReq - K.remRegMH, 0);
+      K.remOTPerPD = K.remOT / (hc * remDays);
+      K.remNeedNoOT = remRegDays > 0 ? K.remReq / (reg * remRegDays) : null;
+      K.remNeedMaxOT = K.remMax > 0 ? K.remReq * hc / K.remMax : null;
+      K.remShortNoOT = K.remNeedNoOT === null ? null : Math.max(Math.ceil(K.remNeedNoOT - hc - 1e-9), 0);
+      K.remShortMaxOT = K.remNeedMaxOT === null ? null : Math.max(Math.ceil(K.remNeedMaxOT - hc - 1e-9), 0);
+      K.dailyNeed = K.remPlan / remDays;
+    }
+  }
+  K.AO = cap_actualOT(M, reg);
+  return K;
+}
+
+function renderCapacity(){
+  const K = cap_calc(), c = K.c, mk = K.mk, view = document.getElementById('view');
+  const RW = K.RW, AO = K.AO, E = K.E;
+  const f1 = v => (v===null || v===undefined || !isFinite(v)) ? '—' : fmt(v,1);
+  const f0 = v => (v===null || v===undefined || !isFinite(v)) ? '—' : fmt(v,0);
+  const availAll = K.H.availTotal || 0;
+  const hasOT = K.ot > 0 || K.Doff > 0;
+  const otColor = !K.ok ? AN.mute : (K.otNeed <= 0 ? AN.teal : (K.otGap > 0 ? AN.red : AN.amber));
+  const shortColor = !K.ok ? AN.mute : (!K.shortNoOT ? AN.teal : (K.shortMaxOT > 0 ? AN.red : AN.amber));
+  const planAuto = an_planOf(mk);
+  const basisLabel = K.basis === 'ship' ? 'ارسال به انبار' : 'تولید همه خطوط';
+  const dayTxt = `${fmt(K.Dreg,0)} روز عادی${K.Doff>0? ' + '+fmt(K.Doff,0)+' پنجشنبه/جمعه':''}`;
+
+  // ---- یادداشت‌های کیفیت داده
+  const notes = [];
+  if(!K.plan) notes.push({ icon:'⚠️', color:AN.amber, text:'برنامه این ماه تعریف نشده؛ آن را در کادر «برنامه ماه» بالا وارد کنید یا فایل برنامه را در «ارسال به‌تفکیک محصول» بارگذاری کنید.' });
+  if(!K.hc) notes.push({ icon:'⚠️', color:AN.amber, text:'تعداد نفرات مشخص نیست؛ «تعداد پرسنل حاضر» را در «ورود داده روزانه» ثبت کنید یا در کادر «تعداد نفرات» بنویسید.' });
+  if(K.plan && K.hc && !K.p) notes.push({ icon:'⚠️', color:AN.amber, text:`برای محاسبه‌ی بهره‌وری هنوز روزی با «تعداد حاضرین» و «${basisLabel}» هم‌زمان ثبت نشده؛ بهره‌وری را دستی وارد کنید.` });
+  if(K.ok){
+    notes.push({ icon:'ℹ️', color:AN.blue, text:`بهره‌وری مبنا <b>${f1(K.p)}</b> قطعه به‌ازای هر نفر-ساعت بر مبنای «${basisLabel}» (${esc(K.pSrc)}). جدول «مرجع اعتبارسنجی» پایین‌تر همین عدد را ماه‌به‌ماه نشان می‌دهد.` });
+    if(K.basis === 'prod'){ const rs = K.hist.filter(h=>h.ratio).map(h=>h.ratio); if(rs.length) notes.push({ icon:'ℹ️', color:AN.blue, text:`برنامه با «تولید» سنجیده شده؛ ارسال به انبار معمولاً حدود <b>${pct(rs.reduce((a,b)=>a+b,0)/rs.length,0)}</b> تولید همان ماه است (تأخیر ارسال/کنترل). اگر برنامه را «ارسال» می‌خواهید، مبنا را در ورودی‌ها عوض کنید.` }); }
+    notes.push({ icon:'ℹ️', color:AN.blue, text:`قاعده‌ی ساعت: <b>${fmt(K.reg,1)}</b> ساعت عادی و تا <b>${fmt(K.reg+K.ot,1)}</b> ساعت با اضافه‌کاری در روز؛ کار در پنجشنبه و جمعه کلاً اضافه‌کاری حساب می‌شود. روزهای عادی ماه (شنبه تا چهارشنبه) از تقویم گرفته شده و تعطیلات رسمی را کم نکرده — در صورت نیاز در ورودی‌ها اصلاح کنید.` });
+    notes.push({ icon:'💡', color:AN.blue, text:`حساسیت: هر <b>۱۰٪</b> بهبود بهره‌وری، نفر-ساعت لازم را حدود <b>${f0(K.reqProd - K.reqProd/1.1)}</b> کم می‌کند. اگر بهره‌وری مبنای زمان‌سنجی (استاندارد) را دارید، در کادر «بهره‌وری» وارد کنید.` });
+    if(K.basis === 'ship') notes.push({ icon:'⚠️', color:AN.amber, text:'مبنای «ارسال به انبار» بهره‌وری را کمتر از واقعیت نشان می‌دهد، چون ارسال از تولید عقب می‌افتد؛ برای سنجش ظرفیت نیرو، «تولید همه خطوط» دقیق‌تر است.' });
+    if(K.otGap > 0) notes.push({ icon:'🔴', color:AN.red, text:`حتی با تمام اضافه‌کاری مجاز (${fmt(K.ot,1)} ساعت در روز عادی${K.Doff>0?' و '+fmt(K.Doff,0)+' روز پنجشنبه/جمعه':''}) <b>${f0(K.otGap)}</b> نفر-ساعت کم می‌آید؛ یعنی با همین نفرات برنامه کامل نمی‌شود — یا نیروی بیشتر، یا کم‌کردن برنامه، یا افزایش بهره‌وری، یا کار در پنجشنبه/جمعه‌های بیشتر.` });
+    else if(K.otNeed > 0) notes.push({ icon:'🟠', color:AN.amber, text:`برنامه فقط با اضافه‌کاری درمی‌آید: حدود <b>${f0(K.otNeed)}</b> نفر-ساعت (<b>${f1(K.otPerPD)}</b> ساعت برای هر نفر در هر روز کاری).` });
+    else notes.push({ icon:'✅', color:AN.teal, text:'با ساعت عادی و همین نفرات برنامه درمی‌آید و نیاز به اضافه‌کاری نیست.' });
+  }
+  { // تقویم رسمی، حضور نفرات و عقب‌ماندگی ثبت
+    if(toEnDigits(mk).split('/')[0] === '1405'){
+      notes.push(K.cal.hols.length
+        ? { icon:'📅', color:AN.blue, text:`تعطیلات رسمی این ماه (غیر از پنجشنبه/جمعه): ${K.cal.hols.map(h=>fmt(h.day,0)+' ('+esc(h.title)+')').join('، ')}؛ از روزهای کاری عادی کم شده‌اند و در صورت کار، اضافه‌کاری کامل حساب می‌شوند.` }
+        : { icon:'📅', color:AN.blue, text:`طبق تقویم رسمی ۱۴۰۵ این ماه تعطیل رسمی غیر از پنجشنبه/جمعه ندارد؛ ${fmt(K.cal.reg,0)} روز کاری عادی و ${fmt(K.cal.off,0)} پنجشنبه/جمعه دارد.` });
+    } else notes.push({ icon:'📅', color:AN.amber, text:'تقویم تعطیلات رسمی داخل داشبورد فقط برای سال ۱۴۰۵ است؛ برای این ماه فقط پنجشنبه/جمعه غیرکاری حساب شده — تعطیلی‌ها را در «تعطیلی‌های اضافه» وارد کنید.' });
+    if(K.hc && K.staff) notes.push({ icon:'👥', color:AN.blue, text:`محاسبه بر مبنای نفرات <b>حاضر</b> است: میانگین حاضرین روزهای عادی <b>${f1(K.hcAvgReg)}</b> از ${fmt(K.staff,0)} نفر نیروی صف (${pct(K.hcAvgReg/K.staff,0)}).${K.hcOffAuto? ` در پنجشنبه/جمعه‌های کاری معمولاً ${f1(K.hcOff)} نفر آمده‌اند.`:''}` });
+    if(!K.isPast && K.lastDate){ let lag = 0; try{ lag = cap_dayNum(K.todayJ) - cap_dayNum(K.lastDate); }catch(e){} if(lag >= 2) notes.push({ icon:'🕒', color:AN.amber, text:`آخرین روز دارای ثبت <b>${esc(K.lastDate)}</b> است و امروز <b>${esc(K.todayJ)}</b>؛ حدود <b>${fmt(lag,0)}</b> روز هنوز ثبت نشده. با ثبت روزهای جدید، تولید تا امروز و پیش‌بینی دقیق‌تر می‌شوند.` }); }
+  }
+  if(K.basis === 'ship' && K.rows.some(r=>r.out === null)) notes.push({ icon:'🕒', color:AN.blue, text:`در <b>${fmt(K.rows.filter(r=>r.out===null).length,0)}</b> روز، «ارسال به انبار» ثبت نشده و آن روزها در بهره‌وری و تولید تا امروز نیامده‌اند.` });
+  if(K.H.noOps || K.H.noTime) notes.push({ icon:'🕒', color:AN.blue, text:`${K.H.noTime? `<b>${fmt(K.H.noTime,0)}</b> ثبت ایستگاه بدون ساعت شروع/پایان`:''}${K.H.noTime && K.H.noOps?' و ':''}${K.H.noOps? `<b>${fmt(K.H.noOps,0)}</b> ثبت بدون نام اپراتور`:''} در اضافه‌کاری واقعی حساب نشد.` });
+  const noMinTotal = RW.rework.noMin + RW.seg.noMin;
+  if(noMinTotal > 0) notes.push({ icon:'🕒', color:AN.blue, text:`<b>${fmt(noMinTotal,0)}</b> ثبت دوباره‌کاری/جداسازی بدون «زمان (دقیقه)» است و در نفر-ساعتشان نیامده؛ نفر-ساعت واقعی کمی بیشتر از عدد نمایش‌داده‌شده است.` });
+
+  // ---- جدول پاسخ به سؤال‌ها
+  const qa = [];
+  if(K.ok){
+    const capTop = hasOT ? K.capMax : K.capReg;
+    const capMsg = capTop >= K.plan ? `برنامه (${f0(K.plan)}) قابل‌دستیابی است` : `<b style="color:${AN.red}">${f0(K.plan - capTop)}</b> قطعه کمتر از برنامه (${f0(K.plan)})`;
+    qa.push(['چقدر می‌توانم تولید کنم؟',
+      hasOT ? `<b>${f0(K.capMax)}</b> قطعه با اضافه‌کاری مجاز<br><span class="muted">${f0(K.capReg)} فقط با ساعت عادی</span>` : `<b>${f0(K.capReg)}</b> قطعه با ساعت عادی`,
+      `${f0(K.hc)} نفر × ${dayTxt} × ${fmt(K.reg,1)}${K.ot>0? ' تا '+fmt(K.reg+K.ot,1):''} ساعت × ${f1(K.p)} قطعه/نفر-ساعت، پس از کسر دوباره‌کاری و جداسازی؛ ${capMsg}.${K.forecast!==null? ` با ریتم ۷ روز اخیر، پایان ماه حدود <b>${f0(K.forecast)}</b> می‌شود.`:''}`]);
+    qa.push(['چقدر کمبود نیرو دارم؟',
+      `<b style="color:${shortColor}">${f0(K.shortNoOT)}</b> نفر فقط با ساعت عادی` + (hasOT ? `<br><span class="muted">${f0(K.shortMaxOT)} نفر با اضافه‌کاری مجاز</span>` : ''),
+      `نیاز: ${f1(K.needNoOT)} نفر با ساعت عادی${hasOT? ` (${f1(K.needMaxOT)} نفر با اضافه‌کاری مجاز)`:''} در برابر ${f0(K.hc)} نفر موجود.`]);
+    qa.push(['چند نفر-ساعت برای تولید نیاز دارم؟', `<b>${f0(K.reqMH)}</b> نفر-ساعت`,
+      `${f0(K.reqProd)} برای تولید ${f0(K.plan)} قطعه + ${f0(E)} دوباره‌کاری و جداسازی (برآورد کل ماه با ریتم روزانه‌ی تا امروز؛ تا امروز ${f1(K.Etd)}).`]);
+    qa.push(['چند نفر-ساعت در دسترس دارم؟', `<b>${f0(K.regMH)}</b> نفر-ساعت عادی` + (hasOT ? `<br><span class="muted">${f0(K.maxMH)} با اضافه‌کاری مجاز</span>` : ''),
+      `${f0(K.hc)} نفر × ${fmt(K.Dreg,0)} روز × ${fmt(K.reg,1)} ساعت عادی${K.ot>0? ` (+ تا ${fmt(K.ot,1)} ساعت اضافه‌کاری در روز عادی)`:''}${K.Doff>0? ` + ${fmt(K.Doff,0)} روز پنجشنبه/جمعه × ${fmt(K.offHrs,1)} ساعت (همه اضافه‌کاری)`:''}.`]);
+    qa.push(['چقدر نیازمند اضافه‌کاری هستم؟', `<b style="color:${otColor}">${f0(K.otNeed)}</b> نفر-ساعت`,
+      K.otNeed > 0 ? `حدود ${f1(K.otPerPD)} ساعت برای هر نفر در هر روز کاری${K.otGap>0? ` — <b style="color:${AN.red}">${f0(K.otGap)} نفر-ساعت بیشتر از اضافه‌کاری مجاز است</b>`:''}.` : 'نیازی نیست.']);
+  }
+  if(K.hc && K.staff) qa.push(['حضور نیروی صف چقدر بوده؟', `<b>${f1(K.hcAvgReg)}</b> از ${fmt(K.staff,0)} نفر<br><span class="muted">${pct(K.hcAvgReg/K.staff,0)} حضور روزهای عادی</span>`,
+    `مرخصی و غیبت حدود ${f1(Math.max(K.staff - K.hcAvgReg,0))} نفر را از دسترس خارج می‌کند${K.ok? ` — ${f0(Math.max(K.staff - K.hcAvgReg,0) * (K.reg + K.ot) * K.Dreg)} نفر-ساعت در روزهای عادی ماه؛ اگر همه حاضر بودند ظرفیت حدود ${f0(K.capFull)} قطعه می‌شد`:''}. گزارش بر مبنای نفرات حاضر است.`]);
+  qa.push(['چقدر دوباره‌کاری انجام دادم؟', `<b>${f1(RW.rework.mh)}</b> نفر-ساعت`,
+    `${f0(RW.rework.qty)} قطعه در ${f0(RW.rework.rows.length)} ثبت${availAll>0? ` — ${pct(RW.rework.mh/availAll,1)} از نفر-ساعت در اختیار`:''}.`]);
+  qa.push(['چقدر جداسازی کردم؟', `<b>${f1(RW.seg.mh)}</b> نفر-ساعت`,
+    `${f0(RW.seg.qty)} قطعه در ${f0(RW.seg.rows.length)} ثبت (ورودی مشروط/جداسازی در خط)${availAll>0? ` — ${pct(RW.seg.mh/availAll,1)} از نفر-ساعت در اختیار`:''}.`]);
+  qa.push(['اضافه‌کاری واقعیِ ثبت‌شده تا امروز؟', `<b>${f1(AO.ot)}</b> نفر-ساعت`,
+    AO.n ? `از روی ساعت شروع/پایان ایستگاه‌ها: ${f0(AO.personDays)} نفر-روز با اضافه‌کاری${AO.otOff>0? ` (${f1(AO.otOff)} نفر-ساعتش در پنجشنبه/جمعه)`:''}؛ میانگین ساعت ثبت‌شده‌ی هر نفر در روز ${f1(AO.avgHours)} (بیشترین ${f1(AO.maxH)}).` : 'هنوز ساعت شروع/پایان کافی ثبت نشده.']);
+
+  const qaHtml = `<div class="card" style="margin-bottom:16px;"><h3>پاسخ به سؤال‌های مدیریتی <span class="muted">(بر پایه‌ی برنامه و داده‌ی واقعی ثبت‌شده)</span></h3>
+    <div class="table-wrap"><table><thead><tr><th>سؤال</th><th>پاسخ</th><th>توضیح</th></tr></thead><tbody>
+    ${qa.map(r=>`<tr><td style="white-space:nowrap;font-weight:800;">${r[0]}</td><td>${r[1]}</td><td class="muted" style="line-height:1.9;">${r[2]}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+
+  // ---- اهرم‌های رسیدن به برنامه
+  let leverHtml = '';
+  if(K.ok){
+    if(K.gapMH > 0){
+      const offBad = K.extraOffDays > K.offDaysLeft + 1e-9;
+      leverHtml = `<div class="card" style="margin-bottom:16px;"><h3>برای رسیدن به برنامه چه گزینه‌هایی هست؟ <span class="muted">(با الگوی کاری فعلی ${f0(K.gapMH)} نفر-ساعت کم می‌آید؛ هر گزینه به‌تنهایی کافی است)</span></h3>
+        <div class="grid grid-4" style="margin:10px 0;">
+          ${kpiCard('نیروی بیشتر','نفر اضافه', '+'+fmt(K.extraPersons,0), null, AN.blue)}
+          ${kpiCard('پنجشنبه/جمعه‌ی کاری بیشتر','روز اضافه', '+'+f1(K.extraOffDays), null, offBad?AN.red:AN.amber)}
+          ${kpiCard('افزایش بهره‌وری','قطعه/نفر-ساعت', K.pUp===null?'—':'+'+pct(K.pUp,1), null, AN.teal)}
+          ${kpiCard('برنامه‌ی قابل‌دستیابی با همین منابع','قطعه', f0(K.capMax), null, AN.purple)}
+        </div>
+        <div class="hint">نیروی بیشتر: حدود ${fmt(Math.min(K.extraPersons, Math.max(K.staff-K.hc,0)),0)} نفر با کاهش مرخصی/غیبت (تا سقف ${fmt(K.staff,0)} نفر نیروی صف) و ${fmt(Math.max(K.extraPersons - Math.max(K.staff-K.hc,0),0),0)} نفر جذب جدید؛ اگر همه‌ی ${fmt(K.staff,0)} نفر حاضر باشند ظرفیت حدود ${f0(K.capFull)} قطعه می‌شود. گزینه‌ی پنجشنبه/جمعه/تعطیل: ${fmt(K.offDaysLeft,0)} پنجشنبه/جمعه‌ی دیگر در ماه مانده${offBad?' — برای جبران کافی نیست و باید با نیرو یا بهره‌وری ترکیب شود':''}. بهره‌وری لازم ${f1(K.pNeeded)} است در برابر ${f1(K.p)} فعلی. قابل‌دستیابی با همین منابع = ${pct(K.capMax/K.plan,0)} برنامه.</div></div>`;
+    } else {
+      leverHtml = `<div class="card" style="margin-bottom:16px;"><div class="hint">✅ با الگوی کاری فعلی (ساعت عادی + اضافه‌کاری مجاز + ${fmt(K.Doff,0)} پنجشنبه/جمعه) نفر-ساعت کافی است و حدود ${f0(K.maxMH - K.reqMH)} نفر-ساعت ذخیره می‌ماند.</div></div>`;
+    }
+  }
+
+  // ---- مرجع اعتبارسنجی: ماه‌های اخیر
+  let histHtml = '';
+  if(K.hist.length){
+    const ps = K.good.map(h=>h.p);
+    let cvMsg = '';
+    if(ps.length >= 2){ const mean = ps.reduce((a,b)=>a+b,0)/ps.length; const sd = Math.sqrt(ps.reduce((a,b)=>a+(b-mean)*(b-mean),0)/ps.length); const cv = sd/mean;
+      cvMsg = cv <= 0.12 ? `<span style="color:${AN.teal}">بهره‌وری ماه‌ها پایدار است (تغییرات ${pct(cv,0)}) — مبنای محاسبه قابل‌اتکاست.</span>` : `<span style="color:${AN.amber}">بهره‌وری ماه‌ها پراکنده است (تغییرات ${pct(cv,0)}) — بهتر است بهره‌وری را دستی تعیین کنید.</span>`; }
+    histHtml = `<div class="card" style="margin-bottom:16px;"><h3>مرجع اعتبارسنجی: ظرفیت و بهره‌وری ماه‌های اخیر <span class="muted">(مبنا: ${basisLabel})</span></h3>
+      <div class="table-wrap"><table><thead><tr><th>ماه</th><th class="num">روز کاری</th><th class="num">پنجشنبه/جمعه</th><th class="num">میانگین نفر</th><th class="num">حضور÷نیروی صف</th><th class="num">ساعت/روز</th><th class="num">نفر-ساعت</th><th class="num">تولید</th><th class="num">ارسال</th><th class="num">ارسال÷تولید</th><th class="num">قطعه/نفر-ساعت</th><th class="num">برنامه</th></tr></thead><tbody>
+      ${K.hist.map(h=>`<tr${h.mk===mk?' style="background:rgba(76,141,255,.08);"':''}><td>${esc(h.label)}${h.mk===mk?' <span class="muted">(تا امروز)</span>':''}</td><td class="num">${fmt(h.days,0)}</td><td class="num">${fmt(h.offDays,0)}</td><td class="num">${h.avgHC? f1(h.avgHC):'—'}</td><td class="num">${h.avgHCreg && K.staff? pct(h.avgHCreg/K.staff,0):'—'}</td><td class="num">${h.avgShift? f1(h.avgShift):'—'}</td><td class="num">${h.avail? f0(h.avail):'—'}</td><td class="num">${f0(h.prodAll)}</td><td class="num">${f0(h.shipAll)}</td><td class="num">${h.ratio? pct(h.ratio,0):'—'}</td><td class="num"><b>${h.p? f1(h.p):'—'}</b></td><td class="num">${h.plan? f0(h.plan):'—'}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="hint" style="margin-top:8px;">ماه‌هایی که «تعداد حاضرین» روزانه‌شان ثبت نشده بهره‌وری ندارند. ${cvMsg}</div></div>`;
+  }
+
+  // ---- کادر «از امروز تا پایان ماه»
+  let remHtml = '';
+  if(K.ok && K.remDays > 0){
+    const needColor = K.avgRecent !== null && K.dailyNeed > K.avgRecent * 1.02 ? AN.red : AN.teal;
+    remHtml = `<div class="card" style="margin-bottom:16px;"><h3>از امروز تا پایان ماه <span class="muted">(${fmt(K.remRegDays,0)} روز عادی${K.remOffDays>0? ' + '+fmt(K.remOffDays,0)+' پنجشنبه/جمعه':''} باقی‌مانده)</span></h3>
+      <div class="grid grid-4" style="margin:10px 0;">
+        ${kpiCard('برنامه باقی‌مانده','قطعه', f0(K.remPlan), null, AN.blue)}
+        ${kpiCard('تولید روزانه‌ی لازم','قطعه/روز', f0(K.dailyNeed), null, needColor)}
+        ${kpiCard('میانگین ۷ روز اخیر','قطعه/روز', K.avgRecent!==null? f0(K.avgRecent):'—', null, AN.amber)}
+        ${kpiCard('اضافه‌کاری لازم برای هر نفر','ساعت/روز', f1(K.remOTPerPD), null, K.remOTPerPD > K.ot ? AN.red : (K.remOTPerPD>0?AN.amber:AN.teal))}
+      </div>
+      <div class="hint">نفر-ساعت لازم باقی‌مانده <b>${f0(K.remReq)}</b> | در دسترس عادی <b>${f0(K.remRegMH)}</b> (با اضافه‌کاری مجاز <b>${f0(K.remMax)}</b>) | اضافه‌کاری لازم <b>${f0(K.remOT)}</b> | کمبود نیرو: <b>${f0(K.remShortNoOT)}</b> نفر فقط با ساعت عادی، <b>${f0(K.remShortMaxOT)}</b> نفر با اضافه‌کاری مجاز.</div></div>`;
+  }
+
+  // ---- جدول دوباره‌کاری/جداسازی
+  const causeTbl = g => g.top.length ? `<table><thead><tr><th>علت</th><th class="num">ثبت</th><th class="num">قطعه</th><th class="num">نفر-ساعت</th></tr></thead><tbody>${g.top.map(x=>`<tr><td>${esc(x.name)}</td><td class="num">${fmt(x.n,0)}</td><td class="num">${fmt(x.qty,0)}</td><td class="num">${x.min? fmt(x.min/60,1):'—'}</td></tr>`).join('')}</tbody></table>` : '<div class="tbl-empty">ثبتی برای این ماه نیست.</div>';
+  const rwHtml = `<div class="grid grid-2" style="margin-bottom:16px;">
+      <div class="card"><h3>دوباره‌کاری — ${f1(RW.rework.mh)} نفر-ساعت <span class="muted">(${f0(RW.rework.qty)} قطعه)</span></h3><div class="table-wrap">${causeTbl(RW.rework)}</div></div>
+      <div class="card"><h3>جداسازی — ${f1(RW.seg.mh)} نفر-ساعت <span class="muted">(${f0(RW.seg.qty)} قطعه)</span></h3><div class="table-wrap">${causeTbl(RW.seg)}</div></div>
+    </div>`;
+
+  // ---- کادر ورودی‌ها
+  const inpStyle = 'width:100%;';
+  const inputsHtml = `<div class="card" style="margin-bottom:16px;"><h3>ورودی‌های محاسبه <span class="muted">(هرچه خالی بماند، خودکار از داده‌ی واقعی یا تقویم محاسبه می‌شود)</span></h3>
+    <div class="form-grid" style="margin-top:8px;">
+      <div class="field"><label>برنامه ماه (قطعه)</label><input id="capPlan" inputmode="numeric" style="${inpStyle}" value="${esc((DB.meta.monthPlans && DB.meta.monthPlans[mk] && DB.meta.monthPlans[mk].plan) || '')}" placeholder="${planAuto? fmt(planAuto,0)+' (خودکار)':'وارد کنید'}"></div>
+      <div class="field"><label>تعداد نفرات</label><input id="capHC" inputmode="numeric" style="${inpStyle}" value="${c.hc[mk]||''}" placeholder="${K.hcAuto? fmt(K.hcAuto,0)+' (میانه‌ی حاضرین روزهای عادی)':'وارد کنید'}"></div>
+      <div class="field"><label>ساعت کار عادی در روز</label><input id="capReg" inputmode="decimal" style="${inpStyle}" value="${c.reg||''}" placeholder="8 (پیش‌فرض)"></div>
+      <div class="field"><label>اضافه‌کاری مجاز در روز عادی (ساعت)</label><input id="capOT" inputmode="decimal" style="${inpStyle}" value="${typeof c.ot==='number'? c.ot : ''}" placeholder="${Math.max((DB.meta.normalShiftHours||10)-K.reg,0)} (تا ${DB.meta.normalShiftHours||10} ساعت)"></div>
+      <div class="field"><label>روزهای کاری عادی (شنبه تا چهارشنبه)</label><input id="capDays" inputmode="numeric" style="${inpStyle}" value="${c.days[mk]||''}" placeholder="${K.cal.reg} (از تقویم، بدون تعطیلات رسمی)"></div>
+      <div class="field"><label>پنجشنبه/جمعه‌ی کاری (همه اضافه‌کاری)</label><input id="capOff" inputmode="numeric" style="${inpStyle}" value="${c.off[mk]!==undefined? c.off[mk] : ''}" placeholder="${Math.min(K.cal.off, Math.max(K.ndOff, K.prevOff))} (الگوی ماه قبل/تا امروز)"></div>
+      <div class="field"><label>بهره‌وری (قطعه / نفر-ساعت)</label><input id="capProd" inputmode="decimal" style="${inpStyle}" value="${c.prod[mk]||''}" placeholder="${K.p? f1(K.p)+' (خودکار)':'وارد کنید'}"></div>
+      <div class="field"><label>کل نیروی صف (نفر)</label><input id="capStaff" inputmode="numeric" style="${inpStyle}" value="${c.staff||''}" placeholder="35 (پیش‌فرض)"></div>
+      <div class="field"><label>تعطیلی‌های اضافه (تاریخ‌ها، با ویرگول)</label><input id="capHol" style="${inpStyle}" value="${esc((c.extraHolidays||[]).join('، '))}" placeholder="مثلاً 1405/08/05، 1405/08/06"></div>
+      <div class="field"><label>مبنای شمارش خروجی</label><select id="capBasis" style="${inpStyle}"><option value="prod" ${K.basis==='prod'?'selected':''}>تولید همه خطوط (پیشنهادی)</option><option value="ship" ${K.basis==='ship'?'selected':''}>ارسال به انبار</option></select></div>
+    </div>
+    <div class="hint" style="margin-top:8px;">نفر-ساعت لازم = برنامه ÷ بهره‌وری + فرایندهای خارج از زمان‌سنجی؛ و این فرایندها همان دوباره‌کاری و جداسازی ثبت‌شده‌اند که با ریتم روزانه‌ی تا امروز برای کل ماه برآورد می‌شوند. برای بالابردن دقت، «زمان (دقیقه)» را در هر ثبت ضایعات/دوباره‌کاری وارد کنید.</div></div>`;
+
+  view.innerHTML = renderMonthBar() + `
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${kpiCard('نفر-ساعت لازم','نفر-ساعت', K.ok? f0(K.reqMH):'—', null, AN.blue)}
+    ${kpiCard('نفر-ساعت در دسترس (ساعت عادی)','نفر-ساعت', K.ok? f0(K.regMH):'—', null, AN.teal)}
+    ${kpiCard('اضافه‌کاری لازم','نفر-ساعت', K.ok? f0(K.otNeed):'—', null, otColor)}
+    ${kpiCard('کمبود نیرو (فقط با ساعت عادی)','نفر', K.ok? f0(K.shortNoOT):'—', null, shortColor)}
+  </div>
+  ${notes.length? `<div class="card" style="margin-bottom:16px;">${an_insightHtml(notes)}</div>`:''}
+  ${qaHtml}
+  ${leverHtml}
+  ${histHtml}
+  ${remHtml}
+  ${K.ok? `<div class="grid grid-2" style="margin-bottom:16px;">
+    <div class="card"><h3>نفر-ساعت: لازم در برابر در دسترس</h3><div class="chart-box" style="height:280px;"><canvas id="chCapMH"></canvas></div></div>
+    <div class="card"><h3>پیشرفت تجمعی در برابر برنامه <span class="muted">(${basisLabel})</span></h3><div class="chart-box" style="height:280px;"><canvas id="chCapBurn"></canvas></div></div>
+  </div>` : ''}
+  ${rwHtml}
+  ${inputsHtml}`;
+
+  bindMonthBar(); an_addPrintBtn('برنامه تولید در برابر ظرفیت و نیروی انسانی');
+
+  // ---- نمودارها
+  if(K.ok){
+    mkChart('chCapMH', {
+      type:'bar',
+      data:{ labels: hasOT ? ['لازم','در دسترس (عادی)','در دسترس + اضافه‌کاری مجاز'] : ['لازم','در دسترس (عادی)'], datasets:[{ data: hasOT ? [K.reqMH, K.regMH, K.maxMH] : [K.reqMH, K.regMH], backgroundColor:[AN.red, AN.teal, AN.blue], borderRadius:8, barPercentage:.62, labelDigits:0, forceLabels:true }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c2=> fmt(c2.parsed.y,0)+' نفر-ساعت' } } },
+        scales:{ y:{ beginAtZero:true, grid:{color:'#1a2540'}, title:{display:true, text:'نفر-ساعت'} }, x:{ grid:{display:false} } } }
+    });
+    const labels = K.rows.map(r=>an_dayLabel(r.date));
+    for(let j=1;j<=K.remDays;j++) labels.push('+'+j);
+    let cum = 0; const actual = K.rows.map(r=>{ cum += (r.out||0); return cum; });
+    const planPace = labels.map((_,i)=> +(K.plan * Math.min(i+1, K.D) / K.D).toFixed(0));
+    const proj = labels.map((_,i)=>{
+      if(K.avgRecent===null || !K.rows.length) return null;
+      if(i < K.rows.length-1) return null;
+      return Math.round(cum + (i-(K.rows.length-1)) * K.avgRecent);
+    });
+    mkChart('chCapBurn', {
+      type:'line',
+      data:{ labels, datasets:[
+        { label:'تجمعی واقعی', data: labels.map((_,i)=> i<actual.length? actual[i]:null), borderColor:AN.teal, backgroundColor:AN.teal, tension:.25, pointRadius:2, borderWidth:2.6, noLabel:true },
+        { label:'پیش‌بینی با ریتم اخیر', data:proj, borderColor:AN.amber, borderDash:[6,5], tension:.1, pointRadius:0, borderWidth:2, noLabel:true },
+        { label:'مسیر لازم برای برنامه', data:planPace, borderColor:'rgba(150,163,190,.85)', borderDash:[2,4], pointRadius:0, borderWidth:2, noLabel:true }
+      ]},
+      options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+        plugins:{ legend:{ position:'bottom', labels:{usePointStyle:true, boxWidth:8} }, tooltip:{ callbacks:{ label:c2=> c2.dataset.label+': '+fmt(c2.parsed.y,0) } } },
+        scales:{ y:{ beginAtZero:true, grid:{color:'#1a2540'}, ticks:{ callback:v=>fmt(v/1000,0)+'k' } }, x:{ grid:{display:false} } } }
+    });
+  }
+
+  // ---- ذخیره‌ی ورودی‌ها
+  const val = id => { const el = document.getElementById(id); return el ? num(String(el.value).replace(/[,٬\s]/g,'')) : null; };
+  const bindNum = (id, apply) => { const el = document.getElementById(id); if(el) el.addEventListener('change', ()=>{ apply(val(id)); scheduleSave(); renderManHoursMerged(); }); };
+  bindNum('capPlan', v=>{ const plans = an_monthPlans(); const cur = plans[mk] || {}; if(v>0) cur.plan = Math.round(v); else delete cur.plan; if(Object.keys(cur).length) plans[mk] = cur; else delete plans[mk]; });
+  bindNum('capHC',   v=>{ if(v>0) c.hc[mk] = Math.round(v); else delete c.hc[mk]; });
+  bindNum('capReg',  v=>{ if(v>0 && v<=24) c.reg = v; else delete c.reg; });
+  bindNum('capOT',   v=>{ if(v!==null && v>=0 && v<=24) c.ot = v; else delete c.ot; });
+  bindNum('capDays', v=>{ if(v>0 && v<=31) c.days[mk] = Math.round(v); else delete c.days[mk]; });
+  bindNum('capOff',  v=>{ if(v!==null && v>=0 && v<=31) c.off[mk] = Math.round(v); else delete c.off[mk]; });
+  bindNum('capStaff', v=>{ if(v>0) c.staff = Math.round(v); else delete c.staff; });
+  { const hel = document.getElementById('capHol'); if(hel) hel.addEventListener('change', ()=>{
+      c.extraHolidays = hel.value.split(/[,،\s]+/).map(x=>cap_normDate(x)).filter(x=>/^\d{4}\/\d{2}\/\d{2}$/.test(x));
+      if(!c.extraHolidays.length) delete c.extraHolidays; scheduleSave(); renderManHoursMerged(); }); }
+  bindNum('capProd', v=>{ if(v>0) c.prod[mk] = v; else delete c.prod[mk]; });
+  const bs = document.getElementById('capBasis'); if(bs) bs.addEventListener('change', ()=>{ c.basis = bs.value; scheduleSave(); renderManHoursMerged(); });
 }
 
 /* =========================================================================
