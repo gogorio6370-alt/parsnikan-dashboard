@@ -110,6 +110,14 @@ button{font-family:inherit;}
 .topbar h2{ margin:0; font-size:18px; font-weight:800; }
 .topbar .sub{ font-size:12px; color:var(--text-mute); margin-top:2px; }
 .topbar-actions{ display:flex; gap:8px; align-items:center; }
+.top-status{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+.ts-chip{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-mute); background:rgba(147,164,195,.08); border:1px solid var(--line); border-radius:999px; padding:3px 11px; white-space:nowrap; }
+.ts-chip b{ color:var(--text); font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.3px; direction:ltr; unicode-bidi:isolate; }
+.ts-dot{ width:8px; height:8px; border-radius:50%; background:#2fd9c4; box-shadow:0 0 0 3px rgba(47,217,196,.18); animation:pulse 1.6s infinite; display:inline-block; }
+.ts-dot.off{ background:#ff5d6c; box-shadow:0 0 0 3px rgba(255,93,108,.18); animation:none; }
+.ts-chip.ok{ color:#2fd9c4; border-color:rgba(47,217,196,.4); }
+.ts-chip.warn{ color:#ffcf5c; border-color:rgba(255,207,92,.45); }
+.ts-chip.bad{ color:#ff5d6c; border-color:rgba(255,93,108,.45); }
 .hamburger{ display:none; }
 
 .view{ padding:22px 26px 60px; }
@@ -345,6 +353,10 @@ td.num, th.num{ text-align:left; font-variant-numeric:tabular-nums; direction:lt
         <div>
           <h2 id="pageTitle">داشبورد مدیریتی</h2>
           <div class="sub" id="pageSub">بازه گزارش: تیر ماه ۱۴۰۵</div>
+          <div class="top-status" id="topStatus">
+            <span class="ts-chip" id="tsClock" title="ساعت زنده‌ی دستگاه شما و وضعیت اتصال اینترنت"><i class="ts-dot" id="tsDot"></i><span id="tsNet">آنلاین</span><b id="tsTime">--:--:--</b><span id="tsDate"></span></span>
+            <span class="ts-chip" id="tsLast" title="">آخرین ثبت: —</span>
+          </div>
         </div>
       </div>
       <div class="topbar-actions">
@@ -454,7 +466,7 @@ function buildManagementAlerts_(M){
   if(worstLine){
     const stNames = lineStations[worstLine.key];
     const matchedStops = stopLossRanking(M.stop.filter(x=>stationNameMatchesAny_(x.station, stNames)));
-    const matchedWasteQty = M.waste.filter(x=>stationNameMatchesAny_(x.station, stNames) && (x.eventType||'ضایعات')!=='دوباره‌کاری').reduce((s,x)=>s+(x.wasteCount||0),0);
+    const matchedWasteQty = M.waste.filter(x=>stationNameMatchesAny_(x.station, stNames) && wasteKind_(x)==='scrap').reduce((s,x)=>s+(x.wasteCount||0),0);
     const lostQtyEst = Math.abs(worstLine.actual - worstLine.target);
     let cause, dept;
     if(matchedStops.length && matchedStops[0].lostQty>0){
@@ -482,7 +494,7 @@ function buildManagementAlerts_(M){
   }
 
   // ۳) غالب‌ترین منشأ ضایعات کل کارخانه این ماه (اگر واقعاً غالب باشد)
-  const wasteScrap = M.waste.filter(x=>(x.eventType||'ضایعات')!=='دوباره‌کاری');
+  const wasteScrap = M.waste.filter(x=>wasteKind_(x)==='scrap');
   const wasteByCat = paretoFrom(wasteScrap, x=>x.category, x=>x.wasteCount);
   if(wasteByCat.length && wasteByCat[0].pct>=0.4){
     const top = wasteByCat[0];
@@ -501,7 +513,7 @@ const FINAL_PRODUCT_LIST_DEFAULT = ['پژو 83','درپوش ساینا','درپ�
 const LINE_PRODUCT_LIST_DEFAULT = ['ترموستات  EF‏7 — 83 درجه','ترموستات  EF‏7 — 88 درجه','ترموستات  EF‏7 — 75 درجه','ترموستات 206 — 89 درجه','ترموستات 206 — 83 درجه','ترموستات 206 — 76 درجه','ترموستات 206 CKD — 89 درجه','ترموستات 206 CKD — 83 درجه','ترموستات 206 CKD — 76 درجه','ترموستات ال 90 — 89 درجه','ترموستات ال 90 — 83 درجه','ترموستات ال 90 — 76 درجه','ترموستات ایسوزو — 85 درجه','ترموستات ایسوزو — 82 درجه','ترموستات ايویکو — 82 درجه','ترموستات ايویکو — 75 درجه','ترموستات ايویکو — 65 درجه','ترموستات بسترن','ترموستات پراید — 71 درجه','ترموستات پراید — 76 درجه','ترموستات پراید — 82 درجه','ترموستات پژو — 83 درجه','ترموستات پژو — 75 درجه','ترموستات پژو-سوپاپ دار — 75 درجه','ترموستات پیکان — 78 درجه','ترموستات پیکان — 82 درجه','ترموستات پیکان — 74 درجه','ترموستات پیکان — 71 درجه','ترموستات چري — 87 درجه','ترموستات چري — 83 درجه','ترموستات ديزل بنز — 71 درجه','ترموستات ديزل بنز — 65 درجه','ترموستات ریو — 88 درجه','ترموستات زانتیا — 83 درجه','ترموستات زانتیا — 89 درجه','ترموستات فوتون — 82 درجه','ترموستات فوتون — 75 درجه','ترموستات فوتون — 65 درجه','ترموستات نیسان — 82 درجه','ترموستات نیسان — درجه‎ 76.5','ترموستات نیسان ديزل — 82 درجه','ترموستات نیسان ديزل — درجه‎ 76.5','ترموستات ولوو FH‏12 — 75 درجه','ترموستات کاپرا — 82 درجه','ترموستات کاپرا — 76 درجه','درپوش ترموستات — L90','درپوش ترموستات — ساینا','درپوش ترموستات — شاهین','درپوش ترموستات — جک','سه راهی آب بغل — 206','سه راهی آب بغل — شاهین پلاس'];
 const WASTE_TYPE_LIST_DEFAULT = ['پایه ورودی','پایه حین تولید','برنجی','واشرتفلون','میله فرمان 29','میله فرمان 30','میله فرمان 31','میله فرمان 32','میله فرمان 33','میله فرمان 34','سیلندر ورودی','کلاهی ورودی','کلاهی حین تولید','درپوش ترموستات ورودی','پایه ckd','واشر ckd','درپوش ترموستات حین تولید','پین ساینا','پین جک','پین شاهین','فنر ترموستات','فنر ckd','قفل شدگی','پین','دریچه پاره حین تولید','خطای اپراتور','دریچه پاره کنترل','نک نخورده','ترکیدگی سیلندر','نشتی سیلندر','قیچی کردن','آنیل','منگوله ورودی','سوختگی منگوله','دریچه ورودی','پارگی دیافراگم','دفرمگی سیلندر','عدم عملکرد','بدنه','گیرکرده','کوتاهی تاج','مشکلات سیلندر','دیافراگم','میله','ایرادات بدنه','خرابی پایه','درپوش L90','پین l90','دمونتاژckd','پین شاهین پلاس','تست','پین405','درپوش 405','ضایعات سیلندر','درپوش','ضایعات بدنه','شکستگی','دفرمگی','سوختگی','ضایعات دریچه','سوراخ در بدنه','ترک دربدنه','ترک','پارگی واشر','پارگی سیلندر','سیلندر ورودی تیپ B — عدم قابلیت اطمینان (۱۰۰٪ جداسازی)','سیلندر ورودی تیپ A — رد پرسکاری','ورودی منگوله — نیاز به منگوله‌زن','واشر CKD — پارگی (جداسازی در خط)','درپوش‌ها — مشکلات کیفی (جداسازی در خط)','سه‌راهی ۲۰۶ — مشکلات کیفی (جداسازی در خط)','کلاهی مشهد — مشکلات کیفی (جداسازی در خط)','دریچه لاستیکی — مشکلات کیفی (جداسازی در خط)','دریچه پراید مشهد — مشکلات کیفی (جداسازی در خط)','سایر'];
 const WASTE_CATEGORIES = ['ورودی','ورودی مشروط','حین فرآیند','کنترل نهایی','سایر'];
-const WASTE_EVENT_TYPES = ['ضایعات','دوباره‌کاری'];
+const WASTE_EVENT_TYPES = ['ضایعات','جداسازی','دوباره‌کاری'];
 const SHORTAGE_STATUS = ['در انتظار تامین','تامین شده','پیگیری فوری'];
 // فهرست قطعات/محصولات — از فایل پیوست شرکت استخراج شده؛ در فرم «ضایعات تولید» (قطعه/محصول)
 // و «کسری قطعه» (نام قطعه/شرح کسری) به‌صورت کشویی استفاده می‌شود.
@@ -635,6 +647,55 @@ function gregorianToJalali(gy,gm,gd){
   const jd = (days<186)? 1+(days%31) : 1+((days-186)%30);
   return [jy, jm, jd];
 }
+/* ---------- سه مفهوم جدا: ضایعات / جداسازی / دوباره‌کاری ----------
+   ضایعات = قطعه‌ی دورریز • جداسازی = قطعه‌ی «ورودی مشروط» که جدا/غربال می‌شود • دوباره‌کاری = قطعه‌ای که اصلاح می‌شود و سالم می‌ماند.
+   این سه نباید در یک عدد جمع شوند (مدیر را به اشتباه می‌اندازد). یک رکورد فقط در یک گروه می‌آید. */
+function wasteKind_(x){
+  if(x && (x.eventType === 'جداسازی' || x.category === 'ورودی مشروط' || /جداساز/.test(x.wasteType || ''))) return 'seg';
+  if(x && x.eventType === 'دوباره‌کاری') return 'rework';
+  return 'scrap';
+}
+function wasteKindLabel_(x){ return { scrap:'ضایعات', seg:'جداسازی', rework:'دوباره‌کاری' }[wasteKind_(x)]; }
+function wasteSplit_(arr){
+  const o = { scrap:{qty:0,min:0,n:0}, seg:{qty:0,min:0,n:0}, rework:{qty:0,min:0,n:0} };
+  (arr||[]).forEach(x=>{ const g = o[wasteKind_(x)]; g.qty += (x.wasteCount||0); g.min += (x.reworkMinutes||0); g.n++; });
+  return o;
+}
+/* ---------- نوار وضعیت بالای همه‌ی تب‌ها: ساعت زنده + آخرین تاریخ ثبت ---------- */
+function topStatusLast_(){
+  const norm = d => { const p = toEnDigits(String(d||'')).trim().split('/'); return p.length === 3 ? p[0] + '/' + String(p[1]).padStart(2,'0') + '/' + String(p[2]).padStart(2,'0') : ''; };
+  const today = todayJalaliStr();
+  const pick = (arr, filt) => { let m = ''; (arr||[]).forEach(r=>{ if(filt && !filt(r)) return; const d = norm(r && r.date); if(d && d <= today && d > m) m = d; }); return m; };
+  const info = {
+    'تولید روزانه': pick(DB.daily, e=>{ try{ return an_dayHasData(e); }catch(_){ return true; } }),
+    'توقفات': pick(DB.stop), 'ضایعات/دوباره‌کاری/جداسازی': pick(DB.waste), 'کسری قطعه': pick(DB.short),
+    'ارسال به‌تفکیک محصول': pick(DB.productOutput), 'آمار ایستگاه‌ها': pick(DB.stationHourly)
+  };
+  let last = ''; Object.keys(info).forEach(k=>{ if(info[k] > last) last = info[k]; });
+  return { last, info, today };
+}
+let topStatusLastCache_ = null, topStatusTickN_ = 0;
+function topStatusUpdate_(force){
+  const t = document.getElementById('tsTime'); if(!t) return;
+  const now = new Date(), pad = n => String(n).padStart(2,'0');
+  t.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  const today = todayJalaliStr();
+  const dEl = document.getElementById('tsDate'); if(dEl) dEl.textContent = (weekdayFromJalali(today) || '') + ' ' + today;
+  const online = (typeof navigator === 'undefined') ? true : navigator.onLine !== false;
+  const dot = document.getElementById('tsDot'), net = document.getElementById('tsNet');
+  if(dot) dot.className = 'ts-dot' + (online ? '' : ' off');
+  if(net) net.textContent = online ? 'آنلاین' : 'آفلاین';
+  if(force || !topStatusLastCache_ || (topStatusTickN_++ % 10) === 0){ try{ topStatusLastCache_ = topStatusLast_(); }catch(e){ topStatusLastCache_ = null; } }
+  const el = document.getElementById('tsLast'); if(!el) return;
+  const L = topStatusLastCache_;
+  if(!L || !L.last){ el.textContent = 'آخرین ثبت: —'; el.className = 'ts-chip'; el.title = 'هنوز داده‌ای ثبت نشده'; return; }
+  let lag = null; try{ lag = cap_dayNum(L.today) - cap_dayNum(L.last); }catch(e){}
+  const rel = lag === null ? '' : (lag <= 0 ? ' (امروز)' : (lag === 1 ? ' (دیروز)' : ' (' + lag + ' روز پیش)'));
+  el.textContent = 'آخرین ثبت: ' + L.last + rel;
+  el.className = 'ts-chip ' + (lag === null ? '' : (lag <= 1 ? 'ok' : (lag <= 3 ? 'warn' : 'bad')));
+  el.title = Object.keys(L.info).map(k=> k + ': ' + (L.info[k] || '—')).join('\n');
+}
+try{ setInterval(()=>topStatusUpdate_(false), 1000); window.addEventListener('online', ()=>topStatusUpdate_(true)); window.addEventListener('offline', ()=>topStatusUpdate_(true)); }catch(e){}
 function todayJalaliStr(){
   const now = new Date();
   const [jy,jm,jd] = gregorianToJalali(now.getFullYear(), now.getMonth()+1, now.getDate());
@@ -1722,6 +1783,7 @@ function goTo(tab){
     dash:'تصویر کلی عملکرد ' + currentLineName()
   };
   document.getElementById('pageTitle').textContent = titles[tab];
+  topStatusUpdate_(true);
   document.getElementById('pageSub').textContent = subs[tab] + ' — ماه فعال: ' + monthLabel(DB.meta.activeMonth);
   destroyCharts();
   const renderers = {takt:renderTaktMerged, manhours:renderManHoursMerged, trend:renderTrend, cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
@@ -3025,12 +3087,11 @@ function paretoDualFrom(items, keyFn){
   const map = new Map();
   items.forEach(it=>{
     const k = keyFn(it) || 'نامشخص';
-    if(!map.has(k)) map.set(k, { label:k, scrap:0, rework:0 });
-    const rec = map.get(k);
-    if((it.eventType||'ضایعات')==='دوباره‌کاری') rec.rework += (it.wasteCount||0);
-    else rec.scrap += (it.wasteCount||0);
+    if(!map.has(k)) map.set(k, { label:k, scrap:0, seg:0, rework:0 });
+    const rec = map.get(k), kd = wasteKind_(it);
+    rec[kd] += (it.wasteCount||0);
   });
-  const arr = [...map.values()].map(r=>({ ...r, value: r.scrap+r.rework })).sort((a,b)=>b.value-a.value);
+  const arr = [...map.values()].map(r=>({ ...r, value: r.scrap+r.seg+r.rework })).sort((a,b)=>b.value-a.value);
   const grand = arr.reduce((s,x)=>s+x.value,0);
   let cum = 0;
   arr.forEach(x=>{ cum += x.value; x.pct = grand? x.value/grand : 0; x.cumPct = grand? cum/grand : 0; });
@@ -3039,7 +3100,7 @@ function paretoDualFrom(items, keyFn){
 // وقتی نمای انتخابی «فقط ضایعات» یا «فقط دوباره‌کاری» باشد، رتبه‌بندی و درصد تجمعی هم باید دوباره
 // فقط بر همان یک ستون حساب شود (نه بر مبنای مجموع) — وگرنه ترتیب پارتو گمراه‌کننده می‌شود.
 function viewFilteredPareto_(dualArr, view){
-  if(view!=='scrap' && view!=='rework') return dualArr; // 'both'
+  if(view!=='scrap' && view!=='rework' && view!=='seg') return dualArr; // 'both'
   const arr = dualArr.map(x=>({ ...x, value:x[view] })).filter(x=>x.value>0);
   arr.sort((a,b)=>b.value-a.value);
   const grand = arr.reduce((s,x)=>s+x.value,0);
@@ -3061,12 +3122,13 @@ function renderWaste(){
   const list = [...M.waste].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
     .filter(x=> (!filters.waste || (x.station+x.part+x.operator+x.wasteType).toLowerCase().includes(filters.waste.toLowerCase()))
              && (filters.wasteCat==='all' || x.category===filters.wasteCat)
-             && (filters.wasteEventType==='all' || (x.eventType||'ضایعات')===filters.wasteEventType));
+             && (filters.wasteEventType==='all' || wasteKindLabel_(x)===filters.wasteEventType));
   // «دوباره‌کاری» (Rework) از نظر کیفیتی با «ضایعات» (Scrap) فرق دارد: در دوباره‌کاری قطعه در نهایت سالم و
   // قابل‌مصرف می‌شود (فقط وقت اضافه گرفته)، ولی در ضایعات قطعه کاملاً دورریز می‌شود. برای همین KPIها و
   // پارتوهای اصلی این تب فقط «ضایعات واقعی» را حساب می‌کنند؛ دوباره‌کاری در بخش اختصاصی خودش (پایین‌تر) دیده می‌شود.
-  const scrapOnly = M.waste.filter(x=>x.eventType!=='دوباره‌کاری');
+  const scrapOnly = M.waste.filter(x=>wasteKind_(x)==='scrap');
   const totalWaste = scrapOnly.reduce((s,x)=>s+(x.wasteCount||0),0);
+  const scrapTopStation = paretoFrom(scrapOnly, x=>x.station, x=>x.wasteCount)[0];
   const totalProduced = (()=>{
     const seen = new Set(); let s=0;
     scrapOnly.forEach(x=>{ const key = x.date+'|'+x.station+'|'+x.part; if(x.produced && !seen.has(key)){ s+=x.produced; seen.add(key);} });
@@ -3090,10 +3152,12 @@ function renderWaste(){
   // «نوع رویداد» (فیلد ۱ در فرم ثبت) — ضایعات واقعی (دورریز) در برابر دوباره‌کاری (قابل‌جبران)؛ چون از نظر
   // مدیریتی مهم‌ترین تفکیک است (همان چیزی که در فرم با کادر آبی و شماره «۱» مشخص شده)، اولین نموداری است
   // که مدیریت می‌بیند.
-  const eventTypeTotals = WASTE_EVENT_TYPES.map(t=>{
-    const rows = M.waste.filter(x=>(x.eventType||'ضایعات')===t);
-    return { label:t, qty: rows.reduce((s,x)=>s+(x.wasteCount||0),0), minutes: rows.reduce((s,x)=>s+(x.reworkMinutes||0),0), rows: rows.length };
-  });
+  const WS = wasteSplit_(M.waste);   // ضایعات / جداسازی / دوباره‌کاری — سه گروه جدا
+  const eventTypeTotals = [
+    { label:'ضایعات', qty: WS.scrap.qty, minutes: WS.scrap.min, rows: WS.scrap.n },
+    { label:'جداسازی', qty: WS.seg.qty, minutes: WS.seg.min, rows: WS.seg.n },
+    { label:'دوباره‌کاری', qty: WS.rework.qty, minutes: WS.rework.min, rows: WS.rework.n }
+  ];
   const eventTypeQtyTotal = eventTypeTotals.reduce((s,x)=>s+x.qty,0);
   // تیپ‌ها و انواع ضایعات دیگر ثابت نیستند — خودتان از همین تب می‌توانید گزینه اضافه/حذف کنید
   // (مثلاً «ورودی مشروط» برای قطعاتی که سالم می‌رسند ولی باید قبل از مصرف جدا/غربال شوند).
@@ -3104,16 +3168,16 @@ function renderWaste(){
   <div class="grid grid-4" style="margin-bottom:16px;">
     ${kpiCard('جمع کل ضایعات ثبت‌شده','عدد', fmt(totalWaste,0), null, '#ff5d6c')}
     ${kpiCard('نرخ ضایعات کل','', pct(wasteRate,2), null, '#ffcf5c')}
-    ${kpiCard('پرتکرارترین ایستگاه', '', stationPareto[0]? esc(stationPareto[0].label):'—', null, '#ff9d42', true)}
+    ${kpiCard('پرتکرارترین ایستگاهِ ضایعات', '', scrapTopStation? esc(scrapTopStation.label):'—', null, '#ff9d42', true)}
     ${kpiCard('تعداد ردیف‌های ثبت‌شده','ردیف', fmt(M.waste.length,0), null, '#4c8dff')}
   </div>
 
-  <div class="section-title" style="margin:4px 0 12px;"><span>⏱ زمان دوباره‌کاری و جداسازی این ماه</span><span class="ln"></span></div>
+  <div class="section-title" style="margin:4px 0 12px;"><span>⏱ زمان و تعداد دوباره‌کاری و جداسازی این ماه (جدا از ضایعات)</span><span class="ln"></span></div>
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('⏱ جمع زمان (دوباره‌کاری + جداسازی)','', minHourFmt(totalReworkMin), null, totalReworkMin>0?'#ff5d6c':'#2fd9c4', true)}
-    ${kpiCard('معادل ساعت کاری ازدست‌رفته','ساعت', fmt(totalReworkMin/60,1), null, '#ff9d42')}
-    ${kpiCard('تعداد قطعه دوباره‌کاری/جداسازی‌شده','عدد', fmt(totalReworkQty,0), null, '#ffcf5c')}
-    ${kpiCard('برآورد اثر روی ظرفیت تولید','عدد', '~'+fmt(reworkLostQtyEst,0), null, '#ff5d6c')}
+    ${kpiCard('⏱ زمان دوباره‌کاری','', minHourFmt(WS.rework.min), null, WS.rework.min>0?'#2fd9c4':'#93a4c3', true)}
+    ${kpiCard('⏱ زمان جداسازی','', minHourFmt(WS.seg.min), null, WS.seg.min>0?'#a78bfa':'#93a4c3', true)}
+    ${kpiCard('قطعه دوباره‌کاری‌شده','عدد', fmt(WS.rework.qty,0), null, '#2fd9c4')}
+    ${kpiCard('قطعه جداسازی‌شده','عدد', fmt(WS.seg.qty,0), null, '#a78bfa')}
   </div>
   ${totalReworkMin>0? `<div class="hint" style="margin:-8px 0 16px;">این ${minHourFmt(totalReworkMin)} (دوباره‌کاری + جداسازی ورودی مشروط)، معادل برآوردیِ <b>~${fmt(reworkLostQtyEst,0)} عدد</b> ظرفیت تولید ازدست‌رفته است (بر مبنای نرخ استاندارد ساعتی همان ایستگاه) — این عدد قبلاً هیچ‌جای دیگری از داشبورد دیده نمی‌شد. برای ثبت این زمان، کافی است در هر ردیف ضایعات (چه «ورودی مشروط» چه «دوباره‌کاری») فیلد «زمان دوباره‌کاری/جداسازی» را پر کنید.</div>` : ''}
 
@@ -3176,7 +3240,7 @@ function renderWaste(){
   </details>
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>۱) نوع رویداد — ضایعات در برابر دوباره‌کاری</h3>
+    <h3>۱) نوع رویداد — ضایعات / جداسازی / دوباره‌کاری</h3>
     <div style="display:flex; align-items:stretch; margin:18px 0 14px; border-radius:14px; overflow:hidden; border:1px solid rgba(255,255,255,.08);">
       <div style="flex:1; background:linear-gradient(160deg, rgba(255,93,108,.18), rgba(255,93,108,.02)); padding:20px 14px; text-align:center;">
         <div style="font-size:26px;">⚠️</div>
@@ -3185,33 +3249,42 @@ function renderWaste(){
         <div style="font-size:13px; color:#8b98b5; margin-top:2px;">${fmt(eventTypeQtyTotal?(eventTypeTotals[0].qty/eventTypeQtyTotal)*100:0,0)}٪ از کل</div>
       </div>
       <div style="width:1px; background:rgba(255,255,255,.1);"></div>
+      <div style="flex:1; background:linear-gradient(180deg, rgba(167,139,250,.2), rgba(167,139,250,.02)); padding:20px 14px; text-align:center;">
+        <div style="font-size:26px;">🗂</div>
+        <div style="font-size:12.5px; color:#cdbcff; font-weight:700; margin:6px 0 2px;">جداسازی <span class="muted" style="font-weight:400;">(ورودی مشروط/غربال)</span></div>
+        <div style="font-size:32px; font-weight:900; color:#a78bfa; line-height:1.2;">${fmt(eventTypeTotals[1].qty,0)}</div>
+        <div style="font-size:13px; color:#8b98b5; margin-top:2px;">${fmt(eventTypeQtyTotal?(eventTypeTotals[1].qty/eventTypeQtyTotal)*100:0,0)}٪ از کل</div>
+      </div>
+      <div style="width:1px; background:rgba(255,255,255,.1);"></div>
       <div style="flex:1; background:linear-gradient(200deg, rgba(47,217,196,.18), rgba(47,217,196,.02)); padding:20px 14px; text-align:center;">
         <div style="font-size:26px;">🔧</div>
         <div style="font-size:12.5px; color:#8ff0c8; font-weight:700; margin:6px 0 2px;">دوباره‌کاری <span class="muted" style="font-weight:400;">(قابل‌جبران)</span></div>
-        <div style="font-size:32px; font-weight:900; color:#2fd9c4; line-height:1.2;">${fmt(eventTypeTotals[1].qty,0)}</div>
-        <div style="font-size:13px; color:#8b98b5; margin-top:2px;">${fmt(eventTypeQtyTotal?(eventTypeTotals[1].qty/eventTypeQtyTotal)*100:0,0)}٪ از کل</div>
+        <div style="font-size:32px; font-weight:900; color:#2fd9c4; line-height:1.2;">${fmt(eventTypeTotals[2].qty,0)}</div>
+        <div style="font-size:13px; color:#8b98b5; margin-top:2px;">${fmt(eventTypeQtyTotal?(eventTypeTotals[2].qty/eventTypeQtyTotal)*100:0,0)}٪ از کل</div>
       </div>
     </div>
     ${eventTypeQtyTotal? (()=>{
-      const sp = (eventTypeTotals[0].qty/eventTypeQtyTotal)*100, rp = (eventTypeTotals[1].qty/eventTypeQtyTotal)*100;
+      const sp = (eventTypeTotals[0].qty/eventTypeQtyTotal)*100, gp = (eventTypeTotals[1].qty/eventTypeQtyTotal)*100, rp = (eventTypeTotals[2].qty/eventTypeQtyTotal)*100;
       return `<div style="display:flex; height:26px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.06);">
         <div style="width:${sp}%; background:linear-gradient(90deg,#ff5d6c,#ff8890); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#fff;">${sp>=8?fmt(sp,0)+'٪':''}</div>
+        <div style="width:${gp}%; background:linear-gradient(90deg,#a78bfa,#c4b5fd); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#0c1220;">${gp>=8?fmt(gp,0)+'٪':''}</div>
         <div style="width:${rp}%; background:linear-gradient(90deg,#5ee6d4,#2fd9c4); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; color:#0c1220;">${rp>=8?fmt(rp,0)+'٪':''}</div>
       </div>`;
     })() : ''}
-    <div class="hint" style="margin-top:10px;">${eventTypeQtyTotal? `از هر ۱۰۰ واحد مغایرت ثبت‌شده این ماه، <b>${fmt((eventTypeTotals[0].qty/eventTypeQtyTotal)*100,0)} واحد ضایعات قطعی</b> و <b>${fmt((eventTypeTotals[1].qty/eventTypeQtyTotal)*100,0)} واحد دوباره‌کاری</b> بوده است.` : 'هنوز داده‌ای برای این ماه ثبت نشده است.'}</div>
+    <div class="hint" style="margin-top:10px;">${eventTypeQtyTotal? `از هر ۱۰۰ واحد مغایرت ثبت‌شده این ماه، <b>${fmt((eventTypeTotals[0].qty/eventTypeQtyTotal)*100,0)} واحد ضایعات قطعی</b>، <b>${fmt((eventTypeTotals[1].qty/eventTypeQtyTotal)*100,0)} واحد جداسازی</b> و <b>${fmt((eventTypeTotals[2].qty/eventTypeQtyTotal)*100,0)} واحد دوباره‌کاری</b> بوده است. فقط ضایعات قطعی در نرخ ضایعات و OEE حساب می‌شود.` : 'هنوز داده‌ای برای این ماه ثبت نشده است.'}</div>
   </div>
 
   <div class="card" style="margin-bottom:16px;">
-    <h3>۲) منشأ بروز — این ضایعات/دوباره‌کاری کجا ایجاد شد؟</h3>
+    <h3>۲) منشأ بروز — این ضایعات/جداسازی/دوباره‌کاری کجا ایجاد شد؟</h3>
     <div class="chart-box"><canvas id="chWasteCat"></canvas></div>
   </div>
 
   <div class="flexbar" style="margin-bottom:12px;">
     <div class="hint" style="margin:0;">نمای پارتوهای زیر (ایستگاه / علت دقیق / محصول):</div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
-      <button class="pill ${paretoView==='both'?'active':''}" data-pv="both">هر دو با هم</button>
+      <button class="pill ${paretoView==='both'?'active':''}" data-pv="both">هر سه با هم</button>
       <button class="pill ${paretoView==='scrap'?'active':''}" data-pv="scrap">فقط ضایعات</button>
+      <button class="pill ${paretoView==='seg'?'active':''}" data-pv="seg">فقط جداسازی</button>
       <button class="pill ${paretoView==='rework'?'active':''}" data-pv="rework">فقط دوباره‌کاری</button>
     </div>
   </div>
@@ -3284,7 +3357,7 @@ function renderWaste(){
       wasteType: wtype, wasteCount: count, eventType: document.getElementById('w_eventType').value, category: document.getElementById('w_cat').value,
       reworkMinutes: num(document.getElementById('w_reworkMin').value) };
     if(editing.waste){ DB.waste = DB.waste.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
-    else{ DB.waste.push(rec); toast(rec.eventType==='دوباره‌کاری'?'دوباره‌کاری ثبت شد.':'ضایعات ثبت شد.','ok'); }
+    else{ DB.waste.push(rec); toast(wasteKindLabel_(rec)+' ثبت شد.','ok'); }
     editing.waste = null; scheduleSave(); renderWaste();
   });
   const cw = document.getElementById('cancelWasteBtn'); if(cw) cw.addEventListener('click', ()=>{ editing.waste=null; renderWaste(); });
@@ -3344,9 +3417,9 @@ function renderWaste(){
   // تغییر کرد چون گلیف «٪» در رندر روی canvas این نمودارها به‌درستی نمایش داده نمی‌شد.
   mkChart('chWasteCat', { type:'doughnut', data:{ labels: catTotals.map(x=>x.label), datasets:[{data:catTotals.map(x=>x.value), backgroundColor:catTotals.map((_,i)=>PALETTE[i%PALETTE.length]), borderColor:'#101827', borderWidth:3}]},
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}} } });
-  dualParetoChart('chWasteStation', stationPareto, paretoView, '#ff5d6c', '#2fd9c4');
-  dualParetoChart('chWasteType', typePareto, paretoView, '#ff5d6c', '#2fd9c4');
-  if(productPareto.length) dualParetoChart('chWasteProduct', productPareto, paretoView, '#ff5d6c', '#2fd9c4');
+  dualParetoChart('chWasteStation', stationPareto, paretoView, '#ff5d6c', '#2fd9c4', '#a78bfa');
+  dualParetoChart('chWasteType', typePareto, paretoView, '#ff5d6c', '#2fd9c4', '#a78bfa');
+  if(productPareto.length) dualParetoChart('chWasteProduct', productPareto, paretoView, '#ff5d6c', '#2fd9c4', '#a78bfa');
   wireComboAddSelects();
 }
 function paretoChart(id, arr, color){
@@ -3364,14 +3437,17 @@ function paretoChart(id, arr, color){
 }
 // نسخهٔ «مولتی» پارتو — یا دو ستون ضایعات/دوباره‌کاری با هم (نمای «هر دو»)، یا فقط یکی از آن دو (طبق
 // نمای انتخابی بالای صفحه)، به‌اضافهٔ خط درصد تجمعی. رتبه‌بندی و درصد تجمعی همیشه با همان نمای انتخابی هماهنگ‌اند.
-function dualParetoChart(id, arr, view, colorScrap, colorRework){
+function dualParetoChart(id, arr, view, colorScrap, colorRework, colorSeg){
+  colorSeg = colorSeg || '#a78bfa';
+  const vMap = { scrap:['ضایعات', colorScrap], seg:['جداسازی', colorSeg], rework:['دوباره‌کاری', colorRework] };
   const bars = view==='both'
     ? [
-        { type:'bar', label:'ضایعات', data: arr.map(x=>x.scrap), backgroundColor: colorScrap, borderRadius:4, order:3, yAxisID:'y', stack:'w' },
+        { type:'bar', label:'ضایعات', data: arr.map(x=>x.scrap), backgroundColor: colorScrap, borderRadius:4, order:4, yAxisID:'y', stack:'w' },
+        { type:'bar', label:'جداسازی', data: arr.map(x=>x.seg), backgroundColor: colorSeg, borderRadius:4, order:3, yAxisID:'y', stack:'w' },
         { type:'bar', label:'دوباره‌کاری', data: arr.map(x=>x.rework), backgroundColor: colorRework, borderRadius:4, order:2, yAxisID:'y', stack:'w' },
       ]
     : [
-        { type:'bar', label: view==='rework'?'دوباره‌کاری':'ضایعات', data: arr.map(x=>x.value), backgroundColor: view==='rework'?colorRework:colorScrap, borderRadius:4, order:2, yAxisID:'y' },
+        { type:'bar', label: (vMap[view]||vMap.scrap)[0], data: arr.map(x=>x.value), backgroundColor: (vMap[view]||vMap.scrap)[1], borderRadius:4, order:2, yAxisID:'y' },
       ];
   mkChart(id, { data:{ labels: arr.map(x=>x.label),
       datasets:[
@@ -3613,7 +3689,7 @@ function computeOEE(rows, M){
   const mtbf = stopEvents? uptimeHours/stopEvents : null;
   // «دوباره‌کاری» با «ضایعات واقعی» فرق دارد (قطعه دوباره‌کاری‌شده در نهایت سالم و قابل‌مصرف است)،
   // پس در محاسبهٔ نرخ کیفیت/OEE فقط ضایعات واقعی حساب می‌شود، نه دوباره‌کاری‌ها.
-  const scrapOnlyM = M.waste.filter(x=>x.eventType!=='دوباره‌کاری');
+  const scrapOnlyM = M.waste.filter(x=>wasteKind_(x)==='scrap');   // ضایعات واقعی؛ جداسازی و دوباره‌کاری در OEE ضایعات حساب نمی‌شوند
   const totalWaste = scrapOnlyM.reduce((s,x)=>s+(x.wasteCount||0),0);
   const totalProduced = (()=>{ const seen=new Set(); let s=0; scrapOnlyM.forEach(x=>{ const key=x.date+'|'+x.station+'|'+x.part; if(x.produced&&!seen.has(key)){s+=x.produced; seen.add(key);} }); return s; })();
   const quality = totalProduced? (totalProduced-totalWaste)/totalProduced : null;
@@ -4117,7 +4193,7 @@ function renderDailyProgram(){
 
   ${inputRisk.records>0 ? `<div class="card no-print" style="margin-bottom:16px; border:1px solid rgba(255,93,108,.35); background:rgba(255,93,108,.06);">
     <div style="font-size:13.5px; font-weight:800; margin-bottom:4px;">⚠️ هشدار «ورودی مشروط» این ماه</div>
-    <div class="hint">${fmt(inputRisk.records,0)} رویداد با منشأ «ورودی مشروط» ثبت شده — ${fmt(inputRisk.scrapCount,0)} عدد ضایعات و ${fmt(inputRisk.reworkCount,0)} عدد دوباره‌کاری. این منشأ سابقهٔ شوک‌زدن به خط را دارد؛ اگر امروز هم قطعهٔ ورودی مشروط دارید، برای ایستگاه‌های مربوطه نیروی پشتیبان یا زمان بازرسی اضافه در نظر بگیرید (تاریخچهٔ کامل: تب «ضایعات/دوباره‌کاری تولید»).</div>
+    <div class="hint">${fmt(inputRisk.records,0)} رویداد با منشأ «ورودی مشروط» ثبت شده — ${fmt(inputRisk.scrapCount,0)} عدد دورریزشده و ${fmt(inputRisk.reworkCount,0)} عدد جداسازی/دوباره‌کاری. این منشأ سابقهٔ شوک‌زدن به خط را دارد؛ اگر امروز هم قطعهٔ ورودی مشروط دارید، برای ایستگاه‌های مربوطه نیروی پشتیبان یا زمان بازرسی اضافه در نظر بگیرید (تاریخچهٔ کامل: تب «ضایعات/دوباره‌کاری تولید»).</div>
   </div>` : ''}
 
   <div class="grid grid-4 no-print" style="margin-bottom:16px;">
@@ -4362,7 +4438,7 @@ function renderCover(){
   const totalShipped = rows.reduce((s,e)=> s + shipTotal(e), 0);
 
   const stopReasons = paretoFrom(M.stop, x=>x.reason, x=>x.hours);
-  const wasteReasons = paretoFrom(M.waste.filter(x=>x.eventType!=='دوباره‌کاری'), x=>x.wasteType, x=>x.wasteCount);
+  const wasteReasons = paretoFrom(M.waste.filter(x=>wasteKind_(x)==='scrap'), x=>x.wasteType, x=>x.wasteCount);
   const mgmtAlerts = buildManagementAlerts_(M);
 
   document.getElementById('view').innerHTML = `
@@ -4658,14 +4734,15 @@ function an_monthSummary(mk){
   const ship = rows.reduce((s,e)=>s+(an_hasShip(e) ? shipTotal(e) : 0), 0);
   const target = rows.filter(e=>allLinesTotal(e)>0 || (an_hasShip(e) && shipTotal(e)>0)).reduce((s,e)=>s+dayCombinedTarget(e), 0);
   const oee = computeOEE(rows, Mm);
-  const scrapOnly = Mm.waste.filter(x=>x.eventType!=='دوباره‌کاری');
-  const reworkCount = Mm.waste.filter(x=>x.eventType==='دوباره‌کاری').reduce((s,x)=>s+(x.wasteCount||0), 0);
+  const scrapOnly = Mm.waste.filter(x=>wasteKind_(x)==='scrap');
+  const reworkCount = Mm.waste.filter(x=>wasteKind_(x)==='rework').reduce((s,x)=>s+(x.wasteCount||0), 0);
+  const segCount = Mm.waste.filter(x=>wasteKind_(x)==='seg').reduce((s,x)=>s+(x.wasteCount||0), 0);
   const mh = an_manHours(Mm);
   return { mk, label: an_shortMonth(mk), days: rows.length, prodAll, prod4, ship, target,
     ach: target>0 ? prodAll/target : null, shipRatio: prodAll>0 ? ship/prodAll : null,
     oee: oee.oee, avail: oee.availability, perf: oee.performance, qual: oee.quality,
     scrapCount: oee.totalWaste, scrapRate: (oee.totalProduced>0) ? oee.totalWaste/oee.totalProduced : null,
-    reworkCount, stopHrs: oee.totalStopHours, stopEvents: oee.stopEvents, shortEvents: Mm.short.length,
+    reworkCount, segCount, stopHrs: oee.totalStopHours, stopEvents: oee.stopEvents, shortEvents: Mm.short.length,
     workedMH: mh.workedAll, availMH: mh.availTotal, util: mh.util, pcsPerMH: mh.pcsPerWorkedMH,
     hasData: rows.length>0 || scrapOnly.length>0 || Mm.stop.length>0 };
 }
@@ -5365,7 +5442,7 @@ function cap_actualOT(M, reg){
 }
 // دوباره‌کاری و جداسازی (ورودی مشروط) — دو گروه جدا (یک ثبت فقط در یک گروه می‌آید تا دوبار شمرده نشود)
 function cap_rework(M){
-  const isSeg = x => x.category === 'ورودی مشروط' || /جداساز/.test(x.wasteType || '');
+  const isSeg = x => wasteKind_(x) === 'seg';
   const mk = (label)=>({ label, rows:[], qty:0, min:0, noMin:0, causes:{} });
   const G = { rework: mk('دوباره‌کاری'), seg: mk('جداسازی') };
   (M.waste||[]).forEach(x=>{
@@ -5929,6 +6006,7 @@ function renderTrend(){
     { l:'عملکرد', v:s=>s.perf, f:v=>pct(v,1), good:'up', pp:true },
     { l:'کیفیت', v:s=>s.qual, f:v=>pct(v,2), good:'up', pp:true },
     { l:'نرخ ضایعات', v:s=>s.scrapRate, f:v=>pct(v,2), good:'down', pp:true },
+    { l:'جداسازی (عدد)', v:s=>s.segCount, f:v=>fmt(v,0), good:'down' },
     { l:'دوباره‌کاری (عدد)', v:s=>s.reworkCount, f:v=>fmt(v,0), good:'down' },
     { l:'توقفات (ساعت)', v:s=>s.stopHrs, f:v=>fmt(v,1), good:'down' },
     { l:'رویداد کسری قطعه', v:s=>s.shortEvents, f:v=>fmt(v,0), good:'down' },
@@ -6075,7 +6153,7 @@ function renderLean(){
 
   const stationParetoS = paretoFrom(M.stop, x=>x.station, x=>x.hours).slice(0,6);
   const reasonParetoS = paretoFrom(M.stop, x=>x.reason, x=>x.hours).slice(0,6);
-  const stationParetoW = paretoFrom(M.waste.filter(x=>x.eventType!=='دوباره‌کاری'), x=>x.station, x=>x.wasteCount).slice(0,6);
+  const stationParetoW = paretoFrom(M.waste.filter(x=>wasteKind_(x)==='scrap'), x=>x.station, x=>x.wasteCount).slice(0,6);
 
   // ---- شاخص‌های تولید و بهره‌وری: تفکیک هر خط + نرخ استفاده از ظرفیت + بهره‌وری نیروی انسانی ----
   const lineLabels = {line1:'خط ۱', line2:'خط ۲', line3:'خط ۳', line4:'خط ۴'};
@@ -6110,7 +6188,7 @@ function renderLean(){
   // ---- بنچمارک صنعت خودرو + هشدار زودهنگام روند (نیمه اول در برابر نیمه دوم بازه) ----
   const halves = dateHalves(rows);
   const stopTrend = halfTrend(M.stop, halves, x=>x.hours||0);
-  const wasteTrend = halfTrend(M.waste, halves, x=>x.wasteCount||0);
+  const wasteTrend = halfTrend(M.waste.filter(x=>wasteKind_(x)==='scrap'), halves, x=>x.wasteCount||0);
   const oeeGapAutomotive = oee - INDUSTRY_BENCHMARK.oeeAutomotive;
   const scrapRate = totalProduced? totalWaste/totalProduced : null;
   const bestHist = bestHistoricalOEE_();
@@ -6507,15 +6585,16 @@ function renderDash(){
   const targetTotal = rows.reduce((s,e)=>s+dayTarget4Lines(e),0);
   const avgDevPct = targetTotal? (sum4-targetTotal)/targetTotal : 0;
   const totalShip = rows.reduce((s,e)=>s+shipTotal(e),0);
-  const totalWaste = M.waste.reduce((s,x)=>s+(x.wasteCount||0),0);
-  const totalProduced = (()=>{ const seen=new Set(); let s=0; M.waste.forEach(x=>{ const key=x.date+'|'+x.station+'|'+x.part; if(x.produced&&!seen.has(key)){s+=x.produced; seen.add(key);} }); return s; })();
+  const scrapRecsD = M.waste.filter(x=>wasteKind_(x)==='scrap');   // فقط ضایعات واقعی (نه جداسازی/دوباره‌کاری)
+  const totalWaste = scrapRecsD.reduce((s,x)=>s+(x.wasteCount||0),0);
+  const totalProduced = (()=>{ const seen=new Set(); let s=0; scrapRecsD.forEach(x=>{ const key=x.date+'|'+x.station+'|'+x.part; if(x.produced&&!seen.has(key)){s+=x.produced; seen.add(key);} }); return s; })();
   const wasteRate = totalProduced? totalWaste/totalProduced : 0;
   const totalStopHours = M.stop.reduce((s,x)=>s+(x.hours||0),0);
   const problemEvents = (()=>{ let n=0; M.daily.forEach(e=> n += (e.notes.problems||'').split('|').map(s=>s.trim()).filter(Boolean).length); return n; })();
   const negDays = rows.filter(e=>mainFourTotal(e)>0 && mainFourTotal(e)-dayTarget4Lines(e)<0).length;
   const shortDays = new Set(M.short.map(x=>x.date)).size;
 
-  const stationParetoW = paretoFrom(M.waste.filter(x=>x.eventType!=='دوباره‌کاری'), x=>x.station, x=>x.wasteCount).slice(0,6);
+  const stationParetoW = paretoFrom(M.waste.filter(x=>wasteKind_(x)==='scrap'), x=>x.station, x=>x.wasteCount).slice(0,6);
   const stationParetoS = paretoFrom(M.stop, x=>x.station, x=>x.hours).slice(0,6);
   const problemPareto = (()=>{
     // مشکلات ثبت‌شده متن آزادند؛ تفاوت‌های جزئی نوشتاری (فاصله «درپوش» در برابر «در پوش»، نیم‌فاصله،
@@ -6547,7 +6626,9 @@ function renderDash(){
   const todayStops = todayRow ? M.stop.filter(x=>x.date===todayRow.date) : [];
   const todayStopHours = todayStops.reduce((s,x)=>s+(x.hours||0),0);
   const todayWasteArr = todayRow ? M.waste.filter(x=>x.date===todayRow.date) : [];
-  const todayWasteQty = todayWasteArr.reduce((s,x)=>s+(x.wasteCount||0),0);
+  const todaySplit = wasteSplit_(todayWasteArr);
+  const todayScrapQty = todaySplit.scrap.qty, todaySegQty = todaySplit.seg.qty, todayReworkQty = todaySplit.rework.qty;
+  const todayWasteQty = todayScrapQty;   // فقط ضایعات واقعی؛ زیان ریالی فقط از ضایعات و توقف می‌آید
   const todayShortArr = todayRow ? M.short.filter(x=>x.date===todayRow.date && x.status!=='تامین شده') : [];
   const todayStopLostQty = todayStops.reduce((s,x)=>s+(x.hours||0)*resolveStationRate(x.station),0);
   const todayLossValue = (todayStopLostQty + todayWasteQty) * unitCost;
@@ -6570,13 +6651,20 @@ function renderDash(){
       action: suggestedAction(x.reason) });
   });
   todayWasteArr.forEach(x=>{
-    const isRework = x.eventType==='دوباره‌کاری';
+    const kind = wasteKind_(x), q = (x.wasteCount||0);
     const stationAlreadySaysRework = normalizeForGrouping(x.station||'').indexOf('دوبارهکاری') !== -1;
-    const titlePrefix = isRework ? (stationAlreadySaysRework ? '' : 'دوباره‌کاری ') : 'ضایعات ';
-    todayEvents.push({ icon: isRework?'🔧':'🗑', color: isRework?'#4c8dff':'#ffcf5c', title: titlePrefix+x.station,
-      detail: fmt(x.wasteCount||0,0)+(isRework?' عدد دوباره‌کاری':' عدد ضایعات'), reason:x.wasteType,
-      impact: unitCost? (x.wasteCount||0)*unitCost : (x.wasteCount||0), impactLabel: unitCost? fmt((x.wasteCount||0)*unitCost,0)+' ریال' : fmt(x.wasteCount||0,0)+' عدد',
-      action: isRework? 'بررسی ریشه‌ای علت دوباره‌کاری و آموزش/تنظیم ایستگاه مربوطه' : 'بررسی ریشه‌ای با کنترل کیفیت و ایستگاه مربوطه' });
+    const kindInfo = {
+      scrap:  { icon:'🗑', color:'#ffcf5c', prefix:'ضایعات ', unitTxt:' عدد ضایعات', action:'بررسی ریشه‌ای با کنترل کیفیت و ایستگاه مربوطه' },
+      seg:    { icon:'🗂', color:'#a78bfa', prefix:'جداسازی ', unitTxt:' عدد جداسازی', action:'پیگیری با تأمین/کنترل ورودی برای ریشه‌ی «ورودی مشروط» و کاهش نیاز به جداسازی' },
+      rework: { icon:'🔧', color:'#4c8dff', prefix: stationAlreadySaysRework ? '' : 'دوباره‌کاری ', unitTxt:' عدد دوباره‌کاری', action:'بررسی ریشه‌ای علت دوباره‌کاری و آموزش/تنظیم ایستگاه مربوطه' }
+    }[kind];
+    const lostValue = (kind==='scrap');   // فقط ضایعات واقعی قطعه از بین می‌برد
+    const mh = x.reworkMinutes>0 ? ' · '+fmt(x.reworkMinutes/60,1)+' نفر-ساعت' : '';
+    todayEvents.push({ icon:kindInfo.icon, color:kindInfo.color, title: kindInfo.prefix + x.station,
+      detail: fmt(q,0)+kindInfo.unitTxt, reason:x.wasteType,
+      impact: unitCost? q*unitCost : q,
+      impactLabel: lostValue ? (unitCost? fmt(q*unitCost,0)+' ریال' : fmt(q,0)+' عدد') : (fmt(q,0)+' عدد درگیر'+mh),
+      action: kindInfo.action });
   });
   todayShortArr.forEach(x=>{
     todayEvents.push({ icon:'🧩', color:'#4c8dff', title:'کسری '+x.part, detail:x.status, reason:x.description||'کسری قطعه',
@@ -6598,7 +6686,7 @@ function renderDash(){
 
   // ---- ۲) ریشه‌یابی یکپارچه (پارتو ترکیبی توقف + ضایعات، بر حسب عدد تولید ازدست‌رفته) ----
   const stopRankedD = stopLossRanking(M.stop);
-  const wasteRankedD = paretoFrom(M.waste, x=>x.station, x=>x.wasteCount);
+  const wasteRankedD = paretoFrom(M.waste.filter(x=>wasteKind_(x)==='scrap'), x=>x.station, x=>x.wasteCount);
   const combinedCauses = [
     ...stopRankedD.map(x=>({label:x.label, value:x.lostQty, type:'⏸ توقف'})),
     ...wasteRankedD.map(x=>({label:x.label, value:x.value, type:'🗑 ضایعات'})),
@@ -6613,7 +6701,7 @@ function renderDash(){
   // ---- ۴) هشدار زودهنگام ریسک (روند نیمه اول در برابر نیمه دوم ماه) ----
   const halvesD = dateHalves(rows);
   const stopTrendD = halfTrend(M.stop, halvesD, x=>x.hours||0);
-  const wasteTrendD = halfTrend(M.waste, halvesD, x=>x.wasteCount||0);
+  const wasteTrendD = halfTrend(M.waste.filter(x=>wasteKind_(x)==='scrap'), halvesD, x=>x.wasteCount||0);
   const shortTrendD = halfTrend(M.short, halvesD, x=>1);
 
   // narrative
@@ -6640,17 +6728,24 @@ function renderDash(){
     ${kpiCard('تحقق برنامه امروز','', todayAttainmentPct===null?'—':pct(todayAttainmentPct,1), null, (todayAttainmentPct!==null&&todayAttainmentPct>=1)?'#2fd9c4':'#ff5d6c')}
     ${kpiCard('نسبت به روز قبل', '', vsPrevPct===null?'—':pct(vsPrevPct,1), null, vsPrevPct===null?'#93a4c3':vsPrevPct>=0?'#2fd9c4':'#ff5d6c')}
   </div>
-  <div class="grid grid-4" style="margin-bottom:16px;">
+  <div class="grid grid-4" style="margin-bottom:10px;">
     ${kpiCard('توقف امروز','دقیقه', fmt(todayStopHours*60,0), null, todayStopHours>0?'#ff5d6c':'#2fd9c4')}
-    ${kpiCard('ضایعات امروز','عدد', fmt(todayWasteQty,0), null, todayWasteQty>0?'#ffcf5c':'#2fd9c4')}
+    ${kpiCard('ضایعات امروز (دورریز)','عدد', fmt(todayScrapQty,0), null, todayScrapQty>0?'#ffcf5c':'#2fd9c4')}
+    ${kpiCard('جداسازی امروز','عدد', fmt(todaySegQty,0), null, todaySegQty>0?'#a78bfa':'#2fd9c4')}
+    ${kpiCard('دوباره‌کاری امروز','عدد', fmt(todayReworkQty,0), null, todayReworkQty>0?'#4c8dff':'#2fd9c4')}
+  </div>
+  <div class="grid grid-4" style="margin-bottom:10px;">
     ${kpiCard('کسری قطعه باز امروز','مورد', fmt(todayShortArr.length,0), null, todayShortArr.length>0?'#ff5d6c':'#2fd9c4')}
     ${unitCost>0? kpiCard('برآورد زیان ریالی امروز','ریال', fmt(todayLossValue,0), null, todayLossValue>0?'#ff5d6c':'#2fd9c4') :
       kpiCard('برآورد زیان ریالی امروز','', 'بهای واحد تعیین نشده', null, '#93a4c3', true)}
+    ${kpiCard('نفر-ساعت جداسازی امروز','نفر-ساعت', fmt(todaySplit.seg.min/60,1), null, todaySplit.seg.min>0?'#a78bfa':'#2fd9c4')}
+    ${kpiCard('نفر-ساعت دوباره‌کاری امروز','نفر-ساعت', fmt(todaySplit.rework.min/60,1), null, todaySplit.rework.min>0?'#4c8dff':'#2fd9c4')}
   </div>
+  <div class="hint" style="margin:0 0 16px;"><b>ضایعات</b> = قطعه‌ی دورریز • <b>جداسازی</b> = قطعه‌ی ورودی مشروط که جدا/غربال شد • <b>دوباره‌کاری</b> = قطعه‌ای که اصلاح شد و سالم ماند. این سه در یک عدد جمع نمی‌شوند؛ زیان ریالی فقط از توقف و ضایعات واقعی حساب می‌شود و جداسازی/دوباره‌کاری با نفر-ساعت سنجیده می‌شوند.</div>
   ${unitCost<=0? `<div class="hint" style="margin:-6px 0 16px;">برای دیدن برآورد زیان ریالی توقف/ضایعات، «بهای هر عدد ترموستات» را در تب «تولید خط تولید» → «ستاپ اهداف» وارد کنید.</div>`:''}
 
   <div class="card" style="margin-bottom:16px;">
-    <div class="flexbar"><h3 style="margin:0;">🤖 ۵ اتفاق مهم امروز</h3><span class="hint" style="margin:0;">${unitCost>0?'مرتب‌شده بر اساس برآورد زیان ریالی':'مرتب‌شده بر اساس مقدار ازدست‌رفته'}</span></div>
+    <div class="flexbar"><h3 style="margin:0;">🤖 ۵ اتفاق مهم امروز</h3><span class="hint" style="margin:0;">${unitCost>0?'مرتب‌شده بر اساس اندازه‌ی اثر (ریال)':'مرتب‌شده بر اساس تعداد قطعه‌ی درگیر'}</span></div>
     ${top5Events.length===0? `<div class="tbl-empty">امروز رویداد قابل‌توجهی (توقف/ضایعات/کسری) ثبت نشده — روز خوبی بوده.</div>` :
       top5Events.map(e=>`<div class="insight"><div class="ico" style="background:${e.color}22; color:${e.color}; font-size:15px;">${e.severity}</div>
         <p><b>${esc(e.title)}</b> — ${esc(e.detail)}${e.reason?' — علت: <b>'+esc(e.reason)+'</b>':''}<br>
@@ -6904,7 +6999,7 @@ function renderActionCenter(){
     title:`کسری قطعه: ${x.part}${x.description?' — '+x.description:''}`, dept:'برنامه‌ریزی و تامین', detail: x.date,
   })).filter(x=>!existingSourceKeys.has(x.sourceKey));
 
-  const wasteScrap = M.waste.filter(x=>(x.eventType||'ضایعات')!=='دوباره‌کاری');
+  const wasteScrap = M.waste.filter(x=>wasteKind_(x)==='scrap');
   const stationWastePareto = paretoFrom(wasteScrap, x=>x.station, x=>x.wasteCount).slice(0,5);
   const wasteSuggestions = stationWastePareto.map(s=>{
     const rowsAtStation = wasteScrap.filter(x=>x.station===s.label);
@@ -7105,8 +7200,8 @@ function renderTargetProgress(){
   const totalStopLostQty = stopRanked.reduce((s,x)=>s+x.lostQty,0);
   const totalStopHours = M.stop.reduce((s,x)=>s+(x.hours||0),0);
 
-  const wasteByStation = paretoFrom(M.waste, x=>x.station, x=>x.wasteCount).slice(0,6);
-  const totalWasteQty = M.waste.reduce((s,x)=>s+(x.wasteCount||0),0);
+  const wasteByStation = paretoFrom(M.waste.filter(x=>wasteKind_(x)==='scrap'), x=>x.station, x=>x.wasteCount).slice(0,6);
+  const totalWasteQty = M.waste.filter(x=>wasteKind_(x)==='scrap').reduce((s,x)=>s+(x.wasteCount||0),0);
 
   const pendingShort = M.short.filter(x=>x.status!=='تامین شده');
   const pendingShortParts = [...new Set(pendingShort.map(x=>x.part))];
