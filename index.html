@@ -5532,7 +5532,11 @@ function renderCapacity(){
   const availAll = K.H.availTotal || 0;
   const hasOT = K.ot > 0 || K.Doff > 0;
   const otColor = !K.ok ? AN.mute : (K.otNeed <= 0 ? AN.teal : (K.otGap > 0 ? AN.red : AN.amber));
-  const shortColor = !K.ok ? AN.mute : (!K.shortNoOT ? AN.teal : (K.shortMaxOT > 0 ? AN.red : AN.amber));
+  // کمبود نیرو با «الگوی کاری فعلی» سنجیده می‌شود: زرد = با کاهش غیبت/مرخصی از همان نیروی صف قابل جبران، قرمز = نیاز به جذب
+  const recoverable = Math.max((K.staff||0) - (K.hc||0), 0);
+  const shortColor = !K.ok ? AN.mute : (K.shortMaxOT <= 0 ? AN.teal : (K.shortMaxOT <= recoverable ? AN.amber : AN.red));
+  const gapColor = !K.ok ? AN.mute : (K.gapMH > 0 ? AN.red : AN.teal);
+  let lagDays = 0; if(!K.isPast && K.lastDate){ try{ lagDays = cap_dayNum(K.todayJ) - cap_dayNum(K.lastDate); }catch(e){} }
   const planAuto = an_planOf(mk);
   const basisLabel = K.basis === 'ship' ? 'ارسال به انبار' : 'تولید همه خطوط';
   const dayTxt = `${fmt(K.Dreg,0)} روز عادی${K.Doff>0? ' + '+fmt(K.Doff,0)+' پنجشنبه/جمعه':''}`;
@@ -5559,7 +5563,7 @@ function renderCapacity(){
         : { icon:'📅', color:AN.blue, text:`طبق تقویم رسمی ۱۴۰۵ این ماه تعطیل رسمی غیر از پنجشنبه/جمعه ندارد؛ ${fmt(K.cal.reg,0)} روز کاری عادی و ${fmt(K.cal.off,0)} پنجشنبه/جمعه دارد.` });
     } else notes.push({ icon:'📅', color:AN.amber, text:'تقویم تعطیلات رسمی داخل داشبورد فقط برای سال ۱۴۰۵ است؛ برای این ماه فقط پنجشنبه/جمعه غیرکاری حساب شده — تعطیلی‌ها را در «تعطیلی‌های اضافه» وارد کنید.' });
     if(K.hc && K.staff) notes.push({ icon:'👥', color:AN.blue, text:`محاسبه بر مبنای نفرات <b>حاضر</b> است: میانگین حاضرین روزهای عادی <b>${f1(K.hcAvgReg)}</b> از ${fmt(K.staff,0)} نفر نیروی صف (${pct(K.hcAvgReg/K.staff,0)}).${K.hcOffAuto? ` در پنجشنبه/جمعه‌های کاری معمولاً ${f1(K.hcOff)} نفر آمده‌اند.`:''}` });
-    if(!K.isPast && K.lastDate){ let lag = 0; try{ lag = cap_dayNum(K.todayJ) - cap_dayNum(K.lastDate); }catch(e){} if(lag >= 2) notes.push({ icon:'🕒', color:AN.amber, text:`آخرین روز دارای ثبت <b>${esc(K.lastDate)}</b> است و امروز <b>${esc(K.todayJ)}</b>؛ حدود <b>${fmt(lag,0)}</b> روز هنوز ثبت نشده. با ثبت روزهای جدید، تولید تا امروز و پیش‌بینی دقیق‌تر می‌شوند.` }); }
+    if(!K.isPast && K.lastDate){ const lag = lagDays; if(lag >= 2) notes.push({ icon:'🕒', color:AN.amber, text:`آخرین روز دارای ثبت <b>${esc(K.lastDate)}</b> است و امروز <b>${esc(K.todayJ)}</b>؛ حدود <b>${fmt(lag,0)}</b> روز هنوز ثبت نشده. با ثبت روزهای جدید، تولید تا امروز و پیش‌بینی دقیق‌تر می‌شوند.` }); }
   }
   if(K.basis === 'ship' && K.rows.some(r=>r.out === null)) notes.push({ icon:'🕒', color:AN.blue, text:`در <b>${fmt(K.rows.filter(r=>r.out===null).length,0)}</b> روز، «ارسال به انبار» ثبت نشده و آن روزها در بهره‌وری و تولید تا امروز نیامده‌اند.` });
   if(K.H.noOps || K.H.noTime) notes.push({ icon:'🕒', color:AN.blue, text:`${K.H.noTime? `<b>${fmt(K.H.noTime,0)}</b> ثبت ایستگاه بدون ساعت شروع/پایان`:''}${K.H.noTime && K.H.noOps?' و ':''}${K.H.noOps? `<b>${fmt(K.H.noOps,0)}</b> ثبت بدون نام اپراتور`:''} در اضافه‌کاری واقعی حساب نشد.` });
@@ -5575,14 +5579,14 @@ function renderCapacity(){
       hasOT ? `<b>${f0(K.capMax)}</b> قطعه با اضافه‌کاری مجاز<br><span class="muted">${f0(K.capReg)} فقط با ساعت عادی</span>` : `<b>${f0(K.capReg)}</b> قطعه با ساعت عادی`,
       `${f0(K.hc)} نفر × ${dayTxt} × ${fmt(K.reg,1)}${K.ot>0? ' تا '+fmt(K.reg+K.ot,1):''} ساعت × ${f1(K.p)} قطعه/نفر-ساعت، پس از کسر دوباره‌کاری و جداسازی؛ ${capMsg}.${K.forecast!==null? ` با ریتم ۷ روز اخیر، پایان ماه حدود <b>${f0(K.forecast)}</b> می‌شود.`:''}`]);
     qa.push(['چقدر کمبود نیرو دارم؟',
-      `<b style="color:${shortColor}">${f0(K.shortNoOT)}</b> نفر فقط با ساعت عادی` + (hasOT ? `<br><span class="muted">${f0(K.shortMaxOT)} نفر با اضافه‌کاری مجاز</span>` : ''),
-      `نیاز: ${f1(K.needNoOT)} نفر با ساعت عادی${hasOT? ` (${f1(K.needMaxOT)} نفر با اضافه‌کاری مجاز)`:''} در برابر ${f0(K.hc)} نفر موجود.`]);
+      `<b style="color:${shortColor}">${f0(hasOT ? K.shortMaxOT : K.shortNoOT)}</b> نفر با الگوی کاری فعلی` + (hasOT ? `<br><span class="muted">${f0(K.shortNoOT)} نفر در حالت مرجع «فقط ۸ ساعت، بدون اضافه‌کاری و پنجشنبه/جمعه»</span>` : ''),
+      `نیاز: ${f1(hasOT ? K.needMaxOT : K.needNoOT)} نفر با الگوی کاری فعلی در برابر ${f0(K.hc)} نفر حاضر${hasOT? ` (حالت مرجع ۸ ساعته: ${f1(K.needNoOT)} نفر؛ فقط برای مقایسه است، چون شیفت واقعی ۱۰ ساعت و پنجشنبه/جمعه کاری است)`:''}.${K.shortMaxOT>0 && recoverable>0? ` از نیروی صف ${fmt(K.staff,0)} نفری، ${f0(Math.min(K.shortMaxOT, recoverable))} نفر با کاهش مرخصی/غیبت تأمین می‌شود${K.shortMaxOT>recoverable? ' و '+f0(K.shortMaxOT-recoverable)+' نفر جذب جدید لازم است':''}.`:''}`]);
     qa.push(['چند نفر-ساعت برای تولید نیاز دارم؟', `<b>${f0(K.reqMH)}</b> نفر-ساعت`,
       `${f0(K.reqProd)} برای تولید ${f0(K.plan)} قطعه + ${f0(E)} دوباره‌کاری و جداسازی (برآورد کل ماه با ریتم روزانه‌ی تا امروز؛ تا امروز ${f1(K.Etd)}).`]);
-    qa.push(['چند نفر-ساعت در دسترس دارم؟', `<b>${f0(K.regMH)}</b> نفر-ساعت عادی` + (hasOT ? `<br><span class="muted">${f0(K.maxMH)} با اضافه‌کاری مجاز</span>` : ''),
-      `${f0(K.hc)} نفر × ${fmt(K.Dreg,0)} روز × ${fmt(K.reg,1)} ساعت عادی${K.ot>0? ` (+ تا ${fmt(K.ot,1)} ساعت اضافه‌کاری در روز عادی)`:''}${K.Doff>0? ` + ${fmt(K.Doff,0)} روز پنجشنبه/جمعه × ${fmt(K.offHrs,1)} ساعت (همه اضافه‌کاری)`:''}.`]);
-    qa.push(['چقدر نیازمند اضافه‌کاری هستم؟', `<b style="color:${otColor}">${f0(K.otNeed)}</b> نفر-ساعت`,
-      K.otNeed > 0 ? `حدود ${f1(K.otPerPD)} ساعت برای هر نفر در هر روز کاری${K.otGap>0? ` — <b style="color:${AN.red}">${f0(K.otGap)} نفر-ساعت بیشتر از اضافه‌کاری مجاز است</b>`:''}.` : 'نیازی نیست.']);
+    qa.push(['چند نفر-ساعت در دسترس دارم؟', `<b>${f0(hasOT ? K.maxMH : K.regMH)}</b> نفر-ساعت با الگوی کاری فعلی` + (hasOT ? `<br><span class="muted">${f0(K.regMH)} فقط با ساعت عادی ۸ ساعته</span>` : ''),
+      `${f0(K.hc)} نفر × ${fmt(K.Dreg,0)} روز × ${fmt(K.reg + K.ot,1)} ساعت${K.Doff>0? ` + ${fmt(K.Doff,0)} روز پنجشنبه/جمعه/تعطیل × ${fmt(K.offHrs,1)} ساعت با حدود ${f1(K.hcOff)} نفر حاضر (همه اضافه‌کاری)`:''}.`]);
+    qa.push(['چقدر نیازمند اضافه‌کاری هستم؟', `<b style="color:${otColor}">${f0(K.otNeed)}</b> نفر-ساعت بالاتر از ۸ ساعت عادی`,
+      K.otNeed > 0 ? `از این، ${f0(Math.min(K.otNeed, K.otCap))} نفر-ساعت در الگوی کاری فعلی (اضافه‌کاری روزانه${K.Doff>0?' + پنجشنبه/جمعه/تعطیل کاری':''}) پیش‌بینی شده است${K.otGap>0? ` و <b style="color:${AN.red}">${f0(K.otGap)} نفر-ساعت فراتر از آن</b> لازم است (حدود ${f1(K.otGap / Math.max(K.hc*K.D,1))} ساعت دیگر برای هر نفر در هر روز کاری)`:' و کسری باقی نمی‌ماند'}.` : 'نیازی نیست.']);
   }
   if(K.hc && K.staff) qa.push(['حضور نیروی صف چقدر بوده؟', `<b>${f1(K.hcAvgReg)}</b> از ${fmt(K.staff,0)} نفر<br><span class="muted">${pct(K.hcAvgReg/K.staff,0)} حضور روزهای عادی</span>`,
     `مرخصی و غیبت حدود ${f1(Math.max(K.staff - K.hcAvgReg,0))} نفر را از دسترس خارج می‌کند${K.ok? ` — ${f0(Math.max(K.staff - K.hcAvgReg,0) * (K.reg + K.ot) * K.Dreg)} نفر-ساعت در روزهای عادی ماه؛ اگر همه حاضر بودند ظرفیت حدود ${f0(K.capFull)} قطعه می‌شد`:''}. گزارش بر مبنای نفرات حاضر است.`]);
@@ -5641,7 +5645,7 @@ function renderCapacity(){
         ${kpiCard('میانگین ۷ روز اخیر','قطعه/روز', K.avgRecent!==null? f0(K.avgRecent):'—', null, AN.amber)}
         ${kpiCard('اضافه‌کاری لازم برای هر نفر','ساعت/روز', f1(K.remOTPerPD), null, K.remOTPerPD > K.ot ? AN.red : (K.remOTPerPD>0?AN.amber:AN.teal))}
       </div>
-      <div class="hint">نفر-ساعت لازم باقی‌مانده <b>${f0(K.remReq)}</b> | در دسترس عادی <b>${f0(K.remRegMH)}</b> (با اضافه‌کاری مجاز <b>${f0(K.remMax)}</b>) | اضافه‌کاری لازم <b>${f0(K.remOT)}</b> | کمبود نیرو: <b>${f0(K.remShortNoOT)}</b> نفر فقط با ساعت عادی، <b>${f0(K.remShortMaxOT)}</b> نفر با اضافه‌کاری مجاز.</div></div>`;
+      <div class="hint">نفر-ساعت لازم باقی‌مانده <b>${f0(K.remReq)}</b> | در دسترس عادی <b>${f0(K.remRegMH)}</b> (با اضافه‌کاری مجاز <b>${f0(K.remMax)}</b>) | اضافه‌کاری لازم <b>${f0(K.remOT)}</b> | کمبود نیرو برای جبران کامل تا پایان ماه: <b>${f0(K.remShortMaxOT)}</b> نفر با الگوی کاری فعلی (در حالت مرجع «فقط ۸ ساعت»: ${f0(K.remShortNoOT)} نفر).${lagDays>=2? ` توجه: ${fmt(lagDays,0)} روز اخیر هنوز ثبت نشده و تولیدشان در «برنامه باقی‌مانده» نیامده؛ با ثبتشان این عدد کمتر می‌شود.`:''}</div></div>`;
   }
 
   // ---- جدول دوباره‌کاری/جداسازی
@@ -5671,10 +5675,11 @@ function renderCapacity(){
   view.innerHTML = renderMonthBar() + `
   <div class="grid grid-4" style="margin-bottom:16px;">
     ${kpiCard('نفر-ساعت لازم','نفر-ساعت', K.ok? f0(K.reqMH):'—', null, AN.blue)}
-    ${kpiCard('نفر-ساعت در دسترس (ساعت عادی)','نفر-ساعت', K.ok? f0(K.regMH):'—', null, AN.teal)}
-    ${kpiCard('اضافه‌کاری لازم','نفر-ساعت', K.ok? f0(K.otNeed):'—', null, otColor)}
-    ${kpiCard('کمبود نیرو (فقط با ساعت عادی)','نفر', K.ok? f0(K.shortNoOT):'—', null, shortColor)}
+    ${kpiCard('نفر-ساعت در دسترس (الگوی کاری فعلی)','نفر-ساعت', K.ok? f0(hasOT ? K.maxMH : K.regMH):'—', null, AN.teal)}
+    ${kpiCard('کمبود نفر-ساعت','نفر-ساعت', K.ok? f0(K.gapMH):'—', null, gapColor)}
+    ${kpiCard('کمبود نیرو (با الگوی کاری فعلی)','نفر', K.ok? f0(hasOT ? K.shortMaxOT : K.shortNoOT):'—', null, shortColor)}
   </div>
+  ${K.ok? `<div class="hint" style="margin:-6px 0 16px;">الگوی کاری فعلی (مبنای ظرفیت): ${fmt(K.Dreg,0)} روز عادی × ${fmt(K.reg+K.ot,1)} ساعت${K.Doff>0? ` + ${fmt(K.Doff,0)} پنجشنبه/جمعه/تعطیل کاری × ${fmt(K.offHrs,1)} ساعت (حدود ${f1(K.hcOff)} نفر)`:''}، با ${f0(K.hc)} نفر حاضر. حالت «فقط ۸ ساعت، بدون اضافه‌کاری و بدون پنجشنبه/جمعه» (${f1(K.needNoOT)} نفر لازم، ${f0(K.shortNoOT)} کمبود) یک مرجع فرضی است، نه مبنای تصمیم.</div>`:''}
   ${notes.length? `<div class="card" style="margin-bottom:16px;">${an_insightHtml(notes)}</div>`:''}
   ${qaHtml}
   ${leverHtml}
