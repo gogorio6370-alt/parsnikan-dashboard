@@ -36,8 +36,10 @@
 html,body{margin:0;padding:0; overflow-x:hidden; max-width:100vw;}
 body{
   background:
-    radial-gradient(1100px 500px at 85% -10%, rgba(76,141,255,.10), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(255,157,66,.08), transparent 60%),
+    radial-gradient(1100px 520px at 85% -10%, rgba(76,141,255,.16), transparent 60%),
+    radial-gradient(760px 420px at 12% 6%, rgba(47,217,196,.10), transparent 62%),
+    radial-gradient(820px 460px at 52% 38%, rgba(179,137,255,.08), transparent 62%),
+    radial-gradient(900px 500px at -10% 110%, rgba(255,157,66,.10), transparent 60%),
     var(--bg);
   color:var(--text);
   font-family:'Vazirmatn', sans-serif;
@@ -169,15 +171,42 @@ button{font-family:inherit;}
 .chk-row{ display:flex; align-items:center; gap:7px; font-size:11.5px; color:var(--text-mute); cursor:pointer; user-select:none; }
 .chk-row input{ width:auto; }
 
-.kpi{ position:relative; overflow:hidden; }
-.kpi .tag{ font-size:11px; color:var(--text-mute); font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:6px;}
+.kpi{ position:relative; overflow:hidden; isolation:isolate;
+  background:linear-gradient(145deg, rgba(255,255,255,.09) 0%, rgba(255,255,255,.028) 46%, rgba(255,255,255,.055) 100%);
+  border:1px solid rgba(255,255,255,.11); border-top-color:rgba(255,255,255,.26); border-bottom-color:rgba(255,255,255,.05);
+  -webkit-backdrop-filter:blur(16px) saturate(125%); backdrop-filter:blur(16px) saturate(125%);
+  box-shadow:0 12px 30px -12px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.16), inset 0 -18px 28px -22px rgba(255,255,255,.05);
+  transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.kpi::before{ content:""; position:absolute; inset:0; z-index:-1; pointer-events:none;
+  background:linear-gradient(118deg, rgba(255,255,255,.11) 0%, rgba(255,255,255,.03) 32%, rgba(255,255,255,0) 54%); }
+.kpi::after{ content:""; position:absolute; top:0; left:18px; right:18px; height:2px; z-index:1; pointer-events:none; border-radius:2px;
+  background:linear-gradient(90deg, transparent, var(--kc, #4c8dff), transparent); opacity:.9; }
+.kpi:hover{ transform:translateY(-2px); border-color:rgba(255,255,255,.2); border-top-color:rgba(255,255,255,.36);
+  box-shadow:0 18px 38px -14px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.22), inset 0 -18px 28px -22px rgba(255,255,255,.07); }
+@supports (color: color-mix(in srgb, red 50%, blue)){
+  .kpi:hover{ box-shadow:0 18px 38px -14px rgba(0,0,0,.7), 0 0 0 1px color-mix(in srgb, var(--kc, #4c8dff) 38%, transparent), 0 8px 30px -10px color-mix(in srgb, var(--kc, #4c8dff) 45%, transparent), inset 0 1px 0 rgba(255,255,255,.22); }
+  .kpi .val{ text-shadow:0 2px 18px color-mix(in srgb, var(--kc, #ffffff) 30%, transparent); }
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .kpi{ background:linear-gradient(180deg, var(--panel), var(--panel-2)); } }
+@media (prefers-reduced-transparency: reduce){
+  .kpi{ -webkit-backdrop-filter:none; backdrop-filter:none; background:linear-gradient(180deg, var(--panel), var(--panel-2)); } }
+@media (prefers-reduced-motion: reduce){ .kpi{ transition:none; } .kpi:hover{ transform:none; } }
+@media (max-width:640px){ .kpi{ -webkit-backdrop-filter:blur(10px) saturate(140%); backdrop-filter:blur(10px) saturate(140%); } }
+.kpi.kpi-go{ cursor:pointer; }
+.kpi .kgo{ position:absolute; left:14px; bottom:10px; font-size:10.5px; font-weight:800; color:var(--kc,#a3b1cb); opacity:0; transform:translateX(5px); transition:opacity .2s ease, transform .2s ease; pointer-events:none; letter-spacing:.2px; }
+.kpi.kpi-go:hover .kgo, .kpi.kpi-go:focus-visible .kgo{ opacity:.95; transform:none; }
+.kpi.kpi-go:focus-visible{ outline:2px solid var(--kc,#4c8dff); outline-offset:2px; }
+.kpi.kpi-go:active{ transform:translateY(0) scale(.992); }
+@media (hover:none){ .kpi .kgo{ opacity:.65; transform:none; } }
+.kpi .tag{ font-size:11px; color:#a3b1cb; font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:6px;}
 .kpi .val{ font-size:26px; font-weight:900; letter-spacing:.2px; }
-.kpi .unit{ font-size:12px; color:var(--text-mute); font-weight:700; margin-right:4px;}
+.kpi .unit{ font-size:12px; color:#9aa9c4; font-weight:700; margin-right:4px;}
 .kpi .delta{ margin-top:8px; font-size:11.5px; font-weight:700; display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:20px; }
 .kpi .delta.up{ color:#8ff0c8; background:rgba(47,217,196,.12);}
 .kpi .delta.down{ color:#ffb0b8; background:rgba(255,93,108,.12);}
 .kpi .delta.flat{ color:var(--text-mute); background:rgba(255,255,255,.05);}
-.kpi .glow{ position:absolute; left:-30px; top:-30px; width:110px;height:110px;border-radius:50%; filter:blur(30px); opacity:.35; }
+.kpi .glow{ position:absolute; top:-30px; left:10%; right:10%; height:74px; border-radius:50%; filter:blur(30px); opacity:.30; z-index:-1; pointer-events:none; }
 
 .bar-track{ height:7px; border-radius:6px; background:#1a2438; overflow:hidden; margin-top:10px; }
 .bar-fill{ height:100%; border-radius:6px; background:linear-gradient(90deg, var(--amber), var(--amber-2)); }
@@ -283,6 +312,8 @@ td.num, th.num{ text-align:left; font-variant-numeric:tabular-nums; direction:lt
   .sidebar, .topbar-actions, .hamburger{ display:none !important; }
   body{ background:#fff; color:#000; }
   .card{ break-inside:avoid; border-color:#ccc; background:#fff; box-shadow:none;}
+  .kpi{ -webkit-backdrop-filter:none !important; backdrop-filter:none !important; background:#fff !important; transform:none !important; }
+  .kpi::before, .kpi::after, .kpi .glow, .kpi .kgo{ display:none !important; }
   .no-print{ display:none !important; }
   .print-only{ display:block !important; }
   table, th, td{ color:#000 !important; border-color:#999 !important; }
@@ -295,6 +326,7 @@ td.num, th.num{ text-align:left; font-variant-numeric:tabular-nums; direction:lt
   @page{ size:A4 landscape; margin:8mm; }
   body.an-printing, body.an-printing .app, body.an-printing .main{ background:#0c1220 !important; color:#eef2f9 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   body.an-printing .view{ padding:0 !important; }
+  body.an-printing .kpi{ background:#141d31 !important; }
   body.an-printing .card{ background:#141d31 !important; border:1px solid #243252 !important; box-shadow:none !important; break-inside:avoid; page-break-inside:avoid; }
   body.an-printing table, body.an-printing th, body.an-printing td{ color:#c9d4e8 !important; border-color:#243252 !important; }
   body.an-printing th{ background:#0f1729 !important; position:static !important; }
@@ -577,7 +609,7 @@ let dirty = { daily:false, waste:false, stop:false, short:false, meta:false };
 let currentTab = 'dash';
 let charts = {};
 let editing = { daily:null, waste:null, stop:null, short:null, stationHourly:null, station:null, productOutput:null, action:null };
-let filters = { waste:'', stop:'', short:'', wasteCat:'all', wasteEventType:'all', stopReason:'all', stationFilter:'all', stationOperatorFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'', dpDate:'' };
+let filters = { waste:'', stop:'', short:'', wasteCat:'all', wasteEventType:'all', stopReason:'all', stationFilter:'all', stationOperatorFilter:'all', personnel:'', stopDate:'', personnelWorkType:'all', poSortBy:'name', poDateFocus:'', dpDate:'', wasteDate:'', shortDate:'' };
 let personnelUnlocked = false; // فقط در همین نشست مرورگر؛ هرگز ذخیره/سینک نمی‌شود
 // دو تب «شاخص‌های ناب» و «نقشه خط و گلوگاه‌ها» کاربرد روزمره کمی دارند و منوی تحلیل را شلوغ می‌کردند؛
 // طبق درخواست شما، از فهرست پنهان‌اند و فقط با وارد کردن رمز مدیر (همان رمز تنظیمات) در همان نشست باز می‌شوند.
@@ -1756,6 +1788,8 @@ function goTo(tab){
     promptAnalyticsPin_(tab);
     return;
   }
+  // فیلترهای روشن‌شده با کلیک KPI فقط برای همان مقصد است؛ با رفتن به تب دیگر از منو پاک می‌شود تا بعداً تب «فیلترشده» باز نشود
+  if(!kpiNav_ && kpiSet_.length && tab !== currentTab){ kpiSet_.forEach(k=>{ if(k in filters) filters[k] = (k==='wasteEventType' || k==='wasteCat' || k==='stopReason') ? 'all' : ''; }); kpiSet_ = []; }
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
@@ -2971,7 +3005,7 @@ function renderShip(){
 function renderShort(){
   const M = monthData();
   const list = [...M.short].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
-    .filter(x=> !filters.short || (x.part+x.description).toLowerCase().includes(filters.short.toLowerCase()));
+    .filter(x=> (!filters.short || (x.part+x.description).toLowerCase().includes(filters.short.toLowerCase())) && (!filters.shortDate || x.date===filters.shortDate));
   const dMapSh = dailyByDateMap_(M.daily);
   const byPart = {};
   M.short.forEach(x=>{ byPart[x.part] = (byPart[x.part]||0)+1; });
@@ -3013,9 +3047,9 @@ function renderShort(){
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="shortTableCard">
     <div class="flexbar">
-      <h3 style="margin:0;">رویدادنامه کسری قطعات (${list.length})</h3>
+      <h3 style="margin:0;">رویدادنامه کسری قطعات (${list.length})${filters.shortDate? ` <span class="badge" style="display:inline-flex; align-items:center; gap:6px; font-weight:600;">فقط روز ${esc(filters.shortDate)} <button id="clearShortDateFilter" style="background:none; border:none; color:inherit; cursor:pointer; font-size:13px; line-height:1;">×</button></span>`:''}</h3>
       <div class="search"><input id="shortSearch" placeholder="جستجوی قطعه…" value="${esc(filters.short)}"></div>
     </div>
     <div class="table-wrap"><table>
@@ -3062,6 +3096,7 @@ function renderShort(){
     });
   }));
   document.getElementById('shortSearch').addEventListener('input', e=>{ filters.short = e.target.value; renderShort(); });
+  { const cs = document.getElementById('clearShortDateFilter'); if(cs) cs.addEventListener('click', ()=>{ filters.shortDate=''; renderShort(); }); }
 
   mkChart('chShortBar', { type:'bar', data:{ labels: topParts.map(x=>x[0]), datasets:[{data: topParts.map(x=>x[1]), backgroundColor:'#ff5d6c', borderRadius:8, maxBarThickness:28}]},
     options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{grid:{color:'#182338'}}, y:{grid:{display:false}}} } });
@@ -3122,7 +3157,8 @@ function renderWaste(){
   const list = [...M.waste].sort((a,b)=>dateSortKey(b.date)-dateSortKey(a.date))
     .filter(x=> (!filters.waste || (x.station+x.part+x.operator+x.wasteType).toLowerCase().includes(filters.waste.toLowerCase()))
              && (filters.wasteCat==='all' || x.category===filters.wasteCat)
-             && (filters.wasteEventType==='all' || wasteKindLabel_(x)===filters.wasteEventType));
+             && (filters.wasteEventType==='all' || wasteKindLabel_(x)===filters.wasteEventType)
+             && (!filters.wasteDate || x.date===filters.wasteDate));
   // «دوباره‌کاری» (Rework) از نظر کیفیتی با «ضایعات» (Scrap) فرق دارد: در دوباره‌کاری قطعه در نهایت سالم و
   // قابل‌مصرف می‌شود (فقط وقت اضافه گرفته)، ولی در ضایعات قطعه کاملاً دورریز می‌شود. برای همین KPIها و
   // پارتوهای اصلی این تب فقط «ضایعات واقعی» را حساب می‌کنند؛ دوباره‌کاری در بخش اختصاصی خودش (پایین‌تر) دیده می‌شود.
@@ -3166,18 +3202,18 @@ function renderWaste(){
 
   document.getElementById('view').innerHTML = renderMonthBar() + `
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('جمع کل ضایعات ثبت‌شده','عدد', fmt(totalWaste,0), null, '#ff5d6c')}
-    ${kpiCard('نرخ ضایعات کل','', pct(wasteRate,2), null, '#ffcf5c')}
+    ${kpiCard('جمع کل ضایعات ثبت‌شده','عدد', fmt(totalWaste,0), null, '#ff5d6c', false, 'waste|wasteEventType=ضایعات')}
+    ${kpiCard('نرخ ضایعات کل','', pct(wasteRate,2), null, '#ffcf5c', false, 'waste|wasteEventType=ضایعات')}
     ${kpiCard('پرتکرارترین ایستگاهِ ضایعات', '', scrapTopStation? esc(scrapTopStation.label):'—', null, '#ff9d42', true)}
-    ${kpiCard('تعداد ردیف‌های ثبت‌شده','ردیف', fmt(M.waste.length,0), null, '#4c8dff')}
+    ${kpiCard('تعداد ردیف‌های ثبت‌شده','ردیف', fmt(M.waste.length,0), null, '#4c8dff', false, 'waste|scroll=wasteTableCard')}
   </div>
 
   <div class="section-title" style="margin:4px 0 12px;"><span>⏱ زمان و تعداد دوباره‌کاری و جداسازی این ماه (جدا از ضایعات)</span><span class="ln"></span></div>
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('⏱ زمان دوباره‌کاری','', minHourFmt(WS.rework.min), null, WS.rework.min>0?'#2fd9c4':'#93a4c3', true)}
-    ${kpiCard('⏱ زمان جداسازی','', minHourFmt(WS.seg.min), null, WS.seg.min>0?'#a78bfa':'#93a4c3', true)}
-    ${kpiCard('قطعه دوباره‌کاری‌شده','عدد', fmt(WS.rework.qty,0), null, '#2fd9c4')}
-    ${kpiCard('قطعه جداسازی‌شده','عدد', fmt(WS.seg.qty,0), null, '#a78bfa')}
+    ${kpiCard('⏱ زمان دوباره‌کاری','', minHourFmt(WS.rework.min), null, WS.rework.min>0?'#2fd9c4':'#93a4c3', true, 'waste|wasteEventType=دوباره‌کاری')}
+    ${kpiCard('⏱ زمان جداسازی','', minHourFmt(WS.seg.min), null, WS.seg.min>0?'#a78bfa':'#93a4c3', true, 'waste|wasteEventType=جداسازی')}
+    ${kpiCard('قطعه دوباره‌کاری‌شده','عدد', fmt(WS.rework.qty,0), null, '#2fd9c4', false, 'waste|wasteEventType=دوباره‌کاری')}
+    ${kpiCard('قطعه جداسازی‌شده','عدد', fmt(WS.seg.qty,0), null, '#a78bfa', false, 'waste|wasteEventType=جداسازی')}
   </div>
   ${totalReworkMin>0? `<div class="hint" style="margin:-8px 0 16px;">این ${minHourFmt(totalReworkMin)} (دوباره‌کاری + جداسازی ورودی مشروط)، معادل برآوردیِ <b>~${fmt(reworkLostQtyEst,0)} عدد</b> ظرفیت تولید ازدست‌رفته است (بر مبنای نرخ استاندارد ساعتی همان ایستگاه) — این عدد قبلاً هیچ‌جای دیگری از داشبورد دیده نمی‌شد. برای ثبت این زمان، کافی است در هر ردیف ضایعات (چه «ورودی مشروط» چه «دوباره‌کاری») فیلد «زمان دوباره‌کاری/جداسازی» را پر کنید.</div>` : ''}
 
@@ -3308,13 +3344,14 @@ function renderWaste(){
     <div class="hint" style="margin-top:8px;">${paretoInsight80_(productPareto,'محصول')}</div>
   </div>` : ''}
 
-  <div class="card">
+  <div class="card" id="wasteTableCard">
     <div class="flexbar">
-      <h3 style="margin:0;">ثبت ضایعات/دوباره‌کاری روزانه — ${monthLabel(DB.meta.activeMonth)} (${list.length} از ${M.waste.length})</h3>
+      <h3 style="margin:0;">ثبت ضایعات/دوباره‌کاری روزانه — ${monthLabel(DB.meta.activeMonth)} (${list.length} از ${M.waste.length})${filters.wasteDate? ` <span class="badge" style="display:inline-flex; align-items:center; gap:6px; font-weight:600;">فقط روز ${esc(filters.wasteDate)} <button id="clearWasteDateFilter" style="background:none; border:none; color:inherit; cursor:pointer; font-size:13px; line-height:1;">×</button></span>`:''}</h3>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <div class="pills">
           <button class="pill ${filters.wasteEventType==='all'?'active':''}" data-wet="all">همه</button>
           <button class="pill ${filters.wasteEventType==='ضایعات'?'active':''}" data-wet="ضایعات">فقط ضایعات</button>
+          <button class="pill ${filters.wasteEventType==='جداسازی'?'active':''}" data-wet="جداسازی">فقط جداسازی</button>
           <button class="pill ${filters.wasteEventType==='دوباره‌کاری'?'active':''}" data-wet="دوباره‌کاری">فقط دوباره‌کاری</button>
         </div>
         <div class="pills">
@@ -3374,6 +3411,7 @@ function renderWaste(){
   document.querySelectorAll('[data-wc]').forEach(b=>b.addEventListener('click', ()=>{ filters.wasteCat = b.dataset.wc; renderWaste(); }));
   document.querySelectorAll('[data-pv]').forEach(b=>b.addEventListener('click', ()=>{ filters.wasteParetoView = b.dataset.pv; renderWaste(); }));
   document.querySelectorAll('[data-wet]').forEach(b=>b.addEventListener('click', ()=>{ filters.wasteEventType = b.dataset.wet; renderWaste(); }));
+  { const cw = document.getElementById('clearWasteDateFilter'); if(cw) cw.addEventListener('click', ()=>{ filters.wasteDate=''; renderWaste(); }); }
   document.getElementById('expWasteCsv').addEventListener('click', ()=>{
     const headers = ['تاریخ','ایستگاه','قطعه','محصول نهایی','اپراتور','تعداد تولید','نوع ضایعات','تعداد ضایعات','تیپ','دوباره‌کاری/جداسازی (دقیقه)'];
     const rr = M.waste.map(x=>[x.date,x.station,x.part,x.finalProduct,x.operator,x.produced,x.wasteType,x.wasteCount,x.category,x.reworkMinutes||'']);
@@ -3548,7 +3586,7 @@ function renderStop(){
       : `<div class="hint">هنوز هیچ توقفی با «ساعت شروع» ثبت نشده — از این پس، وقتی توقفی را با ساعت شروع/پایان ثبت کنید، این نمودار خودکار پر می‌شود و نشان می‌دهد توقفات بیشتر چه ساعتی از روز تکرار می‌شوند.</div>`}
   </div>
 
-  <div class="card">
+  <div class="card" id="stopTableCard">
     <div class="flexbar">
       <h3 style="margin:0;">ثبت توقفات خط تولید — ${monthLabel(DB.meta.activeMonth)} (${list.length} از ${M.stop.length})</h3>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -3784,8 +3822,8 @@ function renderPersonnel(){
   </div>
   <div class="grid grid-3" style="margin-bottom:16px;">
     ${kpiCard('میانگین سن پرسنل','سال', avgAge===null?'—':fmt(avgAge,1), null, '#93a4c3')}
-    ${kpiCard('نیاز نیروی صف طبق برنامه‌ریزی','نفر', fmt(totalRequiredHC,1)+(isDarpooshActiveThisMonth_()?'':' (بدون درپوش)'), null, '#93a4c3')}
-    ${kpiCard('کسری نفرات صف', 'نفر', headcountGap>0? '−'+fmt(headcountGap,1) : 'بدون کسری', null, headcountGap>0?'#ff5d6c':'#2fd9c4')}
+    ${kpiCard('نیاز نیروی صف طبق برنامه‌ریزی','نفر', fmt(totalRequiredHC,1)+(isDarpooshActiveThisMonth_()?'':' (بدون درپوش)'), null, '#93a4c3', false, 'dailyProgram')}
+    ${kpiCard('کسری نفرات صف', 'نفر', headcountGap>0? '−'+fmt(headcountGap,1) : 'بدون کسری', null, headcountGap>0?'#ff5d6c':'#2fd9c4', false, 'capacity')}
   </div>
   <div class="hint" style="margin:-8px 0 16px;">جزئیات نقش‌به‌نقش این کسری (کدام فرآیند دقیقاً کم‌نیرو است) را در تب «برنامه تولید روزانه» → جدول «نقشه نیروی استاندارد» ببینید.</div>
 
@@ -4197,9 +4235,9 @@ function renderDailyProgram(){
   </div>` : ''}
 
   <div class="grid grid-4 no-print" style="margin-bottom:16px;">
-    ${kpiCard('نیروی صف موجود','نفر', fmt(totalHeadcount,0), null, '#4c8dff')}
+    ${kpiCard('نیروی صف موجود','نفر', fmt(totalHeadcount,0), null, '#4c8dff', false, 'personnel')}
     ${kpiCard('نیاز آرایش کامل ایده‌آل','نفر', fmt(totalRequired,1)+(darpooshActive?'':' (بدون درپوش)'), null, '#93a4c3')}
-    ${kpiCard('کسری ساختاری','نفر', totalRequired>totalHeadcount? '−'+fmt(totalRequired-totalHeadcount,1) : 'بدون کسری', null, totalRequired>totalHeadcount?'#ff5d6c':'#2fd9c4')}
+    ${kpiCard('کسری ساختاری','نفر', totalRequired>totalHeadcount? '−'+fmt(totalRequired-totalHeadcount,1) : 'بدون کسری', null, totalRequired>totalHeadcount?'#ff5d6c':'#2fd9c4', false, 'capacity')}
     ${kpiCard('نقش‌های شرطی درپوش','', darpooshActive?'فعال این ماه':'غیرفعال این ماه', null, darpooshActive?'#ffcf5c':'#93a4c3')}
   </div>
   ${manningFactor>1 ? `<div class="card no-print" style="margin-bottom:16px; border:1px solid rgba(255,207,92,.35); background:rgba(255,207,92,.06);">
@@ -5276,10 +5314,10 @@ function renderManHours(){
     ${kpiCard('نفر-ساعت بدون ثبت در ایستگاه','نفر-ساعت', fmt(H.gap,0), null, H.gap>0?AN.red:AN.teal)}
   </div>
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('ظرفیت کل ماه (برنامه‌ای)','نفر-ساعت', H.capMonth? fmt(H.capMonth,0):'—', null, AN.purple)}
+    ${kpiCard('ظرفیت کل ماه (برنامه‌ای)','نفر-ساعت', H.capMonth? fmt(H.capMonth,0):'—', null, AN.purple, false, 'capacity')}
     ${kpiCard('قطعه به‌ازای هر نفر-ساعت کارکرد','قطعه', H.pcsPerWorkedMH===null?'—':fmt(H.pcsPerWorkedMH,1), null, AN.teal)}
     ${kpiCard('قطعه به‌ازای هر نفر-ساعت در اختیار','قطعه', H.pcsPerAvailMH===null?'—':fmt(H.pcsPerAvailMH,1), null, AN.green)}
-    ${kpiCard('میانگین حاضرین در روز','نفر', (()=>{ const d = H.days.filter(r=>r.hc); return d.length? fmt(d.reduce((s,r)=>s+r.hc,0)/d.length,1):'—'; })(), null, AN.pink)}
+    ${kpiCard('میانگین حاضرین در روز','نفر', (()=>{ const d = H.days.filter(r=>r.hc); return d.length? fmt(d.reduce((s,r)=>s+r.hc,0)/d.length,1):'—'; })(), null, AN.pink, false, 'entry')}
   </div>
 
   <div class="grid grid-3" style="margin-bottom:16px;">
@@ -6217,9 +6255,9 @@ function renderLean(){
     ${kpiCard('کیفیت (Quality)','', quality===null?'—':pct(quality,2), null, '#b389ff')}
   </div>
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('MTBF — میانگین فاصله بین خرابی‌ها','ساعت', mtbf===null?'—':fmt(mtbf,1), null, '#2fd9c4')}
-    ${kpiCard('MTTR — میانگین زمان تعمیر','ساعت', mttr===null?'—':fmt(mttr,1), null, '#ff5d6c')}
-    ${kpiCard('تعداد رویدادهای خرابی','مورد', fmt(stopEvents,0), null, '#ffcf5c')}
+    ${kpiCard('MTBF — میانگین فاصله بین خرابی‌ها','ساعت', mtbf===null?'—':fmt(mtbf,1), null, '#2fd9c4', false, 'stop')}
+    ${kpiCard('MTTR — میانگین زمان تعمیر','ساعت', mttr===null?'—':fmt(mttr,1), null, '#ff5d6c', false, 'stop')}
+    ${kpiCard('تعداد رویدادهای خرابی','مورد', fmt(stopEvents,0), null, '#ffcf5c', false, 'stop')}
     ${kpiCard('بهره‌وری واقعی','عدد/ساعت', productivity===null?'—':fmt(productivity,1), null, '#4c8dff')}
   </div>
 
@@ -6234,8 +6272,8 @@ function renderLean(){
     <div class="grid grid-4" style="margin-bottom:14px;">
       ${kpiCard('نرخ استفاده از ظرفیت','', capacityUtil===null?'—':pct(capacityUtil,1), null, capacityUtil>=0.85?'#2fd9c4':capacityUtil>=0.6?'#ffcf5c':'#ff5d6c')}
       ${kpiCard('حداکثر ظرفیت اسمی (۴ خط)','عدد/روز', fmt(nominalPerLine*4,0), null, '#93a4c3')}
-      ${kpiCard('بهره‌وری نیروی انسانی','عدد/نفر-روز', productivityPerPerson===null?'—':fmt(productivityPerPerson,1), null, '#4c8dff')}
-      ${kpiCard('میانگین پرسنل حاضر','نفر', avgHeadcount===null?'—':fmt(avgHeadcount,1), null, '#ffcf5c')}
+      ${kpiCard('بهره‌وری نیروی انسانی','عدد/نفر-روز', productivityPerPerson===null?'—':fmt(productivityPerPerson,1), null, '#4c8dff', false, 'manhours')}
+      ${kpiCard('میانگین پرسنل حاضر','نفر', avgHeadcount===null?'—':fmt(avgHeadcount,1), null, '#ffcf5c', false, 'manhours')}
     </div>
     <div class="chart-box" style="height:260px;"><canvas id="chPerLine"></canvas></div>
     <div class="hint" style="margin-top:10px;">نرخ استفاده از ظرفیت = تولید واقعی ÷ (حداکثر ظرفیت اسمی هر خط × ۴ خط × روزهای ثبت‌شده). ظرفیت اسمی از تب «تولید خط تولید» قابل تنظیم است.</div>
@@ -6289,7 +6327,7 @@ function renderLean(){
     ${bestHist? `<div class="hint" style="margin-top:8px;">بهترین ماه ثبت‌شده‌ی خودتان تاکنون <b>${esc(bestHist.monthKey)}</b> با OEE <b style="color:#8ff0c8;">${pct(bestHist.oee,1)}</b> بوده${bestHist.monthKey!==DB.meta.activeMonth? ` — ماه جاری (${pct(oee,1)}) نسبت به آن ${oee>=bestHist.oee?'<b style="color:#8ff0c8;">بهتر یا برابر</b>':'<b style=\"color:#ffcf5c;\">'+pct(oee-bestHist.oee,1)+' فاصله</b>'} است.`:' (همین ماه جاری، رکورد شماست).'}</div>` : ''}
     <div class="grid grid-4" style="margin-top:12px;">
       ${kpiCard('سقف معمول ضایعات صنعت', '', pct(INDUSTRY_BENCHMARK.scrapRateMax,0), null, '#93a4c3')}
-      ${kpiCard('نرخ ضایعات شما', '', scrapRate===null?'—':pct(scrapRate,2), null, (scrapRate!==null&&scrapRate<=INDUSTRY_BENCHMARK.scrapRateMax)?'#2fd9c4':'#ff5d6c')}
+      ${kpiCard('نرخ ضایعات شما', '', scrapRate===null?'—':pct(scrapRate,2), null, (scrapRate!==null&&scrapRate<=INDUSTRY_BENCHMARK.scrapRateMax)?'#2fd9c4':'#ff5d6c', false, 'waste|wasteEventType=ضایعات')}
       ${kpiCard('بهترین OEE تاریخی خودتان', '', bestHist?pct(bestHist.oee,1):'—', null, '#8ff0c8')}
       ${kpiCard('فاصله OEE تا معمول صنعت خودرو (٪۷۵)', '', pct(oeeGapAutomotive,1), null, oeeGapAutomotive>=0?'#2fd9c4':'#ff5d6c')}
     </div>
@@ -6723,23 +6761,23 @@ function renderDash(){
   <div class="section-title" style="margin:0 0 12px;"><span>📅 امروز ${todayRow?'— '+esc(todayRow.date)+moonSuffix_(todayRow):''} <span class="hint" style="font-weight:400;">(آخرین روز ثبت‌شده در ماه فعال)</span></span><span class="ln"></span></div>
   ${!todayRow? `<div class="card" style="margin-bottom:16px;"><div class="tbl-empty">هنوز روزی در این ماه ثبت نشده.</div></div>` : `
   <div class="grid grid-4" style="margin-bottom:10px;">
-    ${kpiCard('هدف امروز','عدد', todayTarget===null?'—':fmt(todayTarget,0), null, '#93a4c3')}
-    ${kpiCard('تولید امروز','عدد', fmt(todayProduction,0), null, '#4c8dff')}
-    ${kpiCard('تحقق برنامه امروز','', todayAttainmentPct===null?'—':pct(todayAttainmentPct,1), null, (todayAttainmentPct!==null&&todayAttainmentPct>=1)?'#2fd9c4':'#ff5d6c')}
-    ${kpiCard('نسبت به روز قبل', '', vsPrevPct===null?'—':pct(vsPrevPct,1), null, vsPrevPct===null?'#93a4c3':vsPrevPct>=0?'#2fd9c4':'#ff5d6c')}
+    ${kpiCard('هدف امروز','عدد', todayTarget===null?'—':fmt(todayTarget,0), null, '#93a4c3', false, 'prod')}
+    ${kpiCard('تولید امروز','عدد', fmt(todayProduction,0), null, '#4c8dff', false, 'prod')}
+    ${kpiCard('تحقق برنامه امروز','', todayAttainmentPct===null?'—':pct(todayAttainmentPct,1), null, (todayAttainmentPct!==null&&todayAttainmentPct>=1)?'#2fd9c4':'#ff5d6c', false, 'prod')}
+    ${kpiCard('نسبت به روز قبل', '', vsPrevPct===null?'—':pct(vsPrevPct,1), null, vsPrevPct===null?'#93a4c3':vsPrevPct>=0?'#2fd9c4':'#ff5d6c', false, 'prod')}
   </div>
   <div class="grid grid-4" style="margin-bottom:10px;">
-    ${kpiCard('توقف امروز','دقیقه', fmt(todayStopHours*60,0), null, todayStopHours>0?'#ff5d6c':'#2fd9c4')}
-    ${kpiCard('ضایعات امروز (دورریز)','عدد', fmt(todayScrapQty,0), null, todayScrapQty>0?'#ffcf5c':'#2fd9c4')}
-    ${kpiCard('جداسازی امروز','عدد', fmt(todaySegQty,0), null, todaySegQty>0?'#a78bfa':'#2fd9c4')}
-    ${kpiCard('دوباره‌کاری امروز','عدد', fmt(todayReworkQty,0), null, todayReworkQty>0?'#4c8dff':'#2fd9c4')}
+    ${kpiCard('توقف امروز','دقیقه', fmt(todayStopHours*60,0), null, todayStopHours>0?'#ff5d6c':'#2fd9c4', false, 'stop|stopDate='+(todayRow?todayRow.date:''))}
+    ${kpiCard('ضایعات امروز (دورریز)','عدد', fmt(todayScrapQty,0), null, todayScrapQty>0?'#ffcf5c':'#2fd9c4', false, 'waste|wasteEventType=ضایعات|wasteDate='+(todayRow?todayRow.date:''))}
+    ${kpiCard('جداسازی امروز','عدد', fmt(todaySegQty,0), null, todaySegQty>0?'#a78bfa':'#2fd9c4', false, 'waste|wasteEventType=جداسازی|wasteDate='+(todayRow?todayRow.date:''))}
+    ${kpiCard('دوباره‌کاری امروز','عدد', fmt(todayReworkQty,0), null, todayReworkQty>0?'#4c8dff':'#2fd9c4', false, 'waste|wasteEventType=دوباره‌کاری|wasteDate='+(todayRow?todayRow.date:''))}
   </div>
   <div class="grid grid-4" style="margin-bottom:10px;">
-    ${kpiCard('کسری قطعه باز امروز','مورد', fmt(todayShortArr.length,0), null, todayShortArr.length>0?'#ff5d6c':'#2fd9c4')}
-    ${unitCost>0? kpiCard('برآورد زیان ریالی امروز','ریال', fmt(todayLossValue,0), null, todayLossValue>0?'#ff5d6c':'#2fd9c4') :
-      kpiCard('برآورد زیان ریالی امروز','', 'بهای واحد تعیین نشده', null, '#93a4c3', true)}
-    ${kpiCard('نفر-ساعت جداسازی امروز','نفر-ساعت', fmt(todaySplit.seg.min/60,1), null, todaySplit.seg.min>0?'#a78bfa':'#2fd9c4')}
-    ${kpiCard('نفر-ساعت دوباره‌کاری امروز','نفر-ساعت', fmt(todaySplit.rework.min/60,1), null, todaySplit.rework.min>0?'#4c8dff':'#2fd9c4')}
+    ${kpiCard('کسری قطعه باز امروز','مورد', fmt(todayShortArr.length,0), null, todayShortArr.length>0?'#ff5d6c':'#2fd9c4', false, 'short|shortDate='+(todayRow?todayRow.date:''))}
+    ${unitCost>0? kpiCard('برآورد زیان ریالی امروز','ریال', fmt(todayLossValue,0), null, todayLossValue>0?'#ff5d6c':'#2fd9c4', false, 'prod') :
+      kpiCard('برآورد زیان ریالی امروز','', 'بهای واحد تعیین نشده', null, '#93a4c3', true, 'prod')}
+    ${kpiCard('نفر-ساعت جداسازی امروز','نفر-ساعت', fmt(todaySplit.seg.min/60,1), null, todaySplit.seg.min>0?'#a78bfa':'#2fd9c4', false, 'waste|wasteEventType=جداسازی|wasteDate='+(todayRow?todayRow.date:''))}
+    ${kpiCard('نفر-ساعت دوباره‌کاری امروز','نفر-ساعت', fmt(todaySplit.rework.min/60,1), null, todaySplit.rework.min>0?'#4c8dff':'#2fd9c4', false, 'waste|wasteEventType=دوباره‌کاری|wasteDate='+(todayRow?todayRow.date:''))}
   </div>
   <div class="hint" style="margin:0 0 16px;"><b>ضایعات</b> = قطعه‌ی دورریز • <b>جداسازی</b> = قطعه‌ی ورودی مشروط که جدا/غربال شد • <b>دوباره‌کاری</b> = قطعه‌ای که اصلاح شد و سالم ماند. این سه در یک عدد جمع نمی‌شوند؛ زیان ریالی فقط از توقف و ضایعات واقعی حساب می‌شود و جداسازی/دوباره‌کاری با نفر-ساعت سنجیده می‌شوند.</div>
   ${unitCost<=0? `<div class="hint" style="margin:-6px 0 16px;">برای دیدن برآورد زیان ریالی توقف/ضایعات، «بهای هر عدد ترموستات» را در تب «تولید خط تولید» → «ستاپ اهداف» وارد کنید.</div>`:''}
@@ -6755,15 +6793,15 @@ function renderDash(){
 
   <div class="section-title" style="margin:22px 0 14px;"><span>📆 این ماه (${monthLabel(DB.meta.activeMonth)}) <span class="hint" style="font-weight:400;">— ${fmt(rows.length,0)} روز ثبت‌شده</span></span><span class="ln"></span></div>
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('هدف تجمعی ۴ خط اصلی','عدد', fmt(targetTotal,0), null, '#93a4c3')}
-    ${kpiCard('جمع تولید ۴ خط اصلی','عدد', fmt(sum4,0), null, '#ff9d42')}
-    ${kpiCard('میانگین انحراف روزانه از هدف','', pct(avgDevPct,1), avgDevPct>=0?'up':'down', avgDevPct>=0?'#2fd9c4':'#ff5d6c')}
-    ${kpiCard('جمع کل تولید (همه خطوط)','عدد', fmt(sumAll,0), null, '#4c8dff')}
+    ${kpiCard('هدف تجمعی ۴ خط اصلی','عدد', fmt(targetTotal,0), null, '#93a4c3', false, 'prod')}
+    ${kpiCard('جمع تولید ۴ خط اصلی','عدد', fmt(sum4,0), null, '#ff9d42', false, 'prod')}
+    ${kpiCard('میانگین انحراف روزانه از هدف','', pct(avgDevPct,1), avgDevPct>=0?'up':'down', avgDevPct>=0?'#2fd9c4':'#ff5d6c', false, 'prod')}
+    ${kpiCard('جمع کل تولید (همه خطوط)','عدد', fmt(sumAll,0), null, '#4c8dff', false, 'prod')}
   </div>
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('جمع کل قطعات ارسالی','عدد', fmt(totalShip,0), null, '#b389ff')}
-    ${kpiCard('جمع ساعات توقف تولید','ساعت', fmt(totalStopHours,1), null, '#ffcf5c')}
-    ${kpiCard('نرخ ضایعات کل','', pct(wasteRate,2), null, '#ff5d6c')}
+    ${kpiCard('جمع کل قطعات ارسالی','عدد', fmt(totalShip,0), null, '#b389ff', false, 'ship')}
+    ${kpiCard('جمع ساعات توقف تولید','ساعت', fmt(totalStopHours,1), null, '#ffcf5c', false, 'stop')}
+    ${kpiCard('نرخ ضایعات کل','', pct(wasteRate,2), null, '#ff5d6c', false, 'waste|wasteEventType=ضایعات')}
     ${kpiCard('تعداد رویدادهای مشکل خط','مورد', fmt(problemEvents,0), null, '#f472b6')}
   </div>
 
@@ -6778,10 +6816,10 @@ function renderDash(){
   <div class="card" style="margin-bottom:16px;">
     <div class="flexbar"><h3 style="margin:0;">🔮 پیش‌بینی روند تا پایان ماه</h3><span class="hint" style="margin:0;">بر مبنای شیب روند تولید روزانه (رگرسیون خطی ساده)</span></div>
     <div class="grid grid-4" style="margin-top:4px;">
-      ${kpiCard('روند تولید روزانه', '', trendDirection==='up'?'📈 صعودی':trendDirection==='down'?'📉 نزولی':'➖ باثبات', null, trendDirection==='down'?'#ff5d6c':trendDirection==='up'?'#2fd9c4':'#ffcf5c')}
-      ${kpiCard('پیش‌بینی جمع کل پایان ماه', 'عدد', fmt(forecastTotalAll,0), null, '#4c8dff')}
-      ${kpiCard('فاصله پیش‌بینی تا هدف ماه', '', forecastVsTargetPctD===null?'—':pct(forecastVsTargetPctD,1), null, (forecastVsTargetPctD!==null&&forecastVsTargetPctD>=0)?'#2fd9c4':'#ff5d6c')}
-      ${kpiCard('روزهای کاری باقیمانده', 'روز', fmt(daysRemainingD,0), null, '#93a4c3')}
+      ${kpiCard('روند تولید روزانه', '', trendDirection==='up'?'📈 صعودی':trendDirection==='down'?'📉 نزولی':'➖ باثبات', null, trendDirection==='down'?'#ff5d6c':trendDirection==='up'?'#2fd9c4':'#ffcf5c', false, 'target')}
+      ${kpiCard('پیش‌بینی جمع کل پایان ماه', 'عدد', fmt(forecastTotalAll,0), null, '#4c8dff', false, 'target')}
+      ${kpiCard('فاصله پیش‌بینی تا هدف ماه', '', forecastVsTargetPctD===null?'—':pct(forecastVsTargetPctD,1), null, (forecastVsTargetPctD!==null&&forecastVsTargetPctD>=0)?'#2fd9c4':'#ff5d6c', false, 'target')}
+      ${kpiCard('روزهای کاری باقیمانده', 'روز', fmt(daysRemainingD,0), null, '#93a4c3', false, 'target')}
     </div>
     <div class="hint" style="margin-top:8px;">این یک پیش‌بینی خطی ساده است و روزهای تعطیل/نیمه‌شیفت آینده را جداگانه لحاظ نمی‌کند — برای پیش‌بینی دقیق‌تر با احتساب نوع روز، از تب «هدف و پیشرفت تولید» استفاده کنید.</div>
   </div>
@@ -6796,10 +6834,10 @@ function renderDash(){
   <div class="card" style="margin-bottom:16px;">
     <div class="flexbar"><h3 style="margin:0;">🏭 بنچمارک با استاندارد صنعت خودرو</h3><span class="hint" style="margin:0;">مرجع عمومی صنعت — جزئیات کامل در تب «شاخص‌های ناب»</span></div>
     <div class="grid grid-4" style="margin-top:4px;">
-      ${kpiCard('معمول صنعت خودرو', '', pct(INDUSTRY_BENCHMARK.oeeAutomotive,0), null, '#93a4c3')}
-      ${kpiCard('OEE این ماه', '', oeeStatsD.oee===null?'—':pct(oeeStatsD.oee,1), null, oeeStatsD.oee>=INDUSTRY_BENCHMARK.oeeAutomotive?'#2fd9c4':'#ff5d6c')}
-      ${kpiCard('فاصله تا معمول صنعت', '', pct(oeeStatsD.oee-INDUSTRY_BENCHMARK.oeeAutomotive,1), null, (oeeStatsD.oee-INDUSTRY_BENCHMARK.oeeAutomotive)>=0?'#2fd9c4':'#ff5d6c')}
-      ${kpiCard('کلاس جهانی (مرجع بالاتر)', '', pct(INDUSTRY_BENCHMARK.oeeWorldClass,0), null, '#93a4c3')}
+      ${kpiCard('معمول صنعت خودرو', '', pct(INDUSTRY_BENCHMARK.oeeAutomotive,0), null, '#93a4c3', false, 'lean')}
+      ${kpiCard('OEE این ماه', '', oeeStatsD.oee===null?'—':pct(oeeStatsD.oee,1), null, oeeStatsD.oee>=INDUSTRY_BENCHMARK.oeeAutomotive?'#2fd9c4':'#ff5d6c', false, 'lean')}
+      ${kpiCard('فاصله تا معمول صنعت', '', pct(oeeStatsD.oee-INDUSTRY_BENCHMARK.oeeAutomotive,1), null, (oeeStatsD.oee-INDUSTRY_BENCHMARK.oeeAutomotive)>=0?'#2fd9c4':'#ff5d6c', false, 'lean')}
+      ${kpiCard('کلاس جهانی (مرجع بالاتر)', '', pct(INDUSTRY_BENCHMARK.oeeWorldClass,0), null, '#93a4c3', false, 'lean')}
     </div>
   </div>
 
@@ -7275,10 +7313,10 @@ function renderTargetProgress(){
 
   <div class="grid grid-5" style="margin-bottom:16px;">
     ${kpiCard('هدف ماهانه','عدد', monthlyTarget? fmt(monthlyTarget,0):'—', null, '#4c8dff')}
-    ${kpiCard('تولید تجمعی تا امروز','عدد', fmt(cumTotal,0), null, '#ff9d42')}
-    ${kpiCard('باقیمانده تا هدف','عدد', monthlyTarget? fmt(remaining,0):'—', null, remaining>0?'#ffcf5c':'#2fd9c4')}
-    ${kpiCard('درصد پیشرفت از هدف تولید','', progressPct===null?'—':pct(progressPct,1), null, (progressPct!==null&&progressPct>=1)?'#2fd9c4':'#4c8dff')}
-    ${kpiCard('درصد پیشرفت از هدف ارسال','', shipProgressPct===null?'—':pct(shipProgressPct,1), null, (shipProgressPct!==null&&shipProgressPct>=1)?'#2fd9c4':(shipProgressPct!==null&&progressPct!==null&&shipProgressPct<progressPct-0.05)?'#ff5d6c':'#4c8dff')}
+    ${kpiCard('تولید تجمعی تا امروز','عدد', fmt(cumTotal,0), null, '#ff9d42', false, 'prod')}
+    ${kpiCard('باقیمانده تا هدف','عدد', monthlyTarget? fmt(remaining,0):'—', null, remaining>0?'#ffcf5c':'#2fd9c4', false, 'prod')}
+    ${kpiCard('درصد پیشرفت از هدف تولید','', progressPct===null?'—':pct(progressPct,1), null, (progressPct!==null&&progressPct>=1)?'#2fd9c4':'#4c8dff', false, 'prod')}
+    ${kpiCard('درصد پیشرفت از هدف ارسال','', shipProgressPct===null?'—':pct(shipProgressPct,1), null, (shipProgressPct!==null&&shipProgressPct>=1)?'#2fd9c4':(shipProgressPct!==null&&progressPct!==null&&shipProgressPct<progressPct-0.05)?'#ff5d6c':'#4c8dff', false, 'ship')}
   </div>
   <div class="grid grid-4" style="margin-bottom:16px;">
     ${kpiCard('انحراف از مسیر برنامه تا امروز','', paceDevPct===null?'—':pct(paceDevPct,1), null, paceDevPct===null?'#93a4c3':paceDevPct>=0?'#2fd9c4':'#ff5d6c')}
@@ -7861,13 +7899,33 @@ function readTimePicker(idPrefix){
   if(!hEl || !mEl || hEl.value==='' || mEl.value==='') return '';
   return String(hEl.value).padStart(2,'0') + ':' + String(mEl.value).padStart(2,'0');
 }
-function kpiCard(label, unit, val, deltaDir, color, small){
-  return `<div class="card kpi">
+function kpiCard(label, unit, val, deltaDir, color, small, go){
+  const ga = go ? ` data-go="${esc(go)}" role="link" tabindex="0" title="مشاهده جزئیات" aria-label="${esc(String(label).replace(/<[^>]*>/g,''))} — مشاهده جزئیات"` : '';
+  return `<div class="card kpi${go?' kpi-go':''}" style="--kc:${color};"${ga}>
     <div class="glow" style="background:${color};"></div>
     <div class="tag">${label}</div>
     <div class="${small?'':'val'}" style="${small?'font-size:16px;font-weight:800;':''}">${val}${unit?`<span class="unit">${unit}</span>`:''}</div>
+    ${go?'<div class="kgo">جزئیات ←</div>':''}
   </div>`;
 }
+/* کلیک روی کارت KPI → رفتن به تب جزئیات (با فیلتر مربوط و اسکرول به جدول)؛ مشخصات: «تب|کلید=مقدار|…» */
+let kpiNav_ = false, kpiSet_ = [];   // فیلترهایی که کلیک KPI روشن کرده؛ با رفتن به تب دیگر از منو پاک می‌شوند
+function kpiGo_(spec){
+  const parts = String(spec||'').split('|'); const tab = parts.shift(); if(!tab) return;
+  const opts = {}; parts.forEach(q=>{ const i = q.indexOf('='); if(i > 0) opts[q.slice(0,i)] = q.slice(i+1); });
+  if(tab === 'waste'){ filters.waste = ''; filters.wasteCat = 'all'; filters.wasteEventType = 'all'; filters.wasteDate = ''; }
+  if(tab === 'stop'){ filters.stop = ''; filters.stopReason = 'all'; filters.stopDate = ''; }
+  if(tab === 'short'){ filters.short = ''; filters.shortDate = ''; }
+  const keys = Object.keys(opts);
+  keys.forEach(k=>{ if(k !== 'scroll' && Object.prototype.hasOwnProperty.call(filters, k)){ filters[k] = opts[k]; if(kpiSet_.indexOf(k) < 0) kpiSet_.push(k); } });
+  kpiNav_ = true; try{ goTo(tab); } finally { kpiNav_ = false; }
+  const anchor = opts.scroll || (keys.length ? ({ waste:'wasteTableCard', stop:'stopTableCard', short:'shortTableCard' })[tab] : '');
+  if(anchor) setTimeout(()=>{ const el = document.getElementById(anchor); if(el && el.scrollIntoView) el.scrollIntoView({ behavior:'smooth', block:'start' }); }, 120);
+}
+try{
+  document.addEventListener('click', e=>{ const k = e.target && e.target.closest ? e.target.closest('.kpi[data-go]') : null; if(k) kpiGo_(k.getAttribute('data-go')); });
+  document.addEventListener('keydown', e=>{ if((e.key === 'Enter' || e.key === ' ') && e.target && e.target.matches && e.target.matches('.kpi[data-go]')){ e.preventDefault(); kpiGo_(e.target.getAttribute('data-go')); } });
+}catch(err){}
 // چیپ هشدار زودهنگام ریسک — نیمه اول بازه را با نیمه دوم مقایسه می‌کند تا روند صعودی/نزولی
 // (توقف، ضایعات، کسری و ...) پیش از تبدیل‌شدن به بحران آخر ماه، قابل مشاهده باشد.
 function riskChip(label, trend, unit, subtitle){
