@@ -989,10 +989,21 @@ function stationById(id){ return (DB.meta.stations||[]).find(s=>s.id===id); }
 function allLinesTotal(entry){
   return mainFourTotal(entry) + (entry.lines.ckd.qty||0) + (entry.lines.se206.qty||0) + (entry.lines.darpoosh.qty||0) + (entry.lines.diesel.qty||0);
 }
+/* گروه‌های ارسال به انبار — فقط چهار دسته (هم‌سان در فرم ورود داده، تب ارسال و داشبورد).
+   «field» کلید جمع هر دسته است؛ «legacy» کلیدهای ریزِ قدیمی که در ثبت‌های پیشین هست و همچنان در آمار حساب می‌شود. */
+const SHIP_GROUPS_ = [
+  { key:'termostat',     label:'ترموستات‌ها',       field:'termostat_koli', legacy:[], hint:'ترموستات‌های معمولی' },
+  { key:'dieselBenz',    label:'دیزل/بنز',          field:'diesel_benz',    legacy:['benz71'], hint:'بنز، چری، کاپرا و سایر دیزل‌ها' },
+  { key:'ckd',           label:'CKD',              field:'ckd_all',        legacy:['ckd89','ckd76','ckd83'], hint:'همه‌ی CKDها (۷۶، ۸۳، ۸۹)' },
+  { key:'darpooshSe206', label:'درپوش‌ها/سه‌راهی',  field:'darpoosh_se206', legacy:['l90','sayna','shahin','jack','se206','shahinpas'], hint:'درپوش‌ها (ساینا، L90، جک، شاهین) و سه‌راهی (۲۰۶، شاهین‌پلاس)' }
+];
+const SHIP_LEGACY_LABELS_ = { benz71:'بنز ۷۱', ckd89:'CKD 89', ckd76:'CKD 76', ckd83:'CKD 83', l90:'L90 (درپوش)', sayna:'ساینا (درپوش)', shahin:'شاهین معمولی (درپوش)', jack:'جک', se206:'سه‌راهی ۲۰۶', shahinpas:'سه‌راهی شاهین‌پلاس' };
+const SHIP_ALL_KEYS_ = SHIP_GROUPS_.reduce((a,g)=>a.concat([g.field], g.legacy), []);
+function shipGroupSum_(ship, g){ ship = ship || {}; return [g.field].concat(g.legacy).reduce((sum,f)=>sum + (+ship[f]||0), 0); }
+function shipBlank_(){ const o = {}; SHIP_ALL_KEYS_.forEach(k=>{ o[k] = null; }); return o; }
 function shipTotal(entry){
-  const s = entry.ship;
-  return ['termostat_koli','benz71','ckd89','ckd76','ckd83','l90','sayna','shahin','jack','se206','shahinpas']
-    .reduce((sum,k)=> sum + (s[k]||0), 0);
+  const s = (entry && entry.ship) || {};
+  return SHIP_ALL_KEYS_.reduce((sum,k)=> sum + (+s[k]||0), 0);
 }
 function target4Lines(){ return (DB.meta.lineTarget||LINE_TARGET_DEFAULT)*4; }
 // جمع «هدف ماه» همه محصولات — همان عددی که در تب «ارسال به‌تفکیک محصول» به‌عنوان «جمع هدف ماه (همه
@@ -1902,7 +1913,7 @@ function emptyDailyDraft(){
     lines:{ line1:{status:'run',qty:null,product:''}, line2:{status:'run',qty:null,product:''},
       line3:{status:'run',qty:null,product:''}, line4:{status:'run',qty:null,product:'',transferFromDiesel:null},
       ckd:{status:'run',qty:null}, se206:{status:'run',qty:null}, darpoosh:{status:'run',qty:null}, diesel:{status:'run',qty:null} },
-    ship:{ termostat_koli:null,benz71:null,ckd89:null,ckd76:null,ckd83:null,l90:null,sayna:null,shahin:null,jack:null,se206:null,shahinpas:null },
+    ship: shipBlank_(),
     notes:{ shortage:'', stoppage:'', waste:'', problems:'' } };
 }
 function renderEntry(){
@@ -1913,12 +1924,6 @@ function renderEntry(){
     {k:'line3', label:'خط ۳ (مونتاژ ۳)'}, {k:'line4', label:'خط ۴ (مونتاژ ۴)'},
   ];
   const extraDef = [{k:'ckd', label:'CKD'}, {k:'se206', label:'سه‌راهی ۲۰۶'}, {k:'darpoosh', label:'درپوش'}, {k:'diesel', label:'دیزل / بنز'}];
-  const shipDef = [
-    {group:'ترموستات‌ها', fields:[['termostat_koli','ترموستات کلی'],['benz71','بنز ۷۱']]},
-    {group:'CKD', fields:[['ckd89','CKD 89'],['ckd76','CKD 76'],['ckd83','CKD 83']]},
-    {group:'درپوش‌ها', fields:[['l90','L90'],['sayna','ساینا'],['shahin','شاهین'],['jack','جک']]},
-    {group:'سه‌راهی ۲۰۶', fields:[['se206','۲۰۶'],['shahinpas','شاهین‌پس']]},
-  ];
 
   const html = renderMonthBar() + `
   <div class="card" style="margin-bottom:18px;">
@@ -1989,11 +1994,14 @@ function renderEntry(){
     </div>
 
     <div class="section-title"><span>قطعات ارسالی به انبار</span><span class="ln"></span></div>
-    <div class="form-grid">
-      ${shipDef.map(g=>g.fields.map(([k,label])=>`
-        <div class="field"><label>${g.group} — ${label}</label><input id="f_ship_${k}" type="text" inputmode="numeric" value="${draft.ship[k] ?? ''}" placeholder="0"></div>
-      `).join('')).join('')}
+    <div class="form-grid" style="align-items:end;">
+      ${SHIP_GROUPS_.map(g=>{
+        const v = shipGroupSum_(draft.ship, g);
+        const old = g.legacy.filter(f=>draft.ship && draft.ship[f]>0).map(f=>`${SHIP_LEGACY_LABELS_[f]||f}: ${fmt(draft.ship[f],0)}`).join(' · ');
+        return `<div class="field"><label>${g.label}<span class="muted" style="display:block; font-weight:400; font-size:11px; margin-top:2px;">${g.hint}</span></label><input id="f_ship_${g.field}" type="text" inputmode="numeric" value="${v>0? v : ''}" placeholder="0">${old? `<div class="hint" style="margin-top:4px;">ریز ثبت قبلی: ${esc(old)} (اگر عدد را عوض نکنید، همین ریز حفظ می‌شود)</div>`:''}</div>`;
+      }).join('')}
     </div>
+    <div class="hint" style="margin-top:6px;">فقط جمع هر دسته را وارد کنید — مثلاً ارسال «چری ۸۳» را در «دیزل/بنز» بنویسید. ریز هر محصول را در تب «ارسال به‌تفکیک محصول» ثبت کنید.</div>
 
     <div class="section-title"><span>یادداشت‌های روز (هر مورد را با | جدا کنید)</span><span class="ln"></span></div>
     <div class="form-grid">
@@ -2085,7 +2093,15 @@ function renderEntry(){
     ['line1','line2','line3','line4','ckd','se206','darpoosh','diesel'].forEach(k=>{ if(rec.lines[k].status==='stop') rec.lines[k].qty = 0; });
     const transferChk = document.getElementById('f_line4_transferChk');
     rec.lines.line4.transferFromDiesel = (transferChk && transferChk.checked) ? (num(document.getElementById('f_line4_transferQty').value) || 0) : null;
-    shipDef.forEach(g=>g.fields.forEach(([k])=>{ rec.ship[k] = num(document.getElementById(`f_ship_${k}`).value); }));
+    SHIP_GROUPS_.forEach(g=>{
+      const val = num(document.getElementById('f_ship_'+g.field).value) || 0;
+      const old = shipGroupSum_(draft.ship, g);
+      if(draft.id && val === old){   // دست‌نخورده: ریز ثبت قبلی حفظ می‌شود
+        [g.field].concat(g.legacy).forEach(f=>{ rec.ship[f] = (draft.ship && +draft.ship[f]) || 0; });
+      } else {                        // تغییر کرده/جدید: فقط جمع دسته ثبت می‌شود
+        rec.ship[g.field] = val; g.legacy.forEach(f=>{ rec.ship[f] = 0; });
+      }
+    });
     rec.notes = { shortage:document.getElementById('f_shortage').value, stoppage:document.getElementById('f_stoppage').value,
       waste:document.getElementById('f_waste').value, problems:document.getElementById('f_problems').value };
 
@@ -2942,13 +2958,8 @@ function renderShip(){
   // چهار دستهٔ واقعی گزارش ارسال — دقیقاً همان چهار دستهٔ هدف روزانه (۴ خط اصلی/CKD/درپوش+سه‌راهی/دیزل-بنز).
   // قبلاً «بنز۷۱» به‌اشتباه داخل «ترموستات‌ها» جمع می‌شد (باید دیزل/بنز جدا باشد) و «درپوش‌ها» و «سه‌راهی ۲۰۶»
   // دو ردیف جدا بودند در حالی‌که در گزارش‌های مدیریتی همیشه یک دسته‌اند.
-  const groups = [
-    {key:'termostat', label:'ترموستات‌ها', fields:['termostat_koli']},
-    {key:'dieselBenz', label:'دیزل/بنز', fields:['benz71']},
-    {key:'ckd', label:'CKD', fields:['ckd89','ckd76','ckd83']},
-    {key:'darpooshSe206', label:'درپوش‌ها/سه‌راهی', fields:['l90','sayna','shahin','jack','se206','shahinpas']},
-  ];
-  const groupSum = (e,g)=> g.fields.reduce((s,f)=>s+(e.ship[f]||0),0);
+  const groups = SHIP_GROUPS_.map(g=>({ key:g.key, label:g.label, fields:[g.field].concat(g.legacy) }));
+  const groupSum = (e,g)=> g.fields.reduce((s,f)=>s+((e.ship && +e.ship[f])||0),0);
   const groupTotals = groups.map(g=>({ ...g, total: rows.reduce((s,e)=> s + groupSum(e,g), 0) }));
   const grand = groupTotals.reduce((s,g)=>s+g.total,0);
   const dailyTotals = rows.map(e=>shipTotal(e));
@@ -6906,12 +6917,9 @@ function renderDash(){
     });
   }
 
-  const shipGroups = [
-    {label:'ترموستات‌ها', fields:['termostat_koli','benz71']}, {label:'CKD', fields:['ckd89','ckd76','ckd83']},
-    {label:'درپوش‌ها', fields:['l90','sayna','shahin','jack']}, {label:'سه‌راهی ۲۰۶', fields:['se206','shahinpas']}
-  ];
+  const shipGroups = SHIP_GROUPS_.map(g=>({ label:g.label, fields:[g.field].concat(g.legacy) }));
   mkChart('dChShip', { type:'doughnut', data:{ labels: shipGroups.map(g=>g.label),
-    datasets:[{ data: shipGroups.map(g=>rows.reduce((s,e)=>s+g.fields.reduce((s2,f)=>s2+(e.ship[f]||0),0),0)), backgroundColor: PALETTE, borderColor:'#101827', borderWidth:3 }] },
+    datasets:[{ data: shipGroups.map(g=>rows.reduce((s,e)=>s+g.fields.reduce((s2,f)=>s2+((e.ship && +e.ship[f])||0),0),0)), backgroundColor: PALETTE, borderColor:'#101827', borderWidth:3 }] },
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%', plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}} } });
 
   paretoChart('dChWaste', stationParetoW, '#ff5d6c');
