@@ -569,7 +569,7 @@ const NAV = [
   {id:'manhours',label:'👷 نفر-ساعت و ظرفیت نیرو', group:'تحلیل',    icon:'users'},
   {id:'trend',   label:'📈 روند ماهانه',       group:'تحلیل',       icon:'chart'},
   {id:'target',  label:'🎯 هدف و پیشرفت تولید', group:'تحلیل',    icon:'target'},
-  {id:'actions', label:'✅ مرکز اقدامات',      group:'تحلیل',    icon:'checklist'},
+  {id:'actions', label:'⚡ مرکز اقدام — Fast Response', group:'تحلیل',    icon:'checklist'},
   {id:'dash',    label:'داشبورد مدیریتی',   group:'تحلیل',       icon:'chart'},
 ];
 
@@ -1805,7 +1805,7 @@ function goTo(tab){
   currentTab = tab;
   renderNav();
   const titles = {stdtime:'زمان استاندارد ساخت ترموستات', takt:'تکت‌تایم، سایکل‌تایم و زمان استاندارد ساخت', manhours:'نفر-ساعت، ظرفیت و نیاز نیرو', trend:'روند ماهانه تولید، ارسال و شاخص‌ها', cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
-    waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', actions:'مرکز اقدامات', dash:'داشبورد مدیریتی'};
+    waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', actions:'مرکز اقدام — Fast Response', dash:'داشبورد مدیریتی'};
   const subs = {
     takt:'تکت‌تایم و سایکل‌تایم ایستگاه‌ها، و زمان استاندارد ساخت هر گروه محصول — با کلید بالای صفحه جابه‌جا شوید',
     manhours:'نفر-ساعت در اختیار و کارکرد، و برنامه در برابر ظرفیت واقعی (نفر لازم، اضافه‌کاری، دوباره‌کاری و جداسازی)',
@@ -1824,7 +1824,7 @@ function goTo(tab){
     lean:'اثربخشی کلی تجهیزات — برآمده از داده‌های تولید، ضایعات و توقفات همین خط',
     flowmap:'ثبت ظرفیت روزانه هر ایستگاه و شناسایی خودکار گلوگاه(های) خط تولید',
     target:'هدف ماهانه، مسیر پیشرفت روزانه و تحلیل ریشه‌ای انحراف',
-    actions:'اقدامات اصلاحی باز — مسئول، موعد و وضعیت هرکدام',
+    actions:'اعلان‌ها را فوراً به اقدام تبدیل کنید — زمان اعلام، پیش‌بینی انجام، موعد و وضعیت هر اقدام',
     dash:'تصویر کلی عملکرد ' + currentLineName()
   };
   document.getElementById('pageTitle').textContent = titles[tab];
@@ -7000,73 +7000,286 @@ async function runAiAnalysis(data){
 }
 
 /* =========================================================================
-   TAB: مرکز اقدامات (actions) — «چه کسی، چه کاری، تا کِی؟». بدون این تب، جعبه‌ی «هشدارهای
-   مدیریتی» صفحه‌کاور فقط یک تشخیص است؛ این تب همان تشخیص را به یک اقدام قابل‌پیگیری تبدیل می‌کند.
+   TAB: مرکز اقدام — Fast Response (actions) — «چه کسی، چه کاری، چه زمانی، تا کِی؟». اعلان‌های توقف/کسری/ضایعات
+   در همان لحظه و بدون اسکرول به اقدام با سه زمان تبدیل می‌شوند: زمان اعلام، پیش‌بینی انجام و موعد انجام.
    ========================================================================= */
 const ACTION_STATUSES = ['باز','در حال انجام','انجام‌شده','لغو شده'];
-function emptyActionDraft(){ return { title:'', dept:'', dueDate:'', status:'باز', description:'' }; }
-function renderActionCenter(){
-  const draft = editing.action || emptyActionDraft();
-  const isRealEdit = !!(editing.action && (DB.actions||[]).some(x=>x.id===editing.action.id)); // یک پیش‌نویسِ پرشده از پیشنهاد، id واقعی در DB ندارد؛ پس با «ویرایش واقعی» فرق دارد
-  const M = monthData();
-  // هر اقدام به «ماهی» تعلق دارد که در آن ثبت شده (فیلد month؛ برای اقدام‌های قدیمی که این فیلد را ندارند،
-  // ماه تاریخ ثبتشان). با عوض‌شدن ماه فعال، این تب مثل بقیه‌ی تب‌ها تمیز شروع می‌شود و فقط اقدام‌های همان
-  // ماه را نشان می‌دهد. اقدام‌های «باز» ماه‌های قبل گم نمی‌شوند: جدا و با هشدار زیر نشان داده می‌شوند.
-  const actionMonthOf = x => x.month || monthKeyOf(x.createdDate || x.dueDate || '') || DB.meta.activeMonth;
-  const isOpenAct = x => x.status!=='انجام‌شده' && x.status!=='لغو شده';
-  const sortActs = arr => [...arr].sort((a,b)=>{
-    // باز/در حال انجام اول (نزدیک‌ترین موعد بالاتر)، بعد انجام‌شده/لغوشده ته لیست
-    const openA = isOpenAct(a), openB = isOpenAct(b);
-    if(openA!==openB) return openA? -1 : 1;
-    return (a.dueDate||'9999').localeCompare(b.dueDate||'9999');
+const AC_SLA_HOURS = 4;   // هدف Fast Response: هر اعلان حداکثر تا ۴ ساعت به اقدام تبدیل شود
+function emptyActionDraft(){ return { title:'', dept:'', status:'باز', description:'', etaDate:'', etaTime:'', dueDate:'', dueTime:'' }; }
+
+/* ---------- زمان‌ها ----------
+   «زمان اعلام» = لحظه‌ی ثبتِ توقف/کسری/ضایعاتی که اعلان را ساخته. هر رکورد با uid() ساخته می‌شود که
+   Date.now() را در ۸ حرف آخر شناسه دارد؛ همان لحظه‌ی ثبت از شناسه برگردانده می‌شود (بدون فیلد اضافه).
+   «پیش‌بینی انجام» = تاریخ و ساعتِ تخمینی اتمام. «موعد انجام» = مهلت قطعی (ساعت اختیاری، پیش‌فرض پایان روز). */
+function acIdTs_(id){ const t = parseInt(String(id||'').slice(-8), 36); return (t > 1.5e12 && t < 2.6e12) ? t : null; }
+function acTsToJ_(ts){
+  const d = new Date(ts), j = gregorianToJalali(d.getFullYear(), d.getMonth()+1, d.getDate());
+  return { date: j[0] + '/' + String(j[1]).padStart(2,'0') + '/' + String(j[2]).padStart(2,'0'),
+           time: String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') };
+}
+function acJToTs_(date, time, endOfDay){
+  if(!date) return null;
+  const p = toEnDigits(String(date)).split('/').map(Number); if(p.length !== 3 || p.some(isNaN)) return null;
+  const g = jalaliToGregorian(p[0], p[1], p[2]);
+  let h = 0, m = 0;
+  if(time){ const t = String(time).split(':').map(Number); h = t[0] || 0; m = t[1] || 0; } else if(endOfDay){ h = 23; m = 59; }
+  return new Date(g[0], g[1]-1, g[2], h, m, 0, 0).getTime();
+}
+function acFmtDT_(date, time){ return date ? (date + (time ? ' · ' + time : '')) : '—'; }
+function acAgo_(ms){
+  ms = Math.abs(ms); const m = Math.round(ms/60000);
+  if(m < 1) return 'لحظاتی';
+  if(m < 60) return m + ' دقیقه';
+  if(m < 48*60){ const h = Math.round(m/6)/10; return (h % 1 === 0 ? h : h.toFixed(1)) + ' ساعت'; }
+  return Math.round(m/1440) + ' روز';
+}
+function acRoundUp15_(ts){ const q = 15*60000; return Math.ceil(ts/q)*q; }
+function acPresetTs_(k){
+  const now = Date.now();
+  if(k === '2h') return acRoundUp15_(now + 2*3600e3);
+  if(k === '4h') return acRoundUp15_(now + 4*3600e3);
+  if(k === 'tom'){ const d = new Date(); d.setDate(d.getDate()+1); d.setHours(8,0,0,0); return d.getTime(); }
+  if(k === '3d') return acRoundUp15_(now + 3*86400e3);
+  if(k === '7d') return acRoundUp15_(now + 7*86400e3);
+  return acRoundUp15_(now);
+}
+function acSrcLabel_(t){ return t === 'short' ? 'کسری قطعه' : t === 'waste' ? 'ضایعات' : t === 'stop' ? 'توقف' : ''; }
+function acSetDate_(prefix, jdate){
+  const p = toEnDigits(jdate||'').split('/').map(Number); if(p.length !== 3) return;
+  const set = (suf, v)=>{ const el = document.getElementById(prefix + '_' + suf); if(el){ if(![...el.options].some(o=>o.value === String(v))){ const o = document.createElement('option'); o.value = String(v); o.textContent = String(v); el.appendChild(o); } el.value = String(v); } };
+  set('d', p[2]); set('m', p[1]); set('y', p[0]);
+}
+function acSetTime_(prefix, hhmm){
+  const t = String(hhmm||'').split(':').map(Number); if(t.length < 2) return;
+  const h = document.getElementById(prefix + '_h'), m = document.getElementById(prefix + '_m');
+  if(h) h.value = String(t[0]); if(m) m.value = String(t[1]);
+}
+
+/* ---------- پنجره‌ی «اقدام سریع» — بدون اسکرول؛ هم برای تبدیل اعلان، هم ثبت و ویرایش اقدام ---------- */
+function acOpenModal_(init, ctx){
+  ctx = ctx || {};
+  const root = document.getElementById('modalRoot'); if(!root) return;
+  const isEdit = !!ctx.isEdit;
+  const d = Object.assign(emptyActionDraft(), init || {});
+  const annTs = d.announcedTs || null, annDate = d.announcedDate || '', annTime = d.announcedTime || '';
+  const manualAnn = (!annTs && !annDate && !isEdit) ? Date.now() : null;
+  const isOpenSt = s => s !== 'انجام‌شده' && s !== 'لغو شده';
+  if(!isEdit && !d.etaDate){ const j = acTsToJ_(acPresetTs_('4h')); d.etaDate = j.date; d.etaTime = j.time; }
+  if(!isEdit && !d.dueDate){ d.dueDate = d.etaDate; }
+  const deptOpts = [...new Set([...Object.values(STOP_REASON_DEPARTMENT), ...Object.values(WASTE_CATEGORY_DEPARTMENT), 'برنامه‌ریزی و تامین'])];
+  const src = acSrcLabel_(d.sourceType);
+  const annHtml = annTs
+    ? `📣 زمان اعلام: <b>${esc(annDate)} · ${esc(annTime)}</b> <span class="muted">— لحظه‌ی ثبت ${src||'اعلان'}</span> <span class="badge" style="margin-right:6px;">${acAgo_(Date.now()-annTs)} پیش</span>`
+    : (annDate ? `📣 زمان اعلام: <b>${esc(annDate)}</b> <span class="muted">— ساعت ثبت در دسترس نیست</span>` : (isEdit ? `📣 زمان اعلام: <b>ثبت نشده</b> <span class="muted">— اقدامِ قبل از اضافه‌شدن زمان‌ها</span>` : `📣 زمان اعلام: <b>اکنون</b> <span class="muted">— اقدام دستی</span>`));
+  root.innerHTML = `<div class="modal-bg" id="mbg"><div class="modal" style="max-width:700px; width:calc(100vw - 24px); max-height:92vh; overflow:auto; text-align:right;">
+    <h3>${isEdit ? '✏️ ویرایش اقدام' : '⚡ اقدام سریع'}${src ? ` <span class="muted" style="font-weight:400; font-size:12px;">— از ${src}</span>` : ''}</h3>
+    <div style="margin:8px 0 12px; padding:9px 12px; border-radius:10px; background:rgba(76,141,255,.10); border:1px solid rgba(76,141,255,.25); font-size:12.5px;">${annHtml}</div>
+    <div class="field"><label>شرح اقدام</label><input id="acTitle" type="text" value="${esc(d.title)}" placeholder="مثلاً: پیگیری تامین قطعه با انبار مرکزی" autocomplete="off"></div>
+    <div class="form-grid" style="margin-top:8px; grid-template-columns:1.6fr 1fr;">
+      <div class="field"><label>مسئول / واحد</label><input id="acDept" type="text" value="${esc(d.dept)}" list="acDeptList" autocomplete="off"><datalist id="acDeptList">${deptOpts.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>
+      <div class="field"><label>وضعیت</label><select id="acStatus">${ACTION_STATUSES.map(s=>`<option ${d.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
+    </div>
+    <div style="margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08);">
+      <div style="font-weight:800; font-size:13px; margin-bottom:6px;">⏱ پیش‌بینی انجام <span class="muted" style="font-weight:400;">— چه زمانی تمام می‌شود؟</span></div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+        <button type="button" class="pill" data-acpre="2h">۲ ساعت دیگر</button><button type="button" class="pill" data-acpre="4h">۴ ساعت دیگر</button>
+        <button type="button" class="pill" data-acpre="tom">فردا ۰۸:۰۰</button><button type="button" class="pill" data-acpre="3d">۳ روز دیگر</button><button type="button" class="pill" data-acpre="7d">۷ روز دیگر</button>
+      </div>
+      <div class="form-grid" style="grid-template-columns:1.7fr 1fr;"><div class="field"><label>تاریخ</label>${datePickerHtml('acEtaD', d.etaDate)}</div><div class="field"><label>ساعت</label>${timePickerHtml('acEtaT', d.etaTime)}</div></div>
+    </div>
+    <div style="margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08);">
+      <div style="font-weight:800; font-size:13px; margin-bottom:6px;">📅 موعد انجام <span class="muted" style="font-weight:400;">— مهلت قطعی (ساعت اختیاری)</span> <button type="button" class="pill" id="acDueSame" style="margin-right:8px;">هم‌زمان با پیش‌بینی</button></div>
+      <div class="form-grid" style="grid-template-columns:1.7fr 1fr;"><div class="field"><label>تاریخ</label>${datePickerHtml('acDueD', d.dueDate)}</div><div class="field"><label>ساعت <span class="muted">(اختیاری)</span></label>${timePickerHtml('acDueT', d.dueTime)}</div></div>
+    </div>
+    <div id="acWarn" style="margin-top:8px; min-height:18px; font-size:12.5px;"></div>
+    <div class="field" style="margin-top:4px;"><label>توضیحات <span class="muted">(اختیاری)</span></label><input id="acDesc" type="text" value="${esc(d.description||'')}" autocomplete="off"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="acCancel">انصراف</button><button class="btn btn-primary" id="acSave">${isEdit ? 'ذخیره ویرایش' : 'ثبت اقدام'}</button></div>
+  </div></div>`;
+  const close = () => { root.innerHTML = ''; document.removeEventListener('keydown', onEsc); };
+  const onEsc = e => { if(e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onEsc);
+  document.getElementById('acCancel').addEventListener('click', close);
+  document.getElementById('mbg').addEventListener('click', e=>{ if(e.target.id === 'mbg') close(); });
+  const readEta = () => ({ date: readDatePicker('acEtaD'), time: readTimePicker('acEtaT') });
+  const readDue = () => ({ date: readDatePicker('acDueD'), time: readTimePicker('acDueT') });
+  const warn = () => {
+    const e = readEta(), u = readDue(), el = document.getElementById('acWarn'); if(!el) return;
+    const eTs = (e.date && e.time) ? acJToTs_(e.date, e.time) : null, uTs = u.date ? acJToTs_(u.date, u.time, true) : null;
+    const msgs = [];
+    if(eTs && uTs && eTs > uTs) msgs.push(`<span style="color:#ff5d6c;">⚠️ پیش‌بینی انجام (${esc(acFmtDT_(e.date,e.time))}) بعد از موعد است؛ یا موعد را جلو نیاندازید یا پیش‌بینی را زودتر بگذارید.</span>`);
+    if(eTs && annTs && eTs < annTs - 60000) msgs.push(`<span style="color:#ff5d6c;">⚠️ پیش‌بینی انجام نمی‌تواند قبل از زمان اعلام باشد.</span>`);
+    if(eTs && !msgs.length) msgs.push(`<span class="muted">پیش‌بینی: ${acAgo_(eTs - Date.now())} ${eTs >= Date.now() ? 'دیگر' : 'پیش'}${uTs ? ' — تا موعد ' + (uTs >= Date.now() ? acAgo_(uTs - Date.now()) + ' فرصت' : 'گذشته') : ''}</span>`);
+    el.innerHTML = msgs.join('<br>');
+  };
+  root.querySelectorAll('[data-acpre]').forEach(b=>b.addEventListener('click', ()=>{
+    const j = acTsToJ_(acPresetTs_(b.dataset.acpre));
+    acSetDate_('acEtaD', j.date); acSetTime_('acEtaT', j.time);
+    const u = readDue(), uTs = u.date ? acJToTs_(u.date, u.time, true) : null, eTs = acJToTs_(j.date, j.time);
+    if(!u.date || (uTs && uTs < eTs)){ acSetDate_('acDueD', j.date); }   // موعد خالی یا زودتر از پیش‌بینی بود → هم‌روز با پیش‌بینی
+    warn();
+  }));
+  document.getElementById('acDueSame').addEventListener('click', ()=>{ const e = readEta(); if(e.date){ acSetDate_('acDueD', e.date); if(e.time) acSetTime_('acDueT', e.time); warn(); } });
+  ['acEtaD','acEtaT','acDueD','acDueT'].forEach(p=>root.querySelectorAll('#'+p+' select').forEach(s=>s.addEventListener('change', warn)));
+  warn();
+  document.getElementById('acSave').addEventListener('click', ()=>{
+    const title = document.getElementById('acTitle').value.trim();
+    if(!title){ toast('شرح اقدام الزامی است.','err'); return; }
+    const status = document.getElementById('acStatus').value, open = isOpenSt(status);
+    const e = readEta(), u = readDue();
+    if(open && (!e.date || !e.time)){ toast('پیش‌بینی انجام (تاریخ و ساعت) الزامی است.','err'); return; }
+    if(open && !u.date){ toast('موعد انجام الزامی است.','err'); return; }
+    const eTs = (e.date && e.time) ? acJToTs_(e.date, e.time) : null;
+    const annFinal = annTs || manualAnn || null;
+    if(open && annFinal && eTs && eTs < annFinal - 60000){ toast('پیش‌بینی انجام نمی‌تواند قبل از زمان اعلام باشد.','err'); return; }
+    const nowTs = Date.now(), nowJ = acTsToJ_(nowTs);
+    const annJ = annTs ? { date: annDate, time: annTime } : (manualAnn ? acTsToJ_(manualAnn) : { date: annDate || '', time: '' });
+    const wasDone = (init && init.status === 'انجام‌شده');
+    const rec = Object.assign({}, (isEdit ? init : {}), {
+      id: isEdit ? init.id : uid(), title, dept: document.getElementById('acDept').value.trim(), status,
+      description: document.getElementById('acDesc').value.trim(),
+      sourceType: d.sourceType || null, sourceKey: d.sourceKey || null,
+      announcedTs: annFinal, announcedDate: annJ.date, announcedTime: annJ.time,
+      etaDate: e.date || '', etaTime: e.time || '', dueDate: u.date || '', dueTime: u.time || '',
+      month: isEdit ? (init.month || monthKeyOf(init.createdDate || init.dueDate || '') || DB.meta.activeMonth) : DB.meta.activeMonth,
+      createdDate: isEdit ? init.createdDate : nowJ.date, createdTs: isEdit ? (init.createdTs || null) : nowTs
+    });
+    if(status === 'انجام‌شده'){ if(!(wasDone && init.resolvedDate)){ rec.resolvedDate = nowJ.date; rec.resolvedTime = nowJ.time; rec.resolvedTs = nowTs; } }
+    else { rec.resolvedDate = (init && init.resolvedDate && status === 'لغو شده') ? init.resolvedDate : ''; if(status !== 'انجام‌شده'){ rec.resolvedTime = ''; rec.resolvedTs = null; } }
+    if(isEdit){ DB.actions = DB.actions.map(x=>x.id === rec.id ? rec : x); toast('ویرایش شد.','ok'); }
+    else { DB.actions = [...(DB.actions||[]), rec]; toast('اقدام ثبت شد.','ok'); }
+    close(); scheduleSave(); renderActionCenter();
   });
-  const allActs = DB.actions||[];
-  const list = sortActs(allActs.filter(x=>actionMonthOf(x)===DB.meta.activeMonth));
+  setTimeout(()=>{ const t = document.getElementById('acTitle'); if(t && !t.value) t.focus(); }, 30);
+}
+
+function acRowHtml_(x, now, monthNote){
+  const open = x.status !== 'انجام‌شده' && x.status !== 'لغو شده';
+  const dueTs = x.dueDate ? acJToTs_(x.dueDate, x.dueTime, true) : null;
+  const etaTs = x.etaDate ? acJToTs_(x.etaDate, x.etaTime || '23:59') : null;
+  const dueOver = open && dueTs && dueTs < now;
+  const etaOver = open && etaTs && etaTs < now && !dueOver;
+  const etaAfterDue = etaTs && dueTs && etaTs > dueTs;
+  const stColor = x.status === 'انجام‌شده' ? '#2fd9c4' : x.status === 'لغو شده' ? '#7c8aa5' : dueOver ? '#ff5d6c' : x.status === 'در حال انجام' ? '#4c8dff' : '#ffcf5c';
+  const react = (x.announcedTs && x.createdTs) ? `<span class="muted" style="font-size:11.5px;">واکنش: ${acAgo_(x.createdTs - x.announcedTs)}</span>` : '';
+  const srcBadge = x.sourceType ? `<span class="badge" style="margin-left:6px;">${acSrcLabel_(x.sourceType)}</span>` : '';
+  const annCell = x.announcedDate ? `<div>${esc(acFmtDT_(x.announcedDate, x.announcedTime))}</div>${open && x.announcedTs ? `<div class="muted" style="font-size:11.5px;">${acAgo_(now - x.announcedTs)} پیش</div>` : ''}` : '<span class="muted">—</span>';
+  const etaCell = x.etaDate
+    ? `<div style="${etaOver?'color:#ffcf5c; font-weight:700;':''}">${esc(acFmtDT_(x.etaDate, x.etaTime))}</div>${open && etaTs ? `<div class="muted" style="font-size:11.5px; ${etaOver?'color:#ffcf5c;':''}">${etaTs >= now ? acAgo_(etaTs - now) + ' دیگر' : acAgo_(now - etaTs) + ' گذشته'}</div>` : ''}${etaAfterDue ? '<div style="font-size:11.5px; color:#ff5d6c;">⚠️ بعد از موعد</div>' : ''}`
+    : '<span class="muted">—</span>';
+  let dueExtra = '';
+  if(x.status === 'انجام‌شده' && x.resolvedTs && dueTs){ dueExtra = x.resolvedTs <= dueTs ? '<div style="font-size:11.5px; color:#2fd9c4;">✓ در موعد انجام شد</div>' : '<div style="font-size:11.5px; color:#ff5d6c;">⚠️ با تأخیر انجام شد</div>'; }
+  else if(dueOver){ dueExtra = `<div style="font-size:11.5px;">${acAgo_(now - dueTs)} تأخیر</div>`; }
+  else if(open && dueTs){ dueExtra = `<div class="muted" style="font-size:11.5px;">${acAgo_(dueTs - now)} فرصت</div>`; }
+  return `<tr>
+    <td>${srcBadge}${esc(x.title)}${monthNote ? `<div class="muted" style="font-size:11.5px; margin-top:2px; color:#ffcf5c;">ثبت‌شده در ${esc(monthNote)}</div>` : ''}${x.description ? `<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>` : ''}${react ? `<div>${react}</div>` : ''}</td>
+    <td>${esc(x.dept) || '—'}</td>
+    <td>${annCell}</td>
+    <td>${etaCell}</td>
+    <td style="${dueOver?'color:#ff5d6c; font-weight:700;':''}">${esc(acFmtDT_(x.dueDate, x.dueTime))}${dueOver?' ⚠️':''}${dueExtra}</td>
+    <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span>${x.status === 'انجام‌شده' && x.resolvedDate ? `<div class="muted" style="font-size:11.5px; margin-top:3px;">${esc(acFmtDT_(x.resolvedDate, x.resolvedTime))}</div>` : ''}</td>
+    <td><div style="display:flex; gap:6px;">
+      ${x.status !== 'انجام‌شده' ? `<button class="icon-btn" data-adone="${x.id}" title="علامت‌گذاری به‌عنوان انجام‌شده">✅</button>` : ''}
+      <button class="icon-btn" data-aedit="${x.id}" title="ویرایش">✏️</button>
+      <button class="icon-btn" data-adel="${x.id}" title="حذف">🗑️</button>
+    </div></td>
+  </tr>`;
+}
+
+function renderActionCenter(){
+  const M = monthData();
+  const now = Date.now();
+  // هر اقدام به «ماهی» تعلق دارد که در آن ثبت شده؛ اقدام‌های «باز» ماه‌های قبل گم نمی‌شوند و جدا نشان داده می‌شوند.
+  const actionMonthOf = x => x.month || monthKeyOf(x.createdDate || x.dueDate || '') || DB.meta.activeMonth;
+  const isOpenAct = x => x.status !== 'انجام‌شده' && x.status !== 'لغو شده';
+  const dueTsOf = x => x.dueDate ? acJToTs_(x.dueDate, x.dueTime, true) : null;
+  const etaTsOf = x => x.etaDate ? acJToTs_(x.etaDate, x.etaTime || '23:59') : null;
+  const sortActs = arr => [...arr].sort((a,b)=>{
+    const openA = isOpenAct(a), openB = isOpenAct(b);
+    if(openA !== openB) return openA ? -1 : 1;
+    return (dueTsOf(a) || 9e15) - (dueTsOf(b) || 9e15);
+  });
+  const allActs = DB.actions || [];
+  const list = sortActs(allActs.filter(x=>actionMonthOf(x) === DB.meta.activeMonth));
   const carryOver = sortActs(allActs.filter(x=>isOpenAct(x) && actionMonthOf(x) < DB.meta.activeMonth));
   const filterStatus = filters.actionStatus || 'open';
-  const today = todayJalaliStr();
+  const isDueOver = x => isOpenAct(x) && dueTsOf(x) && dueTsOf(x) < now;
   const filtered = list.filter(x=>{
-    if(filterStatus==='open') return isOpenAct(x);
-    if(filterStatus==='overdue') return isOpenAct(x) && x.dueDate && x.dueDate<today;
-    if(filterStatus==='done') return x.status==='انجام‌شده';
-    return true; // 'all'
+    if(filterStatus === 'open') return isOpenAct(x);
+    if(filterStatus === 'overdue') return isDueOver(x);
+    if(filterStatus === 'done') return x.status === 'انجام‌شده';
+    return true;
   });
   const openCount = list.filter(isOpenAct).length;
-  const overdueCount = list.filter(x=>isOpenAct(x) && x.dueDate && x.dueDate<today).length;
-  const doneThisMonth = allActs.filter(x=>x.status==='انجام‌شده' && x.resolvedDate && monthKeyOf(x.resolvedDate)===DB.meta.activeMonth).length;
+  const overdueCount = list.filter(isDueOver).length;
+  const etaMissCount = list.filter(x=>isOpenAct(x) && !isDueOver(x) && etaTsOf(x) && etaTsOf(x) < now).length;
+  const doneCount = list.filter(x=>x.status === 'انجام‌شده').length;
+  const reacts = list.filter(x=>x.announcedTs && x.createdTs && x.createdTs >= x.announcedTs).map(x=>x.createdTs - x.announcedTs);
+  const avgReact = reacts.length ? reacts.reduce((a,b)=>a+b,0)/reacts.length : null;
 
-  // ---- پیشنهادهای خودکار: کسری قطعات، ضایعات/دوباره‌کاری، توقفات — «متصدی» هرکدام از همان
-  // نگاشت علت/منشأ → واحد گرفته می‌شود (همان جدول جعبه «هشدارهای مدیریتی» صفحه‌کاور)؛ شما فقط
-  // موعد انجام و توضیح تکمیلی را اضافه می‌کنید. هر مورد فقط یک‌بار پیشنهاد می‌شود — بعد از تبدیل
-  // به اقدام، دوباره در این لیست ظاهر نمی‌شود (even اگر هنوز باز باشد).
+  // ---- اعلان‌ها (توقف/کسری/ضایعات) که هنوز اقدام ندارند — با «زمان اعلام» از لحظه‌ی ثبت رکورد
   const existingSourceKeys = new Set((DB.actions||[]).map(x=>x.sourceKey).filter(Boolean));
-  const shortSuggestions = M.short.filter(x=>x.status!=='تامین شده').map(x=>({
+  const tsOfRows = rows => { const t = rows.map(r=>acIdTs_(r.id)).filter(Boolean); return t.length ? Math.max(...t) : null; };
+  const dateOfRows = rows => rows.map(r=>r.date).filter(Boolean).sort().slice(-1)[0] || '';
+  const mkAlert = (o, rows) => {
+    const ts = tsOfRows(rows), j = ts ? acTsToJ_(ts) : null;
+    return Object.assign(o, { announcedTs: ts, announcedDate: j ? j.date : dateOfRows(rows), announcedTime: j ? j.time : '', events: rows.length });
+  };
+  const shortSuggestions = M.short.filter(x=>x.status !== 'تامین شده').map(x=>mkAlert({
     sourceType:'short', sourceKey:'short:'+x.id, icon:'📦',
     title:`کسری قطعه: ${x.part}${x.description?' — '+x.description:''}`, dept:'برنامه‌ریزی و تامین', detail: x.date,
-  })).filter(x=>!existingSourceKeys.has(x.sourceKey));
+  }, [x])).filter(x=>!existingSourceKeys.has(x.sourceKey));
 
-  const wasteScrap = M.waste.filter(x=>wasteKind_(x)==='scrap');
+  const wasteScrap = M.waste.filter(x=>wasteKind_(x) === 'scrap');
   const stationWastePareto = paretoFrom(wasteScrap, x=>x.station, x=>x.wasteCount).slice(0,5);
   const wasteSuggestions = stationWastePareto.map(s=>{
-    const rowsAtStation = wasteScrap.filter(x=>x.station===s.label);
+    const rowsAtStation = wasteScrap.filter(x=>x.station === s.label);
     const domCat = paretoFrom(rowsAtStation, x=>x.category, x=>x.wasteCount)[0]?.label || 'سایر';
-    return { sourceType:'waste', sourceKey:'waste:'+DB.meta.activeMonth+':'+s.label, icon:'♻️',
-      title:`ضایعات مکرر — ایستگاه «${s.label}» (بیشترین منشأ: ${domCat})`, dept: departmentForWasteCategory_(domCat), detail:`${fmt(s.value,0)} عدد این ماه` };
+    return mkAlert({ sourceType:'waste', sourceKey:'waste:'+DB.meta.activeMonth+':'+s.label, icon:'♻️',
+      title:`ضایعات مکرر — ایستگاه «${s.label}» (بیشترین منشأ: ${domCat})`, dept: departmentForWasteCategory_(domCat), detail:`${fmt(s.value,0)} عدد این ماه` }, rowsAtStation);
   }).filter(x=>!existingSourceKeys.has(x.sourceKey));
 
   const stopRankedAll = stopLossRanking(M.stop);
-  const stopSuggestions = stopRankedAll.slice(0,5).map(x=>({
+  const stopSuggestions = stopRankedAll.slice(0,5).map(x=>mkAlert({
     sourceType:'stop', sourceKey:'stop:'+DB.meta.activeMonth+':'+x.label, icon:'⏸',
     title:`توقف مکرر — علت «${x.label}»`, dept: departmentForStopReason_(x.label), detail:`${fmt(x.hours,1)} ساعت این ماه`,
-  })).filter(x=>!existingSourceKeys.has(x.sourceKey));
+  }, M.stop.filter(r=>r.reason === x.label))).filter(x=>!existingSourceKeys.has(x.sourceKey));
 
-  const allSuggestions = [...shortSuggestions, ...wasteSuggestions, ...stopSuggestions];
+  const dateTs = a => a.announcedTs || (a.announcedDate ? acJToTs_(a.announcedDate, '') : null) || 9e15;
+  const allSuggestions = [...shortSuggestions, ...wasteSuggestions, ...stopSuggestions].sort((a,b)=>dateTs(a) - dateTs(b));   // قدیمی‌ترین اعلانِ بی‌اقدام اول
+  const waitHours = a => { const t = a.announcedTs || (a.announcedDate ? acJToTs_(a.announcedDate, '12:00') : null); return t ? (now - t)/3600e3 : null; };
+  const oldest = allSuggestions.length ? waitHours(allSuggestions[0]) : null;
+  const late24 = allSuggestions.filter(a=>{ const h = waitHours(a); return h !== null && h > 24; }).length;
+  const showAll = !!filters.acShowAll;
+  const shownAlerts = showAll ? allSuggestions : allSuggestions.slice(0, 8);
 
   document.getElementById('view').innerHTML = renderMonthBar() + `
-  <div class="grid grid-3" style="margin-bottom:16px;">
-    ${kpiCard('اقدامات باز','عدد', fmt(openCount,0), null, openCount>0?'#ffcf5c':'#2fd9c4')}
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${kpiCard('اعلان‌های منتظر اقدام', oldest!==null ? 'قدیمی‌ترین: '+acAgo_(oldest*3600e3) : '', fmt(allSuggestions.length,0), null, allSuggestions.length===0?'#2fd9c4':(late24>0?'#ff5d6c':'#ffcf5c'))}
+    ${kpiCard('اقدام‌های باز', etaMissCount>0 ? etaMissCount+' پیش‌بینی‌شکسته' : 'عدد', fmt(openCount,0), null, openCount>0?'#ffcf5c':'#2fd9c4')}
     ${kpiCard('سررسیدگذشته','عدد', fmt(overdueCount,0), null, overdueCount>0?'#ff5d6c':'#2fd9c4')}
-    ${kpiCard('انجام‌شده در ماه فعال','عدد', fmt(doneThisMonth,0), null, '#4c8dff')}
+    ${kpiCard('میانگین زمان واکنش', avgReact!==null ? '' : 'هنوز داده‌ای نیست', avgReact!==null ? acAgo_(avgReact) : '—', null, avgReact===null?'#93a4c3':(avgReact/3600e3<=AC_SLA_HOURS?'#2fd9c4':'#ffcf5c'), avgReact===null)}
+  </div>
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="flexbar">
+      <h3 style="margin:0;">⚡ اعلان‌های منتظر اقدام <span class="muted" style="font-weight:400;">— Fast Response</span></h3>
+      <button class="btn btn-teal btn-sm" id="acNewBtn">➕ اقدام جدید</button>
+    </div>
+    <div class="hint" style="margin:2px 0 10px;">اعلان‌ها از ثبت کسری قطعه، ضایعات و توقفات ساخته می‌شوند و «زمان اعلام» همان لحظه‌ی ثبتشان است. هدف: هر اعلان تا <b>${AC_SLA_HOURS} ساعت</b> به اقدام تبدیل شود. روی «اقدام سریع» بزنید؛ پنجره همان‌جا باز می‌شود و فقط پیش‌بینی و موعد مانده.</div>
+    ${allSuggestions.length === 0 ? `<div class="tbl-empty">✅ اعلان بی‌اقدامی در ${esc(monthLabel(DB.meta.activeMonth))} نیست.</div>` : `
+    <div style="display:flex; flex-direction:column; gap:8px;">
+      ${shownAlerts.map(s=>{
+        const i = allSuggestions.indexOf(s), h = waitHours(s);
+        const col = h === null ? '#93a4c3' : (h <= AC_SLA_HOURS ? '#2fd9c4' : (h <= 24 ? '#ffcf5c' : '#ff5d6c'));
+        return `<div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.03); border-radius:10px; padding:10px 12px; border-right:3px solid ${col};">
+        <div style="font-size:16px;">${s.icon}</div>
+        <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:13px; color:#e8edf7;">${esc(s.title)}</div>
+          <div class="muted" style="font-size:12px; margin-top:2px;">${esc(s.detail)} — مسئول پیشنهادی: <b>${esc(s.dept)}</b></div>
+          <div style="font-size:12px; margin-top:3px; color:${col};">📣 اعلام: ${esc(acFmtDT_(s.announcedDate, s.announcedTime))}${h !== null ? ' · ' + acAgo_(h*3600e3) + ' پیش' : ''}${s.events>1 ? ' · ' + fmt(s.events,0) + ' رویداد' : ''}</div></div>
+        <button class="btn btn-teal btn-sm" data-sgidx="${i}">⚡ اقدام سریع</button>
+      </div>`; }).join('')}
+    </div>
+    ${allSuggestions.length > 8 ? `<div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" id="acToggleAll">${showAll ? 'نمایش کمتر' : 'نمایش همه ('+fmt(allSuggestions.length,0)+')'}</button></div>` : ''}`}
   </div>
 
   ${carryOver.length? `<details class="card" style="margin-bottom:16px;">
@@ -7075,57 +7288,10 @@ function renderActionCenter(){
       <span class="hint" style="font-weight:400;">هنوز بسته نشده — برای دیدن کلیک کنید</span>
     </summary>
     <div class="table-wrap" style="margin-top:10px;"><table>
-      <thead><tr><th>شرح اقدام</th><th>مسئول</th><th>موعد</th><th>وضعیت</th><th></th></tr></thead>
-      <tbody>
-      ${carryOver.map(x=>{
-        const isOverdue = x.dueDate && x.dueDate<today;
-        const stColor = x.status==='در حال انجام'?'#4c8dff':isOverdue?'#ff5d6c':'#ffcf5c';
-        return `<tr>
-          <td>${esc(x.title)}<div class="muted" style="font-size:11.5px; margin-top:2px; color:#ffcf5c;">ثبت‌شده در ${esc(monthLabel(actionMonthOf(x)))}</div>${x.description?`<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>`:''}</td>
-          <td>${esc(x.dept)||'—'}</td>
-          <td style="${isOverdue?'color:#ff5d6c; font-weight:700;':''}">${esc(x.dueDate)||'—'}${isOverdue?' ⚠️':''}</td>
-          <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span></td>
-          <td><div style="display:flex; gap:6px;">
-            <button class="icon-btn" data-adone="${x.id}" title="علامت‌گذاری به‌عنوان انجام‌شده">✅</button>
-            <button class="icon-btn" data-aedit="${x.id}" title="ویرایش">✏️</button>
-            <button class="icon-btn" data-adel="${x.id}" title="حذف">🗑️</button>
-          </div></td>
-        </tr>`;
-      }).join('')}
-      </tbody>
+      <thead><tr><th>شرح اقدام</th><th>مسئول</th><th>اعلام</th><th>پیش‌بینی انجام</th><th>موعد</th><th>وضعیت</th><th></th></tr></thead>
+      <tbody>${carryOver.map(x=>acRowHtml_(x, now, monthLabel(actionMonthOf(x)))).join('')}</tbody>
     </table></div>
   </details>` : ''}
-
-  ${allSuggestions.length? `
-  <div class="card" style="margin-bottom:16px;">
-    <div class="flexbar"><h3 style="margin:0;">🔗 پیشنهادها — از کسری قطعات، ضایعات/دوباره‌کاری و توقفات</h3><span class="hint" style="margin:0;">ماه: ${monthLabel(DB.meta.activeMonth)}</span></div>
-    <div class="hint" style="margin:2px 0 10px;">شرح و مسئول هرکدام خودکار پر شده — فقط موعد انجام و توضیح تکمیلی (در صورت نیاز) را اضافه کنید.</div>
-    <div style="display:flex; flex-direction:column; gap:8px;">
-      ${allSuggestions.map((s,i)=>`<div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.03); border-radius:10px; padding:10px 12px;">
-        <div style="font-size:16px;">${s.icon}</div>
-        <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:13px; color:#e8edf7;">${esc(s.title)}</div>
-          <div class="muted" style="font-size:12px; margin-top:2px;">${esc(s.detail)} — مسئول پیشنهادی: <b>${esc(s.dept)}</b></div></div>
-        <button class="btn btn-teal btn-sm" data-sgidx="${i}">➕ تبدیل به اقدام</button>
-      </div>`).join('')}
-    </div>
-  </div>` : ''}
-
-  <div class="card" style="margin-bottom:16px;">
-    <h3>${isRealEdit? '✏️ ویرایش اقدام' : '➕ ثبت اقدام جدید'}</h3>
-    <div class="form-grid" style="margin-top:10px;">
-      <div class="field" style="grid-column:1/-1;"><label>شرح اقدام</label><input id="ac_title" type="text" value="${esc(draft.title)}" placeholder="مثلاً: پیگیری تامین قطعه با انبار مرکزی"></div>
-      <div class="field"><label>مسئول / واحد</label><input id="ac_dept" type="text" value="${esc(draft.dept)}" placeholder="مثلاً: تعمیرات و نگهداری" list="ac_deptList">
-        <datalist id="ac_deptList">${[...new Set([...Object.values(STOP_REASON_DEPARTMENT), ...Object.values(WASTE_CATEGORY_DEPARTMENT), 'برنامه‌ریزی و تامین'])].map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
-      </div>
-      <div class="field"><label>موعد انجام</label>${datePickerHtml('ac_due', draft.dueDate)}</div>
-      <div class="field"><label>وضعیت</label><select id="ac_status">${ACTION_STATUSES.map(s=>`<option ${draft.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
-      <div class="field" style="grid-column:1/-1;"><label>توضیحات (اختیاری)</label><input id="ac_desc" type="text" value="${esc(draft.description||'')}" placeholder="جزئیات بیشتر، در صورت نیاز"></div>
-    </div>
-    <div class="btn-row" style="margin-top:12px;">
-      <button class="btn btn-teal btn-sm" id="saveActionBtn">${isRealEdit?'ذخیره ویرایش':'ثبت اقدام'}</button>
-      ${(editing.action)? `<button class="btn btn-ghost btn-sm" id="cancelActionBtn">انصراف</button>` : ''}
-    </div>
-  </div>
 
   <div class="card">
     <div class="flexbar">
@@ -7133,70 +7299,36 @@ function renderActionCenter(){
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         <button class="pill ${filterStatus==='open'?'active':''}" data-af="open">باز (${openCount})</button>
         <button class="pill ${filterStatus==='overdue'?'active':''}" data-af="overdue">سررسیدگذشته (${overdueCount})</button>
-        <button class="pill ${filterStatus==='done'?'active':''}" data-af="done">انجام‌شده</button>
+        <button class="pill ${filterStatus==='done'?'active':''}" data-af="done">انجام‌شده (${doneCount})</button>
         <button class="pill ${filterStatus==='all'?'active':''}" data-af="all">همه</button>
       </div>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>شرح اقدام</th><th>مسئول</th><th>موعد</th><th>وضعیت</th><th></th></tr></thead>
-      <tbody>
-      ${filtered.length===0?`<tr><td colspan="5"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
-      filtered.map(x=>{
-        const isOverdue = (x.status!=='انجام‌شده' && x.status!=='لغو شده') && x.dueDate && x.dueDate<today;
-        const stColor = x.status==='انجام‌شده'?'#2fd9c4':x.status==='لغو شده'?'#7c8aa5':isOverdue?'#ff5d6c':x.status==='در حال انجام'?'#4c8dff':'#ffcf5c';
-        return `<tr>
-          <td>${esc(x.title)}${x.description?`<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>`:''}</td>
-          <td>${esc(x.dept)||'—'}</td>
-          <td style="${isOverdue?'color:#ff5d6c; font-weight:700;':''}">${esc(x.dueDate)||'—'}${isOverdue?' ⚠️':''}</td>
-          <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span></td>
-          <td><div style="display:flex; gap:6px;">
-            ${x.status!=='انجام‌شده'? `<button class="icon-btn" data-adone="${x.id}" title="علامت‌گذاری به‌عنوان انجام‌شده">✅</button>`:''}
-            <button class="icon-btn" data-aedit="${x.id}" title="ویرایش">✏️</button>
-            <button class="icon-btn" data-adel="${x.id}" title="حذف">🗑️</button>
-          </div></td>
-        </tr>`;
-      }).join('')}
-      </tbody>
+      <thead><tr><th>شرح اقدام</th><th>مسئول</th><th>اعلام</th><th>پیش‌بینی انجام</th><th>موعد</th><th>وضعیت</th><th></th></tr></thead>
+      <tbody>${filtered.length === 0 ? `<tr><td colspan="7"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>` : filtered.map(x=>acRowHtml_(x, now, '')).join('')}</tbody>
     </table></div>
   </div>`;
 
   bindMonthBar(()=>renderActionCenter());
 
   document.querySelectorAll('[data-sgidx]').forEach(b=>b.addEventListener('click', ()=>{
-    const s = allSuggestions[+b.dataset.sgidx];
-    editing.action = { title:s.title, dept:s.dept, dueDate:'', status:'باز', description:'', sourceType:s.sourceType, sourceKey:s.sourceKey };
-    renderActionCenter();
-    window.scrollTo({top:0, behavior:'smooth'});
+    const s = allSuggestions[+b.dataset.sgidx]; if(!s) return;
+    acOpenModal_({ title:s.title, dept:s.dept, status:'باز', description:'', sourceType:s.sourceType, sourceKey:s.sourceKey,
+      announcedTs:s.announcedTs, announcedDate:s.announcedDate, announcedTime:s.announcedTime }, { isEdit:false });
   }));
-
-  document.getElementById('saveActionBtn').addEventListener('click', ()=>{
-    const title = document.getElementById('ac_title').value.trim();
-    if(!title){ toast('شرح اقدام الزامی است.','err'); return; }
-    const status = document.getElementById('ac_status').value;
-    const wasNotDone = draft.status!=='انجام‌شده';
-    const rec = {
-      id: isRealEdit? editing.action.id : uid(),
-      title, dept: document.getElementById('ac_dept').value.trim(),
-      dueDate: readDatePicker('ac_due'), status,
-      description: document.getElementById('ac_desc').value.trim(),
-      sourceType: editing.action?.sourceType || null, sourceKey: editing.action?.sourceKey || null,
-      month: isRealEdit? (editing.action.month || actionMonthOf(editing.action)) : DB.meta.activeMonth,
-      createdDate: isRealEdit? editing.action.createdDate : todayJalaliStr(),
-      resolvedDate: status==='انجام‌شده' ? (editing.action?.resolvedDate && !wasNotDone ? editing.action.resolvedDate : todayJalaliStr()) : (editing.action?.resolvedDate||''),
-    };
-    if(isRealEdit){ DB.actions = DB.actions.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
-    else{ DB.actions = [...(DB.actions||[]), rec]; toast('اقدام ثبت شد.','ok'); }
-    editing.action = null; scheduleSave(); renderActionCenter();
-  });
-  const cAc = document.getElementById('cancelActionBtn'); if(cAc) cAc.addEventListener('click', ()=>{ editing.action=null; renderActionCenter(); });
+  const nb = document.getElementById('acNewBtn'); if(nb) nb.addEventListener('click', ()=>acOpenModal_({}, { isEdit:false }));
+  const ta = document.getElementById('acToggleAll'); if(ta) ta.addEventListener('click', ()=>{ filters.acShowAll = !filters.acShowAll; renderActionCenter(); });
   document.querySelectorAll('[data-af]').forEach(b=>b.addEventListener('click', ()=>{ filters.actionStatus = b.dataset.af; renderActionCenter(); }));
-  document.querySelectorAll('[data-aedit]').forEach(b=>b.addEventListener('click', ()=>{ editing.action = JSON.parse(JSON.stringify(DB.actions.find(x=>x.id===b.dataset.aedit))); renderActionCenter(); window.scrollTo({top:0,behavior:'smooth'}); }));
+  document.querySelectorAll('[data-aedit]').forEach(b=>b.addEventListener('click', ()=>{
+    const x = DB.actions.find(y=>y.id === b.dataset.aedit); if(x) acOpenModal_(JSON.parse(JSON.stringify(x)), { isEdit:true });
+  }));
   document.querySelectorAll('[data-adone]').forEach(b=>b.addEventListener('click', ()=>{
-    DB.actions = DB.actions.map(x=>x.id===b.dataset.adone? {...x, status:'انجام‌شده', resolvedDate: todayJalaliStr()} : x);
+    const j = acTsToJ_(Date.now());
+    DB.actions = DB.actions.map(x=>x.id === b.dataset.adone ? { ...x, status:'انجام‌شده', resolvedDate: j.date, resolvedTime: j.time, resolvedTs: Date.now() } : x);
     scheduleSave(); toast('انجام‌شده علامت خورد.','ok'); renderActionCenter();
   }));
   document.querySelectorAll('[data-adel]').forEach(b=>b.addEventListener('click', ()=>{
-    confirmDeleteModal('حذف اقدام', 'این اقدام حذف شود؟', ()=>{ DB.actions = DB.actions.filter(x=>x.id!==b.dataset.adel); scheduleSave(); toast('حذف شد.','ok'); renderActionCenter(); });
+    confirmDeleteModal('حذف اقدام', 'این اقدام حذف شود؟', ()=>{ DB.actions = DB.actions.filter(x=>x.id !== b.dataset.adel); scheduleSave(); toast('حذف شد.','ok'); renderActionCenter(); });
   }));
 }
 
