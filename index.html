@@ -7025,6 +7025,7 @@ function acJToTs_(date, time, endOfDay){
   if(time){ const t = String(time).split(':').map(Number); h = t[0] || 0; m = t[1] || 0; } else if(endOfDay){ h = 23; m = 59; }
   return new Date(g[0], g[1]-1, g[2], h, m, 0, 0).getTime();
 }
+function acStack_(date, time){ return date ? `<div style="white-space:nowrap;">${esc(date)}</div>${time ? `<div class="muted" style="font-size:11.5px;">${esc(time)}</div>` : ''}` : '—'; }
 function acFmtDT_(date, time){ return date ? (date + (time ? ' · ' + time : '')) : '—'; }
 function acAgo_(ms){
   ms = Math.abs(ms); const m = Math.round(ms/60000);
@@ -7043,6 +7044,17 @@ function acPresetTs_(k){
   if(k === '7d') return acRoundUp15_(now + 7*86400e3);
   return acRoundUp15_(now);
 }
+function acFloor15_(hhmm){ const t = String(hhmm||'').split(':').map(Number); if(t.length < 2 || isNaN(t[0]) || isNaN(t[1])) return ''; return String(t[0]).padStart(2,'0') + ':' + String(Math.floor(t[1]/15)*15).padStart(2,'0'); }
+/* زمان تأخیر = از زمان اعلام تا زمان اتمام اقدام.
+   درصد انحراف = (مدت واقعی − مدت پیش‌بینی‌شده) ÷ مدت پیش‌بینی‌شده × ۱۰۰؛ هر دو مدت از زمان اعلام شمرده می‌شوند و
+   مدت پیش‌بینی‌شده = (پیش‌بینی انجام − زمان اعلام) است. مثبت = دیرتر از پیش‌بینی، منفی = زودتر. (پیش‌بینیِ بی‌ساعت = پایان همان روز) */
+function acMetrics_(x){
+  if(!x || !x.announcedTs || !x.resolvedTs || x.resolvedTs < x.announcedTs) return null;
+  const A = x.resolvedTs - x.announcedTs; let P = null, dev = null;
+  if(x.etaDate){ const e = acJToTs_(x.etaDate, x.etaTime, true); if(e && e - x.announcedTs > 0){ P = e - x.announcedTs; dev = (A - P) / P * 100; } }
+  return { A, P, dev };
+}
+function acDevHtml_(dev){ const v = Math.round(dev); const col = v > 0 ? '#ff5d6c' : '#2fd9c4'; return `<span dir="ltr" style="color:${col}; font-weight:700;">${v > 0 ? '+' : ''}${v}٪</span>`; }
 function acSrcLabel_(t){ return t === 'short' ? 'کسری قطعه' : t === 'waste' ? 'ضایعات' : t === 'stop' ? 'توقف' : ''; }
 function acSetDate_(prefix, jdate){
   const p = toEnDigits(jdate||'').split('/').map(Number); if(p.length !== 3) return;
@@ -7066,6 +7078,7 @@ function acOpenModal_(init, ctx){
   const isOpenSt = s => s !== 'انجام‌شده' && s !== 'لغو شده';
   if(!isEdit && !d.etaDate){ d.etaDate = acTsToJ_(Date.now()).date; }   // پیش‌فرض: امروز (ساعت اختیاری)
   if(!isEdit && !d.dueDate){ d.dueDate = d.etaDate; }
+  const doneInit = (d.resolvedDate && d.status === 'انجام‌شده') ? { date: d.resolvedDate, time: acFloor15_(d.resolvedTime) } : (() => { const j = acTsToJ_(Date.now()); return { date: j.date, time: acFloor15_(j.time) }; })();
   const deptOpts = [...new Set([...Object.values(STOP_REASON_DEPARTMENT), ...Object.values(WASTE_CATEGORY_DEPARTMENT), 'برنامه‌ریزی و تامین'])];
   const src = acSrcLabel_(d.sourceType);
   const annHtml = annDate
@@ -7086,6 +7099,10 @@ function acOpenModal_(init, ctx){
     <div style="margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08);">
       <div style="font-weight:800; font-size:13px; margin-bottom:6px;">📅 موعد انجام</div>
       <div class="form-grid" style="grid-template-columns:1.7fr 1fr;"><div class="field"><label>تاریخ</label>${datePickerHtml('acDueD', d.dueDate)}</div><div class="field"><label>ساعت <span class="muted">(اختیاری)</span></label>${timePickerHtml('acDueT', d.dueTime)}</div></div>
+    </div>
+    <div id="acDoneBox" style="margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(47,217,196,.06); border:1px solid rgba(47,217,196,.25); display:${d.status==='انجام‌شده'?'block':'none'};">
+      <div style="font-weight:800; font-size:13px; margin-bottom:6px;">✅ زمان اتمام</div>
+      <div class="form-grid" style="grid-template-columns:1.7fr 1fr;"><div class="field"><label>تاریخ</label>${datePickerHtml('acDoneD', doneInit.date)}</div><div class="field"><label>ساعت <span class="muted">(اختیاری)</span></label>${timePickerHtml('acDoneT', doneInit.time)}</div></div>
     </div>
     <div id="acWarn" style="margin-top:8px; min-height:18px; font-size:12.5px;"></div>
     <div class="field" style="margin-top:4px;"><label>توضیحات <span class="muted">(اختیاری)</span></label><input id="acDesc" type="text" value="${esc(d.description||'')}" autocomplete="off"></div>
@@ -7108,6 +7125,7 @@ function acOpenModal_(init, ctx){
     el.innerHTML = msgs.map(m=>`<span style="color:#ff5d6c;">${m}</span>`).join('<br>');
   };
   ['acEtaD','acEtaT','acDueD','acDueT'].forEach(p=>root.querySelectorAll('#'+p+' select').forEach(s=>s.addEventListener('change', warn)));
+  document.getElementById('acStatus').addEventListener('change', e=>{ document.getElementById('acDoneBox').style.display = e.target.value === 'انجام‌شده' ? 'block' : 'none'; });
   warn();
   document.getElementById('acSave').addEventListener('click', ()=>{
     const title = document.getElementById('acTitle').value.trim();
@@ -7130,8 +7148,17 @@ function acOpenModal_(init, ctx){
       month: isEdit ? (init.month || monthKeyOf(init.createdDate || init.dueDate || '') || DB.meta.activeMonth) : DB.meta.activeMonth,
       createdDate: isEdit ? init.createdDate : nowJ.date, createdTs: isEdit ? (init.createdTs || null) : nowTs
     });
-    if(status === 'انجام‌شده'){ if(!(wasDone && init.resolvedDate)){ rec.resolvedDate = nowJ.date; rec.resolvedTime = nowJ.time; rec.resolvedTs = nowTs; } }
-    else { rec.resolvedDate = (init && init.resolvedDate && status === 'لغو شده') ? init.resolvedDate : ''; rec.resolvedTime = ''; rec.resolvedTs = null; }
+    if(status === 'انجام‌شده'){
+      const dd = readDatePicker('acDoneD'), dt = readTimePicker('acDoneT');
+      if(!dd){ toast('تاریخ اتمام الزامی است.','err'); return; }
+      if(wasDone && init.resolvedTs && init.resolvedDate === dd && acFloor15_(init.resolvedTime) === dt){   // دست‌نخورده: زمان دقیق قبلی حفظ می‌شود
+        rec.resolvedDate = init.resolvedDate; rec.resolvedTime = init.resolvedTime || ''; rec.resolvedTs = init.resolvedTs;
+      } else {
+        const rts = Math.min(acJToTs_(dd, dt, true), nowTs);   // اتمام در آینده معنا ندارد
+        rec.resolvedDate = dd; rec.resolvedTime = dt || ''; rec.resolvedTs = rts;
+      }
+      if(annFinal && rec.resolvedTs < annFinal - 60000){ toast('زمان اتمام نمی‌تواند قبل از زمان اعلام باشد.','err'); return; }
+    } else { rec.resolvedDate = (init && init.resolvedDate && status === 'لغو شده') ? init.resolvedDate : ''; rec.resolvedTime = ''; rec.resolvedTs = null; }
     if(isEdit){ DB.actions = DB.actions.map(x=>x.id === rec.id ? rec : x); toast('ویرایش شد.','ok'); }
     else { DB.actions = [...(DB.actions||[]), rec]; toast('اقدام ثبت شد.','ok'); }
     close(); scheduleSave(); renderActionCenter();
@@ -7139,7 +7166,7 @@ function acOpenModal_(init, ctx){
   setTimeout(()=>{ const t = document.getElementById('acTitle'); if(t && !t.value) t.focus(); }, 30);
 }
 
-function acRowHtml_(x, now, monthNote){
+function acRowHtml_(x, now, monthNote, withDelay){
   const open = x.status !== 'انجام‌شده' && x.status !== 'لغو شده';
   const dueTs = x.dueDate ? acJToTs_(x.dueDate, x.dueTime, true) : null;
   const etaTs = x.etaDate ? acJToTs_(x.etaDate, x.etaTime, true) : null;
@@ -7147,13 +7174,15 @@ function acRowHtml_(x, now, monthNote){
   const etaOver = open && etaTs && etaTs < now && !dueOver;
   const stColor = x.status === 'انجام‌شده' ? '#2fd9c4' : x.status === 'لغو شده' ? '#7c8aa5' : dueOver ? '#ff5d6c' : x.status === 'در حال انجام' ? '#4c8dff' : '#ffcf5c';
   const srcBadge = x.sourceType ? `<span class="badge" style="margin-left:6px;">${acSrcLabel_(x.sourceType)}</span>` : '';
+  const mt = (withDelay && x.status === 'انجام‌شده') ? acMetrics_(x) : null;
   return `<tr>
     <td>${srcBadge}${esc(x.title)}${monthNote ? `<div class="muted" style="font-size:11.5px; margin-top:2px; color:#ffcf5c;">ثبت‌شده در ${esc(monthNote)}</div>` : ''}${x.description ? `<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>` : ''}</td>
     <td>${esc(x.dept) || '—'}</td>
-    <td>${esc(acFmtDT_(x.announcedDate, x.announcedTime))}</td>
-    <td style="${etaOver?'color:#ffcf5c; font-weight:700;':''}">${esc(acFmtDT_(x.etaDate, x.etaTime))}</td>
-    <td style="${dueOver?'color:#ff5d6c; font-weight:700;':''}">${esc(acFmtDT_(x.dueDate, x.dueTime))}${dueOver?' ⚠️':''}</td>
-    <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span>${x.status === 'انجام‌شده' && x.resolvedDate ? `<div class="muted" style="font-size:11.5px; margin-top:3px;">${esc(acFmtDT_(x.resolvedDate, x.resolvedTime))}</div>` : ''}</td>
+    <td>${acStack_(x.announcedDate, x.announcedTime)}</td>
+    <td style="${etaOver?'color:#ffcf5c; font-weight:700;':''}">${acStack_(x.etaDate, x.etaTime)}</td>
+    <td style="${dueOver?'color:#ff5d6c; font-weight:700;':''}">${acStack_(x.dueDate, x.dueTime)}${dueOver?'<div>⚠️</div>':''}</td>
+    ${withDelay ? `<td>${mt ? esc(acAgo_(mt.A)) : '—'}</td><td>${mt && mt.dev !== null ? acDevHtml_(mt.dev) : '—'}</td>` : ''}
+    <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span>${x.status === 'انجام‌شده' && x.resolvedDate ? `<div class="muted" style="font-size:11.5px; margin-top:3px; white-space:nowrap;">${esc(x.resolvedDate)}${x.resolvedTime ? '<br>' + esc(x.resolvedTime) : ''}</div>` : ''}</td>
     <td><div style="display:flex; gap:6px;">
       ${x.status !== 'انجام‌شده' ? `<button class="icon-btn" data-adone="${x.id}" title="علامت‌گذاری به‌عنوان انجام‌شده">✅</button>` : ''}
       <button class="icon-btn" data-aedit="${x.id}" title="ویرایش">✏️</button>
@@ -7192,6 +7221,10 @@ function renderActionCenter(){
   const doneCount = list.filter(x=>x.status === 'انجام‌شده').length;
   const reacts = list.filter(x=>x.announcedTs && x.createdTs && x.createdTs >= x.announcedTs).map(x=>x.createdTs - x.announcedTs);
   const avgReact = reacts.length ? reacts.reduce((a,b)=>a+b,0)/reacts.length : null;
+  const mets = list.filter(x=>x.status === 'انجام‌شده').map(acMetrics_).filter(Boolean);
+  const avgDelay = mets.length ? mets.reduce((a,m)=>a+m.A,0)/mets.length : null;
+  const devSet = mets.filter(m=>m.P > 0), sumP = devSet.reduce((a,m)=>a+m.P,0);
+  const devAgg = sumP > 0 ? (devSet.reduce((a,m)=>a+m.A,0) - sumP) / sumP * 100 : null;   // انحراف تجمعی: مجموع مدت واقعی در برابر مجموع مدت پیش‌بینی‌شده
 
   // ---- اعلان‌ها (توقف/کسری/ضایعات) که هنوز اقدام ندارند — با «زمان اعلام» از لحظه‌ی ثبت رکورد
   const existingSourceKeys = new Set((DB.actions||[]).map(x=>x.sourceKey).filter(Boolean));
@@ -7230,11 +7263,13 @@ function renderActionCenter(){
   const shownAlerts = showAll ? allSuggestions : allSuggestions.slice(0, 8);
 
   document.getElementById('view').innerHTML = renderMonthBar() + `
-  <div class="grid grid-4" style="margin-bottom:16px;">
+  <div class="grid grid-3" style="margin-bottom:16px;">
     ${kpiCard('اعلان‌های منتظر اقدام', 'عدد', fmt(allSuggestions.length,0), null, allSuggestions.length===0?'#2fd9c4':(late24>0?'#ff5d6c':'#ffcf5c'))}
     ${kpiCard('اقدام‌های باز', 'عدد', fmt(openCount,0), null, openCount>0?'#ffcf5c':'#2fd9c4')}
     ${kpiCard('سررسیدگذشته','عدد', fmt(overdueCount,0), null, overdueCount>0?'#ff5d6c':'#2fd9c4')}
     ${kpiCard('میانگین زمان واکنش', avgReact!==null ? '' : 'هنوز داده‌ای نیست', avgReact!==null ? acAgo_(avgReact) : '—', null, avgReact===null?'#93a4c3':(avgReact/3600e3<=AC_SLA_HOURS?'#2fd9c4':'#ffcf5c'), avgReact===null)}
+    ${kpiCard('میانگین زمان تأخیر', avgDelay!==null ? '' : 'هنوز اقدام تکمیل‌شده‌ای نیست', avgDelay!==null ? acAgo_(avgDelay) : '—', null, avgDelay===null?'#93a4c3':'#4c8dff', avgDelay===null)}
+    ${kpiCard('درصد انحراف از پیش‌بینی', '', devAgg!==null ? (devAgg>0?'+':'')+Math.round(devAgg)+'٪' : '—', null, devAgg===null?'#93a4c3':(devAgg>0?'#ff5d6c':'#2fd9c4'), devAgg===null)}
   </div>
 
   <div class="card" style="margin-bottom:16px;">
@@ -7280,8 +7315,8 @@ function renderActionCenter(){
       </div>
     </div>
     <div class="table-wrap"><table>
-      <thead><tr><th>شرح اقدام</th><th>مسئول</th><th>اعلام</th><th>پیش‌بینی انجام</th><th>موعد</th><th>وضعیت</th><th></th></tr></thead>
-      <tbody>${filtered.length === 0 ? `<tr><td colspan="7"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>` : filtered.map(x=>acRowHtml_(x, now, '')).join('')}</tbody>
+      <thead><tr><th>شرح اقدام</th><th>مسئول</th><th>اعلام</th><th>پیش‌بینی انجام</th><th>موعد</th><th title="از زمان اعلام تا زمان اتمام اقدام">زمان تأخیر</th><th title="(مدت واقعی − مدت پیش‌بینی‌شده) ÷ مدت پیش‌بینی‌شده؛ مثبت = دیرتر از پیش‌بینی">درصد انحراف</th><th>وضعیت</th><th></th></tr></thead>
+      <tbody>${filtered.length === 0 ? `<tr><td colspan="9"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>` : filtered.map(x=>acRowHtml_(x, now, '', true)).join('')}</tbody>
     </table></div>
   </div>`;
 
