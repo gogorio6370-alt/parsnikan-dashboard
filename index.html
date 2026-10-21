@@ -7064,31 +7064,27 @@ function acOpenModal_(init, ctx){
   const annTs = d.announcedTs || null, annDate = d.announcedDate || '', annTime = d.announcedTime || '';
   const manualAnn = (!annTs && !annDate && !isEdit) ? Date.now() : null;
   const isOpenSt = s => s !== 'انجام‌شده' && s !== 'لغو شده';
-  if(!isEdit && !d.etaDate){ const j = acTsToJ_(acPresetTs_('4h')); d.etaDate = j.date; d.etaTime = j.time; }
+  if(!isEdit && !d.etaDate){ d.etaDate = acTsToJ_(Date.now()).date; }   // پیش‌فرض: امروز (ساعت اختیاری)
   if(!isEdit && !d.dueDate){ d.dueDate = d.etaDate; }
   const deptOpts = [...new Set([...Object.values(STOP_REASON_DEPARTMENT), ...Object.values(WASTE_CATEGORY_DEPARTMENT), 'برنامه‌ریزی و تامین'])];
   const src = acSrcLabel_(d.sourceType);
-  const annHtml = annTs
-    ? `📣 زمان اعلام: <b>${esc(annDate)} · ${esc(annTime)}</b> <span class="muted">— لحظه‌ی ثبت ${src||'اعلان'}</span> <span class="badge" style="margin-right:6px;">${acAgo_(Date.now()-annTs)} پیش</span>`
-    : (annDate ? `📣 زمان اعلام: <b>${esc(annDate)}</b> <span class="muted">— ساعت ثبت در دسترس نیست</span>` : (isEdit ? `📣 زمان اعلام: <b>ثبت نشده</b> <span class="muted">— اقدامِ قبل از اضافه‌شدن زمان‌ها</span>` : `📣 زمان اعلام: <b>اکنون</b> <span class="muted">— اقدام دستی</span>`));
-  root.innerHTML = `<div class="modal-bg" id="mbg"><div class="modal" style="max-width:700px; width:calc(100vw - 24px); max-height:92vh; overflow:auto; text-align:right;">
-    <h3>${isEdit ? '✏️ ویرایش اقدام' : '⚡ اقدام سریع'}${src ? ` <span class="muted" style="font-weight:400; font-size:12px;">— از ${src}</span>` : ''}</h3>
+  const annHtml = annDate
+    ? `📣 زمان اعلام: <b>${esc(acFmtDT_(annDate, annTime))}</b>`
+    : (isEdit ? `📣 زمان اعلام: <b>ثبت نشده</b>` : `📣 زمان اعلام: <b>اکنون</b>`);
+  root.innerHTML = `<div class="modal-bg" id="mbg"><div class="modal" style="max-width:640px; width:calc(100vw - 24px); max-height:92vh; overflow:auto; text-align:right;">
+    <h3>${isEdit ? '✏️ ویرایش اقدام' : '⚡ اقدام سریع'}${src ? ` <span class="muted" style="font-weight:400; font-size:12px;">— ${src}</span>` : ''}</h3>
     <div style="margin:8px 0 12px; padding:9px 12px; border-radius:10px; background:rgba(76,141,255,.10); border:1px solid rgba(76,141,255,.25); font-size:12.5px;">${annHtml}</div>
-    <div class="field"><label>شرح اقدام</label><input id="acTitle" type="text" value="${esc(d.title)}" placeholder="مثلاً: پیگیری تامین قطعه با انبار مرکزی" autocomplete="off"></div>
+    <div class="field"><label>شرح اقدام</label><input id="acTitle" type="text" value="${esc(d.title)}" autocomplete="off"></div>
     <div class="form-grid" style="margin-top:8px; grid-template-columns:1.6fr 1fr;">
       <div class="field"><label>مسئول / واحد</label><input id="acDept" type="text" value="${esc(d.dept)}" list="acDeptList" autocomplete="off"><datalist id="acDeptList">${deptOpts.map(x=>`<option value="${esc(x)}">`).join('')}</datalist></div>
       <div class="field"><label>وضعیت</label><select id="acStatus">${ACTION_STATUSES.map(s=>`<option ${d.status===s?'selected':''}>${s}</option>`).join('')}</select></div>
     </div>
     <div style="margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08);">
-      <div style="font-weight:800; font-size:13px; margin-bottom:6px;">⏱ پیش‌بینی انجام <span class="muted" style="font-weight:400;">— چه زمانی تمام می‌شود؟</span></div>
-      <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
-        <button type="button" class="pill" data-acpre="2h">۲ ساعت دیگر</button><button type="button" class="pill" data-acpre="4h">۴ ساعت دیگر</button>
-        <button type="button" class="pill" data-acpre="tom">فردا ۰۸:۰۰</button><button type="button" class="pill" data-acpre="3d">۳ روز دیگر</button><button type="button" class="pill" data-acpre="7d">۷ روز دیگر</button>
-      </div>
-      <div class="form-grid" style="grid-template-columns:1.7fr 1fr;"><div class="field"><label>تاریخ</label>${datePickerHtml('acEtaD', d.etaDate)}</div><div class="field"><label>ساعت</label>${timePickerHtml('acEtaT', d.etaTime)}</div></div>
+      <div style="font-weight:800; font-size:13px; margin-bottom:6px;">⏱ پیش‌بینی انجام (مطابق FR)</div>
+      <div class="form-grid" style="grid-template-columns:1.7fr 1fr;"><div class="field"><label>تاریخ</label>${datePickerHtml('acEtaD', d.etaDate)}</div><div class="field"><label>ساعت <span class="muted">(اختیاری)</span></label>${timePickerHtml('acEtaT', d.etaTime)}</div></div>
     </div>
     <div style="margin-top:10px; padding:10px 12px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08);">
-      <div style="font-weight:800; font-size:13px; margin-bottom:6px;">📅 موعد انجام <span class="muted" style="font-weight:400;">— مهلت قطعی (ساعت اختیاری)</span> <button type="button" class="pill" id="acDueSame" style="margin-right:8px;">هم‌زمان با پیش‌بینی</button></div>
+      <div style="font-weight:800; font-size:13px; margin-bottom:6px;">📅 موعد انجام</div>
       <div class="form-grid" style="grid-template-columns:1.7fr 1fr;"><div class="field"><label>تاریخ</label>${datePickerHtml('acDueD', d.dueDate)}</div><div class="field"><label>ساعت <span class="muted">(اختیاری)</span></label>${timePickerHtml('acDueT', d.dueTime)}</div></div>
     </div>
     <div id="acWarn" style="margin-top:8px; min-height:18px; font-size:12.5px;"></div>
@@ -7102,23 +7098,15 @@ function acOpenModal_(init, ctx){
   document.getElementById('mbg').addEventListener('click', e=>{ if(e.target.id === 'mbg') close(); });
   const readEta = () => ({ date: readDatePicker('acEtaD'), time: readTimePicker('acEtaT') });
   const readDue = () => ({ date: readDatePicker('acDueD'), time: readTimePicker('acDueT') });
+  // ساعت اختیاری است؛ اگر نباشد برای مقایسه «پایان همان روز» گرفته می‌شود تا هم‌روز بودن خطا نسازد
+  const tsEnd = o => o.date ? acJToTs_(o.date, o.time, true) : null;
   const warn = () => {
     const e = readEta(), u = readDue(), el = document.getElementById('acWarn'); if(!el) return;
-    const eTs = (e.date && e.time) ? acJToTs_(e.date, e.time) : null, uTs = u.date ? acJToTs_(u.date, u.time, true) : null;
-    const msgs = [];
-    if(eTs && uTs && eTs > uTs) msgs.push(`<span style="color:#ff5d6c;">⚠️ پیش‌بینی انجام (${esc(acFmtDT_(e.date,e.time))}) بعد از موعد است؛ یا موعد را جلو نیاندازید یا پیش‌بینی را زودتر بگذارید.</span>`);
-    if(eTs && annTs && eTs < annTs - 60000) msgs.push(`<span style="color:#ff5d6c;">⚠️ پیش‌بینی انجام نمی‌تواند قبل از زمان اعلام باشد.</span>`);
-    if(eTs && !msgs.length) msgs.push(`<span class="muted">پیش‌بینی: ${acAgo_(eTs - Date.now())} ${eTs >= Date.now() ? 'دیگر' : 'پیش'}${uTs ? ' — تا موعد ' + (uTs >= Date.now() ? acAgo_(uTs - Date.now()) + ' فرصت' : 'گذشته') : ''}</span>`);
-    el.innerHTML = msgs.join('<br>');
+    const eTs = tsEnd(e), uTs = tsEnd(u), msgs = [];
+    if(eTs && uTs && eTs > uTs) msgs.push('⚠️ پیش‌بینی انجام بعد از موعد است.');
+    if(eTs && annTs && eTs < annTs - 60000) msgs.push('⚠️ پیش‌بینی انجام قبل از زمان اعلام است.');
+    el.innerHTML = msgs.map(m=>`<span style="color:#ff5d6c;">${m}</span>`).join('<br>');
   };
-  root.querySelectorAll('[data-acpre]').forEach(b=>b.addEventListener('click', ()=>{
-    const j = acTsToJ_(acPresetTs_(b.dataset.acpre));
-    acSetDate_('acEtaD', j.date); acSetTime_('acEtaT', j.time);
-    const u = readDue(), uTs = u.date ? acJToTs_(u.date, u.time, true) : null, eTs = acJToTs_(j.date, j.time);
-    if(!u.date || (uTs && uTs < eTs)){ acSetDate_('acDueD', j.date); }   // موعد خالی یا زودتر از پیش‌بینی بود → هم‌روز با پیش‌بینی
-    warn();
-  }));
-  document.getElementById('acDueSame').addEventListener('click', ()=>{ const e = readEta(); if(e.date){ acSetDate_('acDueD', e.date); if(e.time) acSetTime_('acDueT', e.time); warn(); } });
   ['acEtaD','acEtaT','acDueD','acDueT'].forEach(p=>root.querySelectorAll('#'+p+' select').forEach(s=>s.addEventListener('change', warn)));
   warn();
   document.getElementById('acSave').addEventListener('click', ()=>{
@@ -7126,11 +7114,10 @@ function acOpenModal_(init, ctx){
     if(!title){ toast('شرح اقدام الزامی است.','err'); return; }
     const status = document.getElementById('acStatus').value, open = isOpenSt(status);
     const e = readEta(), u = readDue();
-    if(open && (!e.date || !e.time)){ toast('پیش‌بینی انجام (تاریخ و ساعت) الزامی است.','err'); return; }
-    if(open && !u.date){ toast('موعد انجام الزامی است.','err'); return; }
-    const eTs = (e.date && e.time) ? acJToTs_(e.date, e.time) : null;
+    if(open && !e.date){ toast('تاریخ پیش‌بینی انجام الزامی است.','err'); return; }
+    if(open && !u.date){ toast('تاریخ موعد انجام الزامی است.','err'); return; }
     const annFinal = annTs || manualAnn || null;
-    if(open && annFinal && eTs && eTs < annFinal - 60000){ toast('پیش‌بینی انجام نمی‌تواند قبل از زمان اعلام باشد.','err'); return; }
+    if(open && annFinal && e.date && tsEnd(e) < annFinal - 60000){ toast('پیش‌بینی انجام نمی‌تواند قبل از زمان اعلام باشد.','err'); return; }
     const nowTs = Date.now(), nowJ = acTsToJ_(nowTs);
     const annJ = annTs ? { date: annDate, time: annTime } : (manualAnn ? acTsToJ_(manualAnn) : { date: annDate || '', time: '' });
     const wasDone = (init && init.status === 'انجام‌شده');
@@ -7144,7 +7131,7 @@ function acOpenModal_(init, ctx){
       createdDate: isEdit ? init.createdDate : nowJ.date, createdTs: isEdit ? (init.createdTs || null) : nowTs
     });
     if(status === 'انجام‌شده'){ if(!(wasDone && init.resolvedDate)){ rec.resolvedDate = nowJ.date; rec.resolvedTime = nowJ.time; rec.resolvedTs = nowTs; } }
-    else { rec.resolvedDate = (init && init.resolvedDate && status === 'لغو شده') ? init.resolvedDate : ''; if(status !== 'انجام‌شده'){ rec.resolvedTime = ''; rec.resolvedTs = null; } }
+    else { rec.resolvedDate = (init && init.resolvedDate && status === 'لغو شده') ? init.resolvedDate : ''; rec.resolvedTime = ''; rec.resolvedTs = null; }
     if(isEdit){ DB.actions = DB.actions.map(x=>x.id === rec.id ? rec : x); toast('ویرایش شد.','ok'); }
     else { DB.actions = [...(DB.actions||[]), rec]; toast('اقدام ثبت شد.','ok'); }
     close(); scheduleSave(); renderActionCenter();
@@ -7155,27 +7142,17 @@ function acOpenModal_(init, ctx){
 function acRowHtml_(x, now, monthNote){
   const open = x.status !== 'انجام‌شده' && x.status !== 'لغو شده';
   const dueTs = x.dueDate ? acJToTs_(x.dueDate, x.dueTime, true) : null;
-  const etaTs = x.etaDate ? acJToTs_(x.etaDate, x.etaTime || '23:59') : null;
+  const etaTs = x.etaDate ? acJToTs_(x.etaDate, x.etaTime, true) : null;
   const dueOver = open && dueTs && dueTs < now;
   const etaOver = open && etaTs && etaTs < now && !dueOver;
-  const etaAfterDue = etaTs && dueTs && etaTs > dueTs;
   const stColor = x.status === 'انجام‌شده' ? '#2fd9c4' : x.status === 'لغو شده' ? '#7c8aa5' : dueOver ? '#ff5d6c' : x.status === 'در حال انجام' ? '#4c8dff' : '#ffcf5c';
-  const react = (x.announcedTs && x.createdTs) ? `<span class="muted" style="font-size:11.5px;">واکنش: ${acAgo_(x.createdTs - x.announcedTs)}</span>` : '';
   const srcBadge = x.sourceType ? `<span class="badge" style="margin-left:6px;">${acSrcLabel_(x.sourceType)}</span>` : '';
-  const annCell = x.announcedDate ? `<div>${esc(acFmtDT_(x.announcedDate, x.announcedTime))}</div>${open && x.announcedTs ? `<div class="muted" style="font-size:11.5px;">${acAgo_(now - x.announcedTs)} پیش</div>` : ''}` : '<span class="muted">—</span>';
-  const etaCell = x.etaDate
-    ? `<div style="${etaOver?'color:#ffcf5c; font-weight:700;':''}">${esc(acFmtDT_(x.etaDate, x.etaTime))}</div>${open && etaTs ? `<div class="muted" style="font-size:11.5px; ${etaOver?'color:#ffcf5c;':''}">${etaTs >= now ? acAgo_(etaTs - now) + ' دیگر' : acAgo_(now - etaTs) + ' گذشته'}</div>` : ''}${etaAfterDue ? '<div style="font-size:11.5px; color:#ff5d6c;">⚠️ بعد از موعد</div>' : ''}`
-    : '<span class="muted">—</span>';
-  let dueExtra = '';
-  if(x.status === 'انجام‌شده' && x.resolvedTs && dueTs){ dueExtra = x.resolvedTs <= dueTs ? '<div style="font-size:11.5px; color:#2fd9c4;">✓ در موعد انجام شد</div>' : '<div style="font-size:11.5px; color:#ff5d6c;">⚠️ با تأخیر انجام شد</div>'; }
-  else if(dueOver){ dueExtra = `<div style="font-size:11.5px;">${acAgo_(now - dueTs)} تأخیر</div>`; }
-  else if(open && dueTs){ dueExtra = `<div class="muted" style="font-size:11.5px;">${acAgo_(dueTs - now)} فرصت</div>`; }
   return `<tr>
-    <td>${srcBadge}${esc(x.title)}${monthNote ? `<div class="muted" style="font-size:11.5px; margin-top:2px; color:#ffcf5c;">ثبت‌شده در ${esc(monthNote)}</div>` : ''}${x.description ? `<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>` : ''}${react ? `<div>${react}</div>` : ''}</td>
+    <td>${srcBadge}${esc(x.title)}${monthNote ? `<div class="muted" style="font-size:11.5px; margin-top:2px; color:#ffcf5c;">ثبت‌شده در ${esc(monthNote)}</div>` : ''}${x.description ? `<div class="muted" style="font-size:12px; margin-top:2px;">${esc(x.description)}</div>` : ''}</td>
     <td>${esc(x.dept) || '—'}</td>
-    <td>${annCell}</td>
-    <td>${etaCell}</td>
-    <td style="${dueOver?'color:#ff5d6c; font-weight:700;':''}">${esc(acFmtDT_(x.dueDate, x.dueTime))}${dueOver?' ⚠️':''}${dueExtra}</td>
+    <td>${esc(acFmtDT_(x.announcedDate, x.announcedTime))}</td>
+    <td style="${etaOver?'color:#ffcf5c; font-weight:700;':''}">${esc(acFmtDT_(x.etaDate, x.etaTime))}</td>
+    <td style="${dueOver?'color:#ff5d6c; font-weight:700;':''}">${esc(acFmtDT_(x.dueDate, x.dueTime))}${dueOver?' ⚠️':''}</td>
     <td><span class="badge" style="background:${stColor}22; color:${stColor}; border:1px solid ${stColor}55;">${esc(x.status)}</span>${x.status === 'انجام‌شده' && x.resolvedDate ? `<div class="muted" style="font-size:11.5px; margin-top:3px;">${esc(acFmtDT_(x.resolvedDate, x.resolvedTime))}</div>` : ''}</td>
     <td><div style="display:flex; gap:6px;">
       ${x.status !== 'انجام‌شده' ? `<button class="icon-btn" data-adone="${x.id}" title="علامت‌گذاری به‌عنوان انجام‌شده">✅</button>` : ''}
@@ -7254,8 +7231,8 @@ function renderActionCenter(){
 
   document.getElementById('view').innerHTML = renderMonthBar() + `
   <div class="grid grid-4" style="margin-bottom:16px;">
-    ${kpiCard('اعلان‌های منتظر اقدام', oldest!==null ? 'قدیمی‌ترین: '+acAgo_(oldest*3600e3) : '', fmt(allSuggestions.length,0), null, allSuggestions.length===0?'#2fd9c4':(late24>0?'#ff5d6c':'#ffcf5c'))}
-    ${kpiCard('اقدام‌های باز', etaMissCount>0 ? etaMissCount+' پیش‌بینی‌شکسته' : 'عدد', fmt(openCount,0), null, openCount>0?'#ffcf5c':'#2fd9c4')}
+    ${kpiCard('اعلان‌های منتظر اقدام', 'عدد', fmt(allSuggestions.length,0), null, allSuggestions.length===0?'#2fd9c4':(late24>0?'#ff5d6c':'#ffcf5c'))}
+    ${kpiCard('اقدام‌های باز', 'عدد', fmt(openCount,0), null, openCount>0?'#ffcf5c':'#2fd9c4')}
     ${kpiCard('سررسیدگذشته','عدد', fmt(overdueCount,0), null, overdueCount>0?'#ff5d6c':'#2fd9c4')}
     ${kpiCard('میانگین زمان واکنش', avgReact!==null ? '' : 'هنوز داده‌ای نیست', avgReact!==null ? acAgo_(avgReact) : '—', null, avgReact===null?'#93a4c3':(avgReact/3600e3<=AC_SLA_HOURS?'#2fd9c4':'#ffcf5c'), avgReact===null)}
   </div>
@@ -7265,7 +7242,6 @@ function renderActionCenter(){
       <h3 style="margin:0;">⚡ اعلان‌های منتظر اقدام <span class="muted" style="font-weight:400;">— Fast Response</span></h3>
       <button class="btn btn-teal btn-sm" id="acNewBtn">➕ اقدام جدید</button>
     </div>
-    <div class="hint" style="margin:2px 0 10px;">اعلان‌ها از ثبت کسری قطعه، ضایعات و توقفات ساخته می‌شوند و «زمان اعلام» همان لحظه‌ی ثبتشان است. هدف: هر اعلان تا <b>${AC_SLA_HOURS} ساعت</b> به اقدام تبدیل شود. روی «اقدام سریع» بزنید؛ پنجره همان‌جا باز می‌شود و فقط پیش‌بینی و موعد مانده.</div>
     ${allSuggestions.length === 0 ? `<div class="tbl-empty">✅ اعلان بی‌اقدامی در ${esc(monthLabel(DB.meta.activeMonth))} نیست.</div>` : `
     <div style="display:flex; flex-direction:column; gap:8px;">
       ${shownAlerts.map(s=>{
@@ -7275,7 +7251,7 @@ function renderActionCenter(){
         <div style="font-size:16px;">${s.icon}</div>
         <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:13px; color:#e8edf7;">${esc(s.title)}</div>
           <div class="muted" style="font-size:12px; margin-top:2px;">${esc(s.detail)} — مسئول پیشنهادی: <b>${esc(s.dept)}</b></div>
-          <div style="font-size:12px; margin-top:3px; color:${col};">📣 اعلام: ${esc(acFmtDT_(s.announcedDate, s.announcedTime))}${h !== null ? ' · ' + acAgo_(h*3600e3) + ' پیش' : ''}${s.events>1 ? ' · ' + fmt(s.events,0) + ' رویداد' : ''}</div></div>
+          <div style="font-size:12px; margin-top:3px; color:${col};">📣 اعلام: ${esc(acFmtDT_(s.announcedDate, s.announcedTime))}</div></div>
         <button class="btn btn-teal btn-sm" data-sgidx="${i}">⚡ اقدام سریع</button>
       </div>`; }).join('')}
     </div>
