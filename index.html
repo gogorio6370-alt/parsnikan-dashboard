@@ -580,13 +580,13 @@ const PART_LIST_DEFAULT = ['سیلندر مس  فورج - قادری','فنر ت
 
 const NAV = [
   {id:'cover',   label:'🖥️ نمایشگر مدیریتی', group:'نمایشگر',     icon:'monitor'},
+  {id:'dash',    label:'📋 جلسه روزانه تولید', group:'نمایشگر',   icon:'chart'},
   {id:'entry',   label:'ورود داده',        group:'ثبت اطلاعات', icon:'edit'},
   {id:'stations',label:'آمار روزانه ایستگاه‌ها', group:'ثبت اطلاعات', icon:'clock'},
   {id:'personnel', label:'👥 پرسنل',        group:'ثبت اطلاعات', icon:'users'},
   {id:'dailyProgram', label:'📋 برنامه تولید روزانه', group:'ثبت اطلاعات', icon:'clipboard'},
   {id:'prod',    label:'تولید خط تولید',    group:'گزارش‌ها',    icon:'factory'},
-  {id:'ship',    label:'ارسال به انبار',    group:'گزارش‌ها',    icon:'truck'},
-  {id:'productOutput', label:'ارسال به‌تفکیک محصول', group:'گزارش‌ها', icon:'box'},
+  {id:'ship',    label:'ارسال به انبار و محصول', group:'گزارش‌ها', icon:'truck'},
   {id:'short',   label:'کسری قطعات',        group:'گزارش‌ها',    icon:'alert'},
   {id:'waste',   label:'ضایعات/دوباره‌کاری تولید', group:'گزارش‌ها', icon:'trash'},
   {id:'stop',    label:'توقفات تولید',      group:'گزارش‌ها',    icon:'pause'},
@@ -597,7 +597,6 @@ const NAV = [
   {id:'trend',   label:'📈 روند ماهانه',       group:'تحلیل',       icon:'chart'},
   {id:'target',  label:'🎯 هدف و پیشرفت تولید', group:'تحلیل',    icon:'target'},
   {id:'actions', label:'⚡ مرکز اقدام — Fast Response', group:'تحلیل',    icon:'checklist'},
-  {id:'dash',    label:'داشبورد مدیریتی',   group:'تحلیل',       icon:'chart'},
 ];
 
 const ICONS = {
@@ -755,6 +754,40 @@ function topStatusUpdate_(force){
   el.title = Object.keys(L.info).map(k=> k + ': ' + (L.info[k] || '—')).join('\n');
 }
 try{ setInterval(()=>topStatusUpdate_(false), 1000); window.addEventListener('online', ()=>topStatusUpdate_(true)); window.addEventListener('offline', ()=>topStatusUpdate_(true)); }catch(e){}
+/* ---------- لاغرسازی: بخش‌های تکراری به‌جای حذف فوری، یک هفته «جمع‌شده» می‌مانند ---------- */
+function collapseCardByTitle_(titleIncludes, noteHtml){
+  const h = [...document.querySelectorAll('#view .card h3')].find(e=>e.textContent.includes(titleIncludes)); if(!h) return false;
+  const card = h.closest('.card'); if(!card || card.dataset.collapsed) return false;
+  card.dataset.collapsed = '1';
+  const body = document.createElement('div'); body.style.display = 'none'; body.style.marginTop = '10px';
+  [...card.childNodes].forEach(n=>{ if(n !== h) body.appendChild(n); });
+  const note = document.createElement('div'); note.className = 'hint'; note.style.margin = '4px 0 0'; note.innerHTML = noteHtml || '';
+  card.appendChild(note); card.appendChild(body);
+  const caret = document.createElement('span'); caret.textContent = '◂'; caret.style.cssText = 'display:inline-block; margin-left:8px; color:#8b98b5;';
+  h.insertBefore(caret, h.firstChild); h.style.cursor = 'pointer';
+  h.addEventListener('click', ()=>{ const open = body.style.display === 'none'; body.style.display = open ? '' : 'none'; caret.textContent = open ? '▾' : '◂'; });
+  return true;
+}
+// داشبورد مدیریتی → «جلسه روزانه تولید»: امروز و ۵ اتفاق مهم، به‌علاوه اقدام‌های باز؛ بخش‌های ماهانه در یک بخش جمع‌شده (به‌زودی حذف می‌شود)
+function dashSlim_(M){
+  const view = document.getElementById('view'); if(!view) return;
+  const kids = [...view.children];
+  const start = kids.find(e=>e.classList.contains('section-title') && e.textContent.includes('این ماه'));
+  const exp = kids.find(e=>e.classList.contains('card') && e.textContent.includes('خروجی کامل گزارش'));
+  if(!start || !exp) return;
+  const iS = kids.indexOf(start), iE = kids.indexOf(exp); if(iE <= iS) return;
+  const A = execActionSummary_(M);
+  start.insertAdjacentHTML('beforebegin', `<div class="grid grid-4" style="margin:0 0 16px;">
+    ${kpiCard('اعلان‌های منتظر اقدام','عدد', fmt(A.waiting,0), null, A.waiting>0?'#ffcf5c':'#2fd9c4', false, 'actions')}
+    ${kpiCard('اقدام‌های سررسیدگذشته','عدد', fmt(A.overdue,0), null, A.overdue>0?'#ff5d6c':'#2fd9c4', false, 'actions')}
+    ${kpiCard('اقدام‌های باز','عدد', fmt(A.open,0), null, A.open>0?'#ffcf5c':'#2fd9c4', false, 'actions')}
+  </div>`);
+  const det = document.createElement('details'); det.className = 'card'; det.style.marginTop = '16px';
+  det.innerHTML = `<summary style="cursor:pointer; font-weight:800; font-size:14px; list-style:none; display:flex; align-items:center; gap:8px;"><span>🗄</span><span>بخش‌های ماهانه‌ی قبلی این صفحه</span><span class="hint" style="font-weight:400;">دوره‌ی آزمایشی یک‌هفته‌ای؛ همه‌ی آن‌ها در «نمایشگر مدیریتی» و تب‌های تحلیلی هست و بعد از آن حذف می‌شوند — برای دیدن کلیک کنید</span></summary>`;
+  const wrap = document.createElement('div'); wrap.style.marginTop = '14px';
+  kids.slice(iS, iE).forEach(n=>wrap.appendChild(n)); det.appendChild(wrap);
+  view.appendChild(det);
+}
 function todayJalaliStr(){
   const now = new Date();
   const [jy,jm,jd] = gregorianToJalali(now.getFullYear(), now.getMonth()+1, now.getDate());
@@ -1793,7 +1826,7 @@ function promptAnalyticsPin_(pendingTab){
   setTimeout(()=>{ const el=document.getElementById('aPin'); if(el) el.focus(); }, 30);
 }
 // تب‌های مشترک یکی شده‌اند: «زمان استاندارد ساخت» داخل «تکت‌تایم» و «ظرفیت و نیاز نیرو» داخل «نفر-ساعت» (با کلید بالای صفحه)
-let an_subTab = { takt:'takt', manhours:'mh' };
+let an_subTab = { takt:'takt', manhours:'mh', ship:'ship' };
 function an_subBar_(tab, items){
   const view = document.getElementById('view'); if(!view) return;
   const bar = view.querySelector('.card.tight'); if(!bar) return;
@@ -1812,6 +1845,10 @@ function renderTaktMerged(){
   if(an_subTab.takt === 'std') renderStdTime(); else renderTakt();
   an_subBar_('takt', [['takt','⏱ تکت‌تایم و سایکل‌تایم'], ['std','⏳ زمان استاندارد ساخت']]);
 }
+function renderShipMerged(){
+  if(an_subTab.ship === 'po') renderProductOutput(); else renderShip();
+  an_subBar_('ship', [['ship','📦 ارسال به انبار'], ['po','🏷️ ارسال به‌تفکیک محصول']]);
+}
 function renderManHoursMerged(){
   if(an_subTab.manhours === 'cap') renderCapacity(); else renderManHours();
   an_subBar_('manhours', [['mh','👷 نفر-ساعت و بهره‌گیری'], ['cap','🧮 برنامه در برابر ظرفیت و نیرو']]);
@@ -1819,6 +1856,7 @@ function renderManHoursMerged(){
 function goTo(tab){
   if(tab === 'stdtime'){ an_subTab.takt = 'std'; tab = 'takt'; }
   else if(tab === 'capacity'){ an_subTab.manhours = 'cap'; tab = 'manhours'; }
+  else if(tab === 'productOutput'){ an_subTab.ship = 'po'; tab = 'ship'; }
   // اپراتور اگر (مثلاً از طریق لینک قدیمی/کلیک از نمایشگر) به تبی خارج از دسترسی مجازش برسد، به «ورود داده» برمی‌گردد
   if(currentSessionRole()!=='admin' && !STAFF_ALLOWED_TABS.includes(tab)) tab = 'entry';
   // دسترسی مستقیم به تب‌های قفل‌شده (مثلاً از راه‌های دیگری غیر از منو) هم رمز می‌خواهد
@@ -1831,8 +1869,8 @@ function goTo(tab){
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
-  const titles = {stdtime:'زمان استاندارد ساخت ترموستات', takt:'تکت‌تایم، سایکل‌تایم و زمان استاندارد ساخت', manhours:'نفر-ساعت، ظرفیت و نیاز نیرو', trend:'روند ماهانه تولید، ارسال و شاخص‌ها', cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار', short:'کسری قطعات',
-    waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', actions:'مرکز اقدام — Fast Response', dash:'داشبورد مدیریتی'};
+  const titles = {stdtime:'زمان استاندارد ساخت ترموستات', takt:'تکت‌تایم، سایکل‌تایم و زمان استاندارد ساخت', manhours:'نفر-ساعت، ظرفیت و نیاز نیرو', trend:'روند ماهانه تولید، ارسال و شاخص‌ها', cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار و ارسال به‌تفکیک محصول', short:'کسری قطعات',
+    waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', actions:'مرکز اقدام — Fast Response', dash:'جلسه روزانه تولید'};
   const subs = {
     takt:'تکت‌تایم و سایکل‌تایم ایستگاه‌ها، و زمان استاندارد ساخت هر گروه محصول — با کلید بالای صفحه جابه‌جا شوید',
     manhours:'نفر-ساعت در اختیار و کارکرد، و برنامه در برابر ظرفیت واقعی (نفر لازم، اضافه‌کاری، دوباره‌کاری و جداسازی)',
@@ -1844,7 +1882,7 @@ function goTo(tab){
     dailyProgram:'تخصیص روزانه پرسنل به ایستگاه‌ها — قابل چاپ، مطابق فرم رسمی برنامه تولید روزانه',
     prod:'عملکرد روزانه خطوط اصلی در مقابل هدف تولید',
     productOutput:'ثبت ارسال به‌تفکیک هر محصول/کد کالا و پایش تحقق برنامه ماهانه — زیرمجموعه «ارسال به انبار»',
-    ship:'گزارش تجمیعی قطعات ارسالی به انبار',
+    ship:'گزارش تجمیعی ارسال به انبار، و ثبت و پایش ارسال به‌تفکیک هر محصول — با کلید بالای صفحه جابه‌جا شوید',
     short:'رویدادنامه کسری قطعات موردی خط تولید',
     waste:'ثبت ضایعات/دوباره‌کاری و تحلیل پارتو به تفکیک ایستگاه',
     stop:'ثبت و تحلیل پارتو توقفات خط تولید',
@@ -1852,13 +1890,13 @@ function goTo(tab){
     flowmap:'ثبت ظرفیت روزانه هر ایستگاه و شناسایی خودکار گلوگاه(های) خط تولید',
     target:'هدف ماهانه، مسیر پیشرفت روزانه و تحلیل ریشه‌ای انحراف',
     actions:'اعلان‌ها را فوراً به اقدام تبدیل کنید — زمان اعلام، پیش‌بینی انجام، موعد و وضعیت هر اقدام',
-    dash:'تصویر کلی عملکرد ' + currentLineName()
+    dash:'برای جلسه‌ی روزانه: وضعیت آخرین روز، اتفاق‌های مهم و اقدام‌های باز — ' + currentLineName()
   };
   document.getElementById('pageTitle').textContent = titles[tab];
   topStatusUpdate_(true);
   document.getElementById('pageSub').textContent = subs[tab] + ' — ماه فعال: ' + monthLabel(DB.meta.activeMonth);
   destroyCharts();
-  const renderers = {takt:renderTaktMerged, manhours:renderManHoursMerged, trend:renderTrend, cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShip, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
+  const renderers = {takt:renderTaktMerged, manhours:renderManHoursMerged, trend:renderTrend, cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShipMerged, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
   renderers[tab]();
   document.getElementById('view').dataset.hadContent = '1';
   document.getElementById('view').scrollTop = 0;
@@ -2781,7 +2819,7 @@ function handleProductPlanUpload_(file){
       DB.meta.productMonthlyTargets = targets;
       scheduleSave();
       toast('برنامه تولید (' + n + ' محصول) با موفقیت بارگذاری شد.','ok');
-      renderProductOutput();
+      renderShipMerged();
     }catch(err){ toast('خواندن فایل اکسل ناموفق بود.','err'); console.error(err); }
   };
   reader.readAsArrayBuffer(file);
@@ -2934,8 +2972,8 @@ function renderProductOutput(){
   bindMonthBar(()=>renderProductOutput());
   wireSyncBtn('syncBtn_po');
 
-  document.getElementById('poSortBy').addEventListener('change', (e)=>{ filters.poSortBy = e.target.value; renderProductOutput(); });
-  { const el = document.getElementById('clearPoDateFocus'); if(el) el.addEventListener('click', ()=>{ filters.poDateFocus=''; renderProductOutput(); }); }
+  document.getElementById('poSortBy').addEventListener('change', (e)=>{ filters.poSortBy = e.target.value; renderShipMerged(); });
+  { const el = document.getElementById('clearPoDateFocus'); if(el) el.addEventListener('click', ()=>{ filters.poDateFocus=''; renderShipMerged(); }); }
 
   document.getElementById('planUploadBtn').addEventListener('click', ()=> document.getElementById('planUploadInput').click());
   document.getElementById('planUploadInput').addEventListener('change', (e)=>{
@@ -2946,7 +2984,7 @@ function renderProductOutput(){
 
   { const sel = document.getElementById('po_product'); let prevVal = sel.value;
     sel.addEventListener('change', ()=>{
-      if(sel.value === '__add__'){ sel.value = prevVal; poOpenAddProduct_(canon=>{ if(canon) renderProductOutput(); }); }
+      if(sel.value === '__add__'){ sel.value = prevVal; poOpenAddProduct_(canon=>{ if(canon) renderShipMerged(); }); }
       else prevVal = sel.value;
     }); }
 
@@ -2959,20 +2997,20 @@ function renderProductOutput(){
     const isNew = !editing.productOutput;
     if(editing.productOutput){ DB.productOutput = DB.productOutput.map(x=>x.id===rec.id?rec:x); toast('ویرایش شد.','ok'); }
     else{ DB.productOutput.push(rec); toast('تولید محصول ثبت شد.','ok'); }
-    editing.productOutput = null; filters.poPick = ''; scheduleSave(); renderProductOutput();
+    editing.productOutput = null; filters.poPick = ''; scheduleSave(); renderShipMerged();
   });
   const cancelPoBtn = document.getElementById('cancelPoBtn');
-  if(cancelPoBtn) cancelPoBtn.addEventListener('click', ()=>{ editing.productOutput = null; renderProductOutput(); });
+  if(cancelPoBtn) cancelPoBtn.addEventListener('click', ()=>{ editing.productOutput = null; renderShipMerged(); });
   document.querySelectorAll('[data-poedit]').forEach(b=> b.addEventListener('click', ()=>{
     editing.productOutput = JSON.parse(JSON.stringify(DB.productOutput.find(x=>x.id===b.dataset.poedit)));
-    renderProductOutput(); window.scrollTo({top:0, behavior:'smooth'});
+    renderShipMerged(); window.scrollTo({top:0, behavior:'smooth'});
   }));
   document.querySelectorAll('[data-podel]').forEach(b=> b.addEventListener('click', ()=>{
     confirmDeleteModal('حذف ثبت تولید محصول', 'این ردیف حذف می‌شود؛ می‌توانید بعداً از «سطل بازیابی» برش گردانید.', ()=>{
       const rec = DB.productOutput.find(x=>x.id===b.dataset.podel);
       DB.productOutput = DB.productOutput.filter(x=>x.id!==b.dataset.podel);
       if(rec) moveToTrash('productOutput', rec);
-      scheduleSave(); renderProductOutput(); toast('حذف شد — از سطل بازیابی قابل بازگشت است.','ok');
+      scheduleSave(); renderShipMerged(); toast('حذف شد — از سطل بازیابی قابل بازگشت است.','ok');
     });
   }));
 }
@@ -6470,6 +6508,7 @@ function renderLean(){
     syncRosterInputs(); DB.meta.workforceRoster = roster; scheduleSave();
   }));
 
+  collapseCardByTitle_('برنامه‌ریزی نیروی انسانی بر اساس هدف ماهانه', 'تنظیمات پایه‌ی نیرو (روزهای کاری، پرسنل استاندارد، چیدمان). محاسبه‌ی رسمی نیاز و کمبود نیرو فقط در تب «نفر-ساعت و ظرفیت نیرو» است — برای تنظیمات کلیک کنید.');
   bindMonthBar(()=>renderLean());
 }
 
@@ -6941,7 +6980,8 @@ function renderDash(){
     <div id="aiAnalysisBox" style="margin-top:12px; min-height:40px;"></div>
   </div>`;
 
-  mkChart('dChTrend', { type:'line', data:{ labels: rows.map(e=>moonLabel_(e.date, e)), datasets:[
+  dashSlim_(M);
+mkChart('dChTrend', { type:'line', data:{ labels: rows.map(e=>moonLabel_(e.date, e)), datasets:[
       {label:'جمع کل تولید (همه اقلام)', data: rows.map(e=>allLinesTotal(e)), borderColor:'#ff9d42', backgroundColor:'rgba(255,157,66,.15)', fill:true, tension:.35, pointRadius:3},
       {label:'هدف', data: rows.map(e=>dayCombinedTarget(e)), borderColor:'#4c8dff', borderDash:[6,5], pointRadius:0, noLabel:true}
     ]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom', labels:{boxWidth:10,padding:14}}}, scales:{x:{grid:{color:'#182338'}}, y:{grid:{color:'#182338'}}} } });
