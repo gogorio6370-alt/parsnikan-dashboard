@@ -3299,9 +3299,10 @@ function renderWaste(){
       <div class="field"><label>تاریخ</label>${datePickerHtml('w_date', editing.waste?.date)}</div>
       <div class="field"><label>ایستگاه</label>${stationSelectHtml('w_station', editing.waste?.station||'')}</div>
       <div class="field span-2" style="background:rgba(76,141,255,.08); border:1px solid rgba(76,141,255,.3); border-radius:10px; padding:10px 12px;">
-        <label style="font-weight:800;">۱) نوع رویداد — ضایعات یا دوباره‌کاری؟</label>
-        <select id="w_eventType">${WASTE_EVENT_TYPES.map(t=>`<option ${(editing.waste?.eventType||'ضایعات')===t?'selected':''}>${t}</option>`).join('')}</select>
-        <div class="hint" style="margin-top:6px;">اگر قطعه در نهایت با کمی وقت اضافه <b>سالم و قابل‌مصرف</b> شد، «دوباره‌کاری» را انتخاب کنید — نه «ضایعات». این انتخاب روی نرخ ضایعات و گزارش‌های مدیریتی اثر مستقیم دارد.</div>
+        <label style="font-weight:800;">۱) نوع رویداد — ضایعات، جداسازی یا دوباره‌کاری؟</label>
+        <select id="w_eventType">${WASTE_EVENT_TYPES.map(t=>`<option ${(editing.waste ? wasteKindLabel_(editing.waste) : 'ضایعات')===t?'selected':''}>${t}</option>`).join('')}</select>
+        <div class="hint" style="margin-top:6px;"><b>ضایعات</b> = دورریز قطعی • <b>جداسازی</b> = قطعه‌ی «ورودی مشروط» که جدا/غربال می‌شود • <b>دوباره‌کاری</b> = قطعه با کمی وقت اضافه <b>سالم و قابل‌مصرف</b> می‌شود. فقط ضایعات در نرخ ضایعات و OEE حساب می‌شود.</div>
+        <div id="w_kindNote" style="margin-top:6px; font-size:12.5px; font-weight:700;"></div>
       </div>
       <div class="field span-2" style="background:rgba(255,207,92,.08); border:1px solid rgba(255,207,92,.3); border-radius:10px; padding:10px 12px;">
         <label style="font-weight:800;">۲) این ضایعات/دوباره‌کاری کجا بروز کرد؟</label>
@@ -3315,7 +3316,7 @@ function renderWaste(){
       </div>
       <div class="field"><label>تعداد تولید</label><input id="w_produced" type="text" inputmode="numeric" value="${editing.waste?.produced ?? ''}"></div>
       <div class="field"><label>علت دقیق</label><select id="w_type"><option value="">— انتخاب —</option>${wasteTypeOptions.map(o=>`<option value="${esc(o)}" ${editing.waste?.wasteType===o?'selected':''}>${esc(o)}</option>`).join('')}</select></div>
-      <div class="field"><label>تعداد <span class="muted">(ضایعات یا دوباره‌کاری‌شده، بر اساس نوع رویداد بالا)</span></label><input id="w_count" type="text" inputmode="numeric" value="${editing.waste?.wasteCount ?? ''}"></div>
+      <div class="field"><label>تعداد <span class="muted">(ضایعات، جداسازی یا دوباره‌کاری‌شده، بر اساس نوع رویداد بالا)</span></label><input id="w_count" type="text" inputmode="numeric" value="${editing.waste?.wasteCount ?? ''}"></div>
       <div class="field"><label>زمان دوباره‌کاری / جداسازی <span class="muted">(دقیقه — اگر این ردیف نیاز به وقت اضافه اپراتور داشت، چه دوباره‌کاری چه جداسازی ورودی مشروط)</span></label><input id="w_reworkMin" type="text" inputmode="numeric" placeholder="مثلاً 30" value="${editing.waste?.reworkMinutes ?? ''}"></div>
     </div>
     <div class="modal-actions" style="justify-content:flex-start; margin-top:14px;">
@@ -3442,7 +3443,7 @@ function renderWaste(){
       <thead><tr><th>تاریخ</th><th>ایستگاه</th><th>نوع رویداد</th><th>قطعه</th><th>محصول نهایی</th><th>اپراتور</th><th class="num">تولید</th><th>علت دقیق</th><th class="num">تعداد</th><th>منشأ</th><th class="num">دوباره‌کاری/جداسازی (دقیقه/ساعت)</th><th></th></tr></thead>
       <tbody>
       ${list.length===0?`<tr><td colspan="12"><div class="tbl-empty">موردی یافت نشد.</div></td></tr>`:
-      list.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapWa)}</td><td>${esc(x.station)}</td>        <td><span class="badge ${(x.eventType||'ضایعات')==='دوباره‌کاری'?'badge-blue':'badge-stop'}">${(x.eventType||'ضایعات')==='دوباره‌کاری'?'🔧 دوباره‌کاری':'🗑 ضایعات'}</span></td>
+      list.map(x=>`<tr><td>${moonLabelByDate_(x.date, dMapWa)}</td><td>${esc(x.station)}</td>        <td>${(()=>{ const k = wasteKind_(x); return k === 'seg' ? '<span class="badge" style="background:#a78bfa22; color:#a78bfa; border:1px solid #a78bfa55;">🗂 جداسازی</span>' : k === 'rework' ? '<span class="badge badge-blue">🔧 دوباره‌کاری</span>' : '<span class="badge badge-stop">🗑 ضایعات</span>'; })()}</td>
         <td>${esc(x.part)}</td><td>${esc(x.finalProduct)||'—'}</td><td>${esc(x.operator)||'—'}</td>
         <td class="num">${fmt(x.produced,0)}</td><td>${esc(x.wasteType)}</td><td class="num">${fmt(x.wasteCount,0)}</td>
         <td><span class="badge ${x.category==='ورودی'?'badge-blue':x.category==='حین فرآیند'?'badge-warn':'badge-mute'}">${esc(x.category)}</span></td>
@@ -3457,6 +3458,24 @@ function renderWaste(){
   bindMonthBar(()=>renderWaste());
   wireSyncBtn('syncBtn_waste');
   wireOperatorPicker('w_operatorPicker');
+  // نمایش زنده‌ی اینکه این ردیف چگونه ثبت و شمرده می‌شود (همان قاعده‌ی wasteKind_ که در همه‌ی گزارش‌ها استفاده می‌شود)
+  const kindNote = ()=>{
+    const el = document.getElementById('w_kindNote'); if(!el) return;
+    const kind = wasteKind_({ eventType: document.getElementById('w_eventType').value, category: document.getElementById('w_cat').value, wasteType: document.getElementById('w_type').value });
+    const info = { scrap:['#ff5d6c','🗑 به‌عنوان «ضایعات» شمرده می‌شود — در نرخ ضایعات و OEE حساب می‌شود.'],
+                   seg:['#a78bfa','🗂 به‌عنوان «جداسازی» شمرده می‌شود — جدا از ضایعات؛ زمان آن را در «زمان دوباره‌کاری / جداسازی» بنویسید.'],
+                   rework:['#2fd9c4','🔧 به‌عنوان «دوباره‌کاری» شمرده می‌شود — جدا از ضایعات؛ زمان آن را در «زمان دوباره‌کاری / جداسازی» بنویسید.'] }[kind];
+    const evt = document.getElementById('w_eventType').value, cat = document.getElementById('w_cat').value;
+    const conflict = (kind === 'seg' && evt !== 'جداسازی') ? ' (چون منشأ «ورودی مشروط» انتخاب شده؛ برای تغییر، منشأ را عوض کنید)' : '';
+    el.style.color = info[0]; el.textContent = info[1] + conflict;
+  };
+  document.getElementById('w_eventType').addEventListener('change', e=>{
+    if(e.target.value === 'جداسازی'){ const c = document.getElementById('w_cat'); if([...c.options].some(o=>o.value === 'ورودی مشروط' || o.textContent === 'ورودی مشروط')) c.value = 'ورودی مشروط'; }
+    kindNote();
+  });
+  document.getElementById('w_cat').addEventListener('change', kindNote);
+  document.getElementById('w_type').addEventListener('change', kindNote);
+  kindNote();
 
   document.getElementById('saveWasteBtn').addEventListener('click', ()=>{
     const date = readDatePicker('w_date');
@@ -3489,8 +3508,8 @@ function renderWaste(){
   document.querySelectorAll('[data-wet]').forEach(b=>b.addEventListener('click', ()=>{ filters.wasteEventType = b.dataset.wet; renderWaste(); }));
   { const cw = document.getElementById('clearWasteDateFilter'); if(cw) cw.addEventListener('click', ()=>{ filters.wasteDate=''; renderWaste(); }); }
   document.getElementById('expWasteCsv').addEventListener('click', ()=>{
-    const headers = ['تاریخ','ایستگاه','قطعه','محصول نهایی','اپراتور','تعداد تولید','نوع ضایعات','تعداد ضایعات','تیپ','دوباره‌کاری/جداسازی (دقیقه)'];
-    const rr = M.waste.map(x=>[x.date,x.station,x.part,x.finalProduct,x.operator,x.produced,x.wasteType,x.wasteCount,x.category,x.reworkMinutes||'']);
+    const headers = ['تاریخ','ایستگاه','نوع رویداد','قطعه','محصول نهایی','اپراتور','تعداد تولید','علت دقیق','تعداد','منشأ','دوباره‌کاری/جداسازی (دقیقه)'];
+    const rr = M.waste.map(x=>[x.date,x.station,wasteKindLabel_(x),x.part,x.finalProduct,x.operator,x.produced,x.wasteType,x.wasteCount,x.category,x.reworkMinutes||'']);
     downloadFile('ثبت-ضایعات.csv', toCSV(headers, rr), 'text/csv;charset=utf-8');
   });
 
