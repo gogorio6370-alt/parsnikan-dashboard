@@ -590,6 +590,7 @@ const NAV = [
   {id:'short',   label:'کسری قطعات',        group:'گزارش‌ها',    icon:'alert'},
   {id:'waste',   label:'ضایعات/دوباره‌کاری تولید', group:'گزارش‌ها', icon:'trash'},
   {id:'stop',    label:'توقفات تولید',      group:'گزارش‌ها',    icon:'pause'},
+  {id:'kpi',     label:'📊 شاخص‌های تولید',   group:'تحلیل',       icon:'gauge'},
   {id:'lean',    label:'شاخص‌های ناب (OEE)', group:'تحلیل',       icon:'gauge'},
   {id:'flowmap', label:'نقشه خط و گلوگاه‌ها', group:'تحلیل',       icon:'map'},
   {id:'takt',    label:'⏱ تکت‌تایم و زمان ساخت', group:'تحلیل', icon:'clock'},
@@ -1869,9 +1870,10 @@ function goTo(tab){
   flushPendingSave(); // don't let unsaved changes from the tab we're leaving sit in a fragile debounce window
   currentTab = tab;
   renderNav();
-  const titles = {stdtime:'زمان استاندارد ساخت ترموستات', takt:'تکت‌تایم، سایکل‌تایم و زمان استاندارد ساخت', manhours:'نفر-ساعت، ظرفیت و نیاز نیرو', trend:'روند ماهانه تولید، ارسال و شاخص‌ها', cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار و ارسال به‌تفکیک محصول', short:'کسری قطعات',
+  const titles = {kpi:'شاخص‌های تولید', stdtime:'زمان استاندارد ساخت ترموستات', takt:'تکت‌تایم، سایکل‌تایم و زمان استاندارد ساخت', manhours:'نفر-ساعت، ظرفیت و نیاز نیرو', trend:'روند ماهانه تولید، ارسال و شاخص‌ها', cover:'نمایشگر مدیریتی', entry:'ورود داده روزانه', stations:'آمار روزانه ایستگاه‌ها', personnel:'پرسنل واحد', dailyProgram:'برنامه تولید روزانه', prod:'گزارش تولید خط تولید', productOutput:'ارسال به‌تفکیک محصول', ship:'ارسال به انبار و ارسال به‌تفکیک محصول', short:'کسری قطعات',
     waste:'ضایعات/دوباره‌کاری تولید', stop:'توقفات تولید', lean:'شاخص‌های ناب (OEE / MTBF / MTTR)', flowmap:'نقشه خط تولید و گلوگاه‌ها', target:'هدف و پیشرفت تولید', actions:'مرکز اقدام — Fast Response', dash:'جلسه روزانه تولید'};
   const subs = {
+    kpi:'تحقق برنامه‌ی تولید به‌تفکیک خط، روزهای رسیده به هدف و مسیر برنامه‌ی ماهانه',
     takt:'تکت‌تایم و سایکل‌تایم ایستگاه‌ها، و زمان استاندارد ساخت هر گروه محصول — با کلید بالای صفحه جابه‌جا شوید',
     manhours:'نفر-ساعت در اختیار و کارکرد، و برنامه در برابر ظرفیت واقعی (نفر لازم، اضافه‌کاری، دوباره‌کاری و جداسازی)',
     trend:'سیر ماه‌به‌ماه تولید، ارسال، تحقق هدف، OEE، ضایعات، توقفات و نیروی انسانی',
@@ -1896,7 +1898,7 @@ function goTo(tab){
   topStatusUpdate_(true);
   document.getElementById('pageSub').textContent = subs[tab] + ' — ماه فعال: ' + monthLabel(DB.meta.activeMonth);
   destroyCharts();
-  const renderers = {takt:renderTaktMerged, manhours:renderManHoursMerged, trend:renderTrend, cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShipMerged, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
+  const renderers = {kpi:renderProdKpi, takt:renderTaktMerged, manhours:renderManHoursMerged, trend:renderTrend, cover:renderCover, entry:renderEntry, stations:renderStations, personnel:renderPersonnel, dailyProgram:renderDailyProgram, prod:renderProd, productOutput:renderProductOutput, ship:renderShipMerged, short:renderShort, waste:renderWaste, stop:renderStop, lean:renderLean, flowmap:renderFlowmap, target:renderTargetProgress, actions:renderActionCenter, dash:renderDash};
   renderers[tab]();
   document.getElementById('view').dataset.hadContent = '1';
   document.getElementById('view').scrollTop = 0;
@@ -7459,6 +7461,552 @@ function renderActionCenter(){
    انحراف منفی، علل آن را با اتکا به داده‌های توقفات/ضایعات/کسری قطعات
    همین ماه رتبه‌بندی و کمّی می‌کند (قاعده‌محور — بدون نیاز به اتصال اینترنت).
    ========================================================================= */
+
+/* =========================================================================
+   TAB: شاخص‌های تولید (kpi) — شاخص ۱: تحقق برنامه
+   مبنا: همان اعداد «تولید خط تولید» (تولید ÷ هدف روزانه‌ی متناسب با شیفت)؛
+   هدف هر خط از «ستاپ اهداف» می‌آید و در روزهای شیفت کوتاه/تعطیل کوچک می‌شود.
+   ========================================================================= */
+const PK_LINES = [
+  { k:'line1',    label:'خط ۱ (پراید)' },
+  { k:'line2',    label:'خط ۲ (پراید)' },
+  { k:'line3',    label:'خط ۳' },
+  { k:'line4',    label:'خط ۴' },
+  { k:'ckd',      label:'CKD' },
+  { k:'se206',    label:'سه‌راهی ۲۰۶' },
+  { k:'darpoosh', label:'درپوش' },
+  { k:'diesel',   label:'دیزل/بنز' }
+];
+function pk_lineTarget_(k){
+  if(k==='line1'||k==='line2'||k==='line3'||k==='line4') return DB.meta.lineTarget || LINE_TARGET_DEFAULT;
+  if(k==='ckd') return DB.meta.ckdTarget || 0;
+  if(k==='se206') return DB.meta.se206Target || 0;
+  if(k==='darpoosh') return DB.meta.darpooshTarget || 0;
+  if(k==='diesel') return DB.meta.dieselTarget || DIESEL_TARGET_DEFAULT;
+  return 0;
+}
+function pk_compute_(M){
+  const rows = M.daily.filter(an_dayHasData).sort(an_byDate);
+  const perLine = {}; PK_LINES.forEach(l=>{ perLine[l.k] = { k:l.k, label:l.label, out:0, target:0, days:0, stopDays:0, hit:0 }; });
+  const days = [];
+  rows.forEach(e=>{
+    const f = dayShiftFactor(e);
+    let dAct = 0, dTgt = 0;   // مبنای روز: فقط ردیف‌هایی که همان روز ثبت شده‌اند (هدف خط غیرفعال/ثبت‌نشده کسری حساب نمی‌شود)
+    PK_LINES.forEach(l=>{
+      const L = (e.lines || {})[l.k]; if(!L) return;
+      // ردیفی که آن روز اصلاً ثبت نشده (qty خالی) شمرده نمی‌شود؛ «توقف» با تولید صفر شمرده می‌شود تا زیان دیده شود
+      const has = L.status==='stop' || (L.status==='run' && L.qty!==null && L.qty!==undefined);
+      const t = pk_lineTarget_(l.k) * f;
+      if(!has || !(t>0)) return;
+      const q = L.qty || 0, pl = perLine[l.k];
+      pl.out += q; pl.target += t; pl.days++; dAct += q; dTgt += t;
+      if(L.status==='stop') pl.stopDays++;
+      if(q >= t) pl.hit++;
+    });
+    days.push({ date:e.date, e, act:dAct, tgt:dTgt, f, ratio: dTgt>0 ? dAct/dTgt : null });
+  });
+  const act = days.reduce((s,d)=>s+d.act,0), tgt = days.reduce((s,d)=>s+d.tgt,0);
+  const monthlyTarget = productMonthlyTargetSum_();
+  const workingDays = DB.meta.workingDaysPerMonth || 23;
+  const eqDays = days.reduce((s,d)=>s+d.f,0);
+  const planToDate = (monthlyTarget>0 && workingDays>0) ? monthlyTarget/workingDays*eqDays : null;
+  const remDays = Math.max(workingDays - eqDays, 0);
+  const lines = Object.values(perLine).filter(x=>x.days>0).map(x=>Object.assign(x, { ratio: x.target>0 ? x.out/x.target : null, gap: x.out - x.target }));
+  return {
+    days, lines, act, tgt, attain: tgt>0 ? act/tgt : null,
+    hitDays: days.filter(d=>d.ratio!==null && d.ratio>=1).length,
+    lowDays: days.filter(d=>d.ratio!==null && d.ratio<0.9).length,
+    monthlyTarget, workingDays, eqDays, planToDate,
+    paceRatio: planToDate>0 ? act/planToDate : null,
+    remDays, avgPerDay: eqDays>0 ? act/eqDays : null,
+    reqPerDay: (monthlyTarget>0 && remDays>0) ? Math.max(monthlyTarget-act,0)/remDays : null
+  };
+}
+/* ---------- شاخص ۲: راندمان نیروی انسانی ----------
+   نفر-ساعت استاندارد هر قطعه = (جمع نفرات «نقشه نیروی استاندارد» × ساعت شیفت عادی) ÷ هدف روزانه‌ی کل.
+   راندمان = نفر-ساعت استاندارد کسب‌شده (تولید × استاندارد قطعه) ÷ نفر-ساعت مصرف‌شده.
+   دو مخرج: «ثبت‌شده در ایستگاه» (آمار روزانه ایستگاه‌ها) و «کل نیروی حاضر» (تعداد نفر × ساعت شیفت). */
+function pk_stdMHperPiece_(){
+  const lt = DB.meta.lineTarget || LINE_TARGET_DEFAULT;
+  const dar = isDarpooshActiveThisMonth_();
+  const plan = dar ? STANDARD_MANNING_PLAN.concat(CONDITIONAL_MANNING_PLAN) : STANDARD_MANNING_PLAN;
+  const hc = plan.reduce((s,r)=>s+(r.required||0),0);
+  const daily = 4*lt + (DB.meta.ckdTarget||0) + (DB.meta.dieselTarget||DIESEL_TARGET_DEFAULT) + (dar ? (DB.meta.se206Target||0)+(DB.meta.darpooshTarget||0) : 0);
+  const hrs = DB.meta.normalShiftHours || 10;
+  return daily>0 ? { perPiece: hc*hrs/daily, hc, daily, hrs } : null;
+}
+function pk_labor_(M){
+  const S = pk_stdMHperPiece_();
+  const mh = an_manHours(M);
+  if(!S) return { std:null };
+  const std = S.perPiece;
+  const dW = mh.days.filter(r=>r.worked>0 && r.out>0), dA = mh.days.filter(r=>r.avail>0 && r.out>0);
+  const worked = dW.reduce((s,r)=>s+r.worked,0), earnedW = dW.reduce((s,r)=>s+r.out*std,0);
+  const avail = dA.reduce((s,r)=>s+r.avail,0), earnedA = dA.reduce((s,r)=>s+r.out*std,0);
+  const series = mh.days.filter(r=>r.out>0 && (r.worked>0 || r.avail>0)).map(r=>({ date:r.date, e:r.e,
+    effW: r.worked>0 ? r.out*std/r.worked : null, effA: r.avail>0 ? r.out*std/r.avail : null }));
+  return { std, S, mh, series, worked, avail,
+    effWorked: worked>0 ? earnedW/worked : null, effAvail: avail>0 ? earnedA/avail : null,
+    coverage: mh.util, noTime: mh.noTime, noOps: mh.noOps };
+}
+/* ---------- شاخص ۴: کیفیت — سه نرخ جدا (ضایعات / دوباره‌کاری / جداسازی) ----------
+   مخرج هر سه نرخ: تولید کل روزهای ثبت‌شده. جمع نمی‌شوند؛ زمان دوباره‌کاری/جداسازی به نفر-ساعت تبدیل می‌شود. */
+const PK_KIND = { scrap:{ label:'ضایعات', color:'#ff5d6c' }, rework:{ label:'دوباره‌کاری', color:'#ff9d42' }, seg:{ label:'جداسازی', color:'#a78bfa' } };
+function pk_quality_(M){
+  const rows = M.daily.filter(an_dayHasData);
+  const prod = rows.reduce((s,e)=>s+allLinesTotal(e),0);
+  const sp = wasteSplit_(M.waste);
+  const rate = q => prod>0 ? q/prod : null;
+  const par = {}, byDay = {};
+  let noMin = 0;
+  M.waste.forEach(x=>{
+    const kind = wasteKind_(x), name = String(x.wasteType || 'نامشخص');
+    const k = kind + '|' + normalizeForGrouping(name);
+    const g = par[k] || (par[k] = { kind, name, qty:0, min:0, n:0 });
+    g.qty += (x.wasteCount||0); g.min += (x.reworkMinutes||0); g.n++;
+    const d = byDay[x.date] || (byDay[x.date] = { scrap:0, rework:0, seg:0 });
+    d[kind] += (x.wasteCount||0);
+    if((kind==='rework' || kind==='seg') && !(x.reworkMinutes>0)) noMin++;
+  });
+  const kindTot = { scrap:sp.scrap.qty, rework:sp.rework.qty, seg:sp.seg.qty };
+  const list = Object.values(par).sort((a,b)=>b.qty-a.qty).map(g=>Object.assign(g,{ share: kindTot[g.kind]>0 ? g.qty/kindTot[g.kind] : null }));
+  const days = Object.keys(byDay).sort((a,b)=>dateSortKey(a)-dateSortKey(b));
+  const mhLost = (sp.rework.min + sp.seg.min)/60;
+  return { prod, sp, noMin, list, days, byDay, mhLost,
+    mhPer1000: prod>0 ? mhLost/prod*1000 : null,
+    rates:{ scrap:rate(sp.scrap.qty), rework:rate(sp.rework.qty), seg:rate(sp.seg.qty) } };
+}
+function pk_prevQuality_(){
+  const keys = allMonthKeys(), i = keys.indexOf(DB.meta.activeMonth);
+  for(let j=i+1; j<keys.length; j++){
+    const Mm = an_monthM(keys[j]);
+    if(Mm.waste.length && Mm.daily.some(an_dayHasData)) return { key:keys[j], Q:pk_quality_(Mm) };
+  }
+  return null;
+}
+/* ---------- شاخص ۵: زیان توقف و کسری قطعات ----------
+   زیان تولید = ساعت توقف × نرخ ساعتی ایستگاه (برآورد حداکثری؛ توقف ایستگاه غیرگلوگاه با بافر ممکن است جبران شود).
+   نفر-ساعت درگیر = ساعت توقف × نفرات استاندارد همان ایستگاه در «نقشه نیروی استاندارد» (فقط توقف‌های قابل تطبیق).
+   کسری قطعه مدت ندارد؛ فقط تعداد/وضعیت/قطعه‌ی پرتکرار نشان داده می‌شود. */
+function pk_loss_(M){
+  const plan = isDarpooshActiveThisMonth_() ? STANDARD_MANNING_PLAN.concat(CONDITIONAL_MANNING_PLAN) : STANDARD_MANNING_PLAN;
+  const roleKeys = plan.map(r=>({ hc:r.required||0, keys:(r.stations||[]).map(normalizeForGrouping) }));
+  const manOf = st => {
+    const n = normalizeForGrouping(st); if(!n) return null;
+    const m = roleKeys.filter(r=>r.keys.some(k=>k && (n.includes(k) || k.includes(n))));
+    return m.length ? m.reduce((s,r)=>s+r.hc,0) : null;
+  };
+  let hU=0, hP=0, qU=0, qP=0, mhU=0, matched=0, unmatched=0, nU=0, nP=0;
+  const byReason = {}, byStation = {}, byDay = {};
+  const shortKw = /کسری|کمبود|قطعه/;
+  let shortHours = 0;
+  (M.stop||[]).forEach(x=>{
+    const h = x.hours||0, rate = resolveStationRate(x.station)||0, planned = x.planned===true;
+    const d = byDay[x.date] || (byDay[x.date] = { u:0, p:0 });
+    if(planned){ hP += h; qP += h*rate; nP++; d.p += h; return; }
+    hU += h; qU += h*rate; nU++; d.u += h;
+    const reason = String(x.reason || 'سایر');
+    const g = byReason[reason] || (byReason[reason] = { label:reason, hours:0, n:0, lost:0 });
+    g.hours += h; g.n++; g.lost += h*rate;
+    const st = byStation[x.station||'—'] || (byStation[x.station||'—'] = { label:x.station||'—', hours:0, n:0 });
+    st.hours += h; st.n++;
+    if(shortKw.test(reason)) shortHours += h;
+    const hc = manOf(x.station);
+    if(hc===null) unmatched++; else { matched++; mhU += h*hc; }
+  });
+  const reasons = Object.values(byReason).sort((a,b)=>b.lost-a.lost || b.hours-a.hours).map(g=>Object.assign(g,{ share: hU>0 ? g.hours/hU : null }));
+  const stations = Object.values(byStation).sort((a,b)=>b.hours-a.hours);
+  // کسری قطعات
+  const parts = {}; let sQty = 0, sOpen = 0;
+  (M.short||[]).forEach(x=>{
+    const k = normalizeForGrouping(x.part || 'نامشخص');
+    const g = parts[k] || (parts[k] = { name:String(x.part||'نامشخص'), qty:0, n:0, open:0 });
+    g.qty += (x.qty||0); g.n++; sQty += (x.qty||0);
+    if(x.status !== 'تامین شده'){ g.open++; sOpen++; }
+  });
+  const partList = Object.values(parts).sort((a,b)=>b.qty-a.qty || b.n-a.n);
+  const days = Object.keys(byDay).sort((a,b)=>dateSortKey(a)-dateSortKey(b));
+  return { hU, hP, qU, qP, nU, nP, mhU, matched, unmatched, reasons, stations, byDay, days, shortHours,
+    short:{ n:(M.short||[]).length, qty:sQty, open:sOpen, parts:partList },
+    avgDur: nU>0 ? hU/nU : null };
+}
+/* ---------- شاخص ۶: وابستگی به اضافه‌کاری ----------
+   ساعت عادی (پیش‌فرض ۸) و باقی ساعت شیفت = اضافه‌کاری؛ پنجشنبه/جمعه/تعطیل رسمی کلاً اضافه‌کاری (همان قاعده‌ی تب «نفر-ساعت و ظرفیت نیرو»).
+   سهم تولید در ساعات اضافه = برآورد متناسب با ساعت (فرض: تولید یکنواخت در طول شیفت). */
+function pk_ot_(M){
+  const c = cap_cfg(), reg = c.reg > 0 ? c.reg : 8;
+  const rows = M.daily.filter(an_dayHasData).sort(an_byDate).filter(e=>e.headcount > 0);
+  const T = { normal:{ days:0, hc:0, mh:0, ot:0, out:0 }, off:{ days:0, hc:0, mh:0, ot:0, out:0 } };
+  const days = []; let mh = 0, ot = 0, out = 0, otOut = 0;
+  rows.forEach(e=>{
+    const h = an_shiftHoursOf(e), off = cap_isOff(e.date), otH = off ? h : Math.max(h - reg, 0);
+    const o = allLinesTotal(e), m = e.headcount * h, om = e.headcount * otH, g = off ? T.off : T.normal;
+    g.days++; g.hc += e.headcount; g.mh += m; g.ot += om; g.out += o;
+    days.push({ date:e.date, e, off, regMH:m - om, otMH:om });
+    mh += m; ot += om; out += o; otOut += h>0 ? o * otH / h : 0;
+  });
+  return { reg, T, days, mh, ot, out, otOut, share: mh>0 ? ot/mh : null, outShare: out>0 ? otOut/out : null };
+}
+function pk_prevOT_(){
+  const keys = allMonthKeys(), i = keys.indexOf(DB.meta.activeMonth);
+  for(let j=i+1; j<keys.length; j++){ const r = pk_ot_(an_monthM(keys[j])); if(r.days.length) return { key:keys[j], share:r.share }; }
+  return null;
+}
+/* ---------- شاخص ۳: تراز خط (سایکل ایستگاه به استاندارد) ---------- */
+function pk_ratioColor_(r){ return r===null||r===undefined ? '#93a4c3' : (r<=1 ? '#2fd9c4' : (r<=1.15 ? '#ffcf5c' : '#ff5d6c')); }
+/* ---------- شاخص ۷: ارسال در برابر تولید ---------- */
+function pk_ship_(M){
+  const rows = M.daily.filter(an_dayHasData).sort(an_byDate);
+  let prodAll = 0, prodS = 0, shipS = 0; const series = [];
+  rows.forEach(e=>{
+    const p = allLinesTotal(e); prodAll += p;
+    if(an_hasShip(e)){ prodS += p; shipS += shipTotal(e); series.push({ date:e.date, e, cumP:prodS, cumS:shipS }); }
+  });
+  const avg = rows.length ? prodAll/rows.length : null;
+  return { rows:rows.length, daysShip:series.length, prodAll, prodS, shipS, series,
+    ratio: prodS>0 ? shipS/prodS : null, gap: prodS - shipS, gapDays: (avg>0) ? (prodS - shipS)/avg : null };
+}
+/* ---------- شاخص ۸: سرعت پاسخ (مرکز اقدام / Fast Response) ---------- */
+function pk_fr_(M){
+  const now = Date.now();
+  const monthOf = x => x.month || monthKeyOf(x.createdDate || x.dueDate || '') || DB.meta.activeMonth;
+  const isOpen = x => x.status !== 'انجام‌شده' && x.status !== 'لغو شده';
+  const dueTs = x => x.dueDate ? acJToTs_(x.dueDate, x.dueTime, true) : null;
+  const all = DB.actions || [];
+  const list = all.filter(x=>monthOf(x) === DB.meta.activeMonth);
+  const carry = all.filter(x=>isOpen(x) && monthOf(x) < DB.meta.activeMonth).length;
+  const open = list.filter(isOpen), done = list.filter(x=>x.status === 'انجام‌شده');
+  const overdue = open.filter(x=>dueTs(x) && dueTs(x) < now);
+  const reacts = list.filter(x=>x.announcedTs && x.createdTs && x.createdTs >= x.announcedTs).map(x=>x.createdTs - x.announcedTs);
+  const mets = done.map(acMetrics_).filter(Boolean);
+  const withDue = done.filter(x=>dueTs(x) && x.resolvedTs);
+  const onTime = withDue.filter(x=>x.resolvedTs <= dueTs(x)).length;
+  const devSet = mets.filter(m=>m.P > 0), sumP = devSet.reduce((a,m)=>a+m.P,0);
+  let sug = []; try{ sug = acBuildSuggestions_(M) || []; }catch(e){ sug = []; }
+  const waitH = a => { const t = a.announcedTs || (a.announcedDate ? acJToTs_(a.announcedDate, '12:00') : null); return t ? (now - t)/3600e3 : null; };
+  const waits = sug.map(waitH).filter(v=>v!==null);
+  return { now, list, open, done, overdue, carry, dueTs,
+    avgReact: reacts.length ? reacts.reduce((a,b)=>a+b,0)/reacts.length : null,
+    avgClose: mets.length ? mets.reduce((a,m)=>a+m.A,0)/mets.length : null,
+    onTimeRate: withDue.length ? onTime/withDue.length : null, withDueN: withDue.length,
+    devAgg: sumP>0 ? (devSet.reduce((a,m)=>a+m.A,0) - sumP)/sumP*100 : null,
+    unacted: sug.length, oldestH: waits.length ? Math.max(...waits) : null, late24: waits.filter(h=>h>24).length };
+}
+function pk_color_(r){ return r===null||r===undefined ? '#93a4c3' : (r>=1 ? '#2fd9c4' : (r>=0.9 ? '#ffcf5c' : '#ff5d6c')); }
+function renderProdKpi(){
+  const M = monthData();
+  const K = pk_compute_(M);
+  const view = document.getElementById('view');
+  if(!K.days.length){
+    view.innerHTML = renderMonthBar() + '<div class="card"><div class="tbl-empty">برای این ماه هنوز تولید روزانه ثبت نشده است.</div></div>';
+    bindMonthBar(); return;
+  }
+  const sorted = K.lines.slice().sort((a,b)=>(a.ratio??9)-(b.ratio??9));
+  const insights = [];
+  const worst = sorted[0];
+  if(worst && worst.ratio!==null && worst.ratio<1)
+    insights.push(`<b>${esc(worst.label)}</b> کمترین تحقق را دارد: <b>${pct(worst.ratio,1)}</b> (کسری ${fmt(-worst.gap,0)} قطعه${worst.stopDays? ` — ${fmt(worst.stopDays,0)} روز توقف` : ''}).`);
+  const bigGap = K.lines.slice().sort((a,b)=>a.gap-b.gap)[0];
+  if(bigGap && bigGap.gap<0 && (!worst || bigGap.k!==worst.k))
+    insights.push(`بیشترین کسری قطعه‌ای در <b>${esc(bigGap.label)}</b> است: <b>${fmt(-bigGap.gap,0)}</b> قطعه (تحقق ${pct(bigGap.ratio,1)}).`);
+  if(K.lowDays)
+    insights.push(`<b>${fmt(K.lowDays,0)}</b> روز از <b>${fmt(K.days.length,0)}</b> روز زیر ۹۰٪ هدف بوده است.`);
+  if(K.reqPerDay!==null && K.avgPerDay!==null)
+    insights.push(`برای رسیدن به برنامه‌ی ماهانه، تولید روزانه باید <b>${fmt(K.reqPerDay,0)}</b> قطعه باشد؛ میانگین فعلی <b>${fmt(K.avgPerDay,0)}</b> قطعه در روز (معادل روز کامل) است.`);
+  const insHtml = insights.length ? `<div class="card" style="margin-bottom:16px;"><h3>🔎 برداشت سریع</h3>${insights.map(t=>`<div style="padding:6px 0; border-bottom:1px solid var(--panel-border); font-size:13px; line-height:1.9;">${t}</div>`).join('')}</div>` : '';
+  const rowsHtml = sorted.map(r=>{
+    const c = pk_color_(r.ratio), w = Math.min((r.ratio||0)*100, 130)/1.3;
+    return `<tr>
+      <td>${esc(r.label)}</td>
+      <td class="num">${fmt(r.out,0)}</td>
+      <td class="num">${fmt(r.target,0)}</td>
+      <td class="num" style="min-width:150px;"><div style="display:flex; align-items:center; gap:8px;"><div style="flex:1; height:8px; background:#182338; border-radius:5px; overflow:hidden;"><div style="width:${w.toFixed(1)}%; height:100%; background:${c};"></div></div><b style="color:${c}; min-width:52px; text-align:left;">${pct(r.ratio,1)}</b></div></td>
+      <td class="num" style="color:${r.gap>=0?'#2fd9c4':'#ff5d6c'};">${r.gap>=0?'+':''}${fmt(r.gap,0)}</td>
+      <td class="num">${fmt(r.hit,0)} / ${fmt(r.days,0)}</td>
+      <td class="num">${r.stopDays? fmt(r.stopDays,0) : '—'}</td>
+    </tr>`;
+  }).join('');
+  const LB = pk_labor_(M);
+  let laborHtml = '';
+  if(!LB.std || !LB.series.length){
+    laborHtml = `<div class="card" style="margin-top:16px;"><h3>👷 راندمان نیروی انسانی</h3><div class="tbl-empty">برای محاسبه، «تعداد نفر» روزانه (ورود داده) یا «آمار روزانه ایستگاه‌ها» با ساعت شروع/پایان و نام اپراتور لازم است.</div></div>`;
+  } else {
+    const warn = [];
+    if(LB.effWorked!==null && LB.effWorked>1.1) warn.push('راندمان نیروی ثبت‌شده بیش از ۱۱۰٪ است؛ احتمالاً آمار ایستگاه‌ها ناقص ثبت شده (مخرج کوچک‌تر از واقعیت).');
+    if(LB.noTime || LB.noOps) warn.push(`${fmt(LB.noTime||0,0)} ثبت ایستگاه بدون ساعت شروع/پایان و ${fmt(LB.noOps||0,0)} ثبت بدون نام اپراتور در محاسبه نیامد.`);
+    if(LB.mh.hasFallback) warn.push('در برخی روزها تعداد نفر ثبت نشده و از «تعداد استاندارد/فهرست پرسنل» استفاده شده است.');
+    laborHtml = `
+  <div class="grid grid-4" style="margin:16px 0;">
+    ${kpiCard('راندمان نیروی ثبت‌شده در ایستگاه','', LB.effWorked===null?'—':pct(LB.effWorked,1), null, pk_color_(LB.effWorked), false, 'manhours')}
+    ${kpiCard('راندمان کل نیروی حاضر','', LB.effAvail===null?'—':pct(LB.effAvail,1), null, pk_color_(LB.effAvail), false, 'manhours')}
+    ${kpiCard('نفر-ثانیه‌ی استاندارد هر قطعه','نفر·ث', fmt(LB.std*3600,0), null, '#4c8dff', false, 'manhours')}
+    ${kpiCard('پوشش ثبت نفر-ساعت','', LB.coverage===null?'—':pct(LB.coverage,0), null, LB.coverage===null?'#93a4c3':(LB.coverage>=0.8?'#2fd9c4':LB.coverage>=0.6?'#ffcf5c':'#ff5d6c'), false, 'stations')}
+  </div>
+  <div class="card">
+    <h3>👷 راندمان نیروی انسانی روزانه <span class="muted">نفر-ساعت استاندارد کسب‌شده ÷ نفر-ساعت مصرف‌شده — استاندارد = ${fmt(LB.S.hc,1)} نفر × ${fmt(LB.S.hrs,0)} ساعت ÷ ${fmt(LB.S.daily,0)} قطعه‌ی هدف روزانه</span></h3>
+    ${warn.length? `<div class="hint" style="color:#ffcf5c; margin-bottom:8px; line-height:1.9;">${warn.map(esc).join('<br>')}</div>` : ''}
+    <div class="chart-box"><canvas id="chPkLabor"></canvas></div>
+  </div>`;
+  }
+  const Q = pk_quality_(M), PQ = pk_prevQuality_();
+  let qualityHtml = '';
+  if(!(Q.prod>0) || !M.waste.length){
+    qualityHtml = `<div class="card" style="margin-top:16px;"><h3>🧪 کیفیت: سه نرخ جدا</h3><div class="tbl-empty">${Q.prod>0 ? 'در این ماه ضایعات، دوباره‌کاری یا جداسازی ثبت نشده است.' : 'تولید این ماه ثبت نشده است.'}</div></div>`;
+  } else {
+    const dl = (key)=>{ if(!PQ || PQ.Q.rates[key]===null || Q.rates[key]===null) return ''; const d=(Q.rates[key]-PQ.Q.rates[key])*100; return `${PK_KIND[key].label}: ${d>0?'+':''}${fmt(d,2)} واحد درصد`; };
+    const ins = [];
+    const dtxt = ['scrap','rework','seg'].map(dl).filter(Boolean);
+    if(dtxt.length) ins.push('تغییر نسبت به ماه قبل — ' + dtxt.join(' | '));
+    if(Q.mhPer1000!==null && Q.mhLost>0) ins.push(`هزینه‌ی پنهان: <b>${fmt(Q.mhLost,1)}</b> نفر-ساعت صرف دوباره‌کاری و جداسازی شده (<b>${fmt(Q.mhPer1000,1)}</b> نفر-ساعت به‌ازای هر ۱۰۰۰ قطعه).`);
+    if(Q.list[0]) ins.push(`بزرگ‌ترین علت: <b>${esc(Q.list[0].name)}</b> (${PK_KIND[Q.list[0].kind].label}) با <b>${fmt(Q.list[0].qty,0)}</b> قطعه.`);
+    if(Q.noMin) ins.push(`${fmt(Q.noMin,0)} ردیف دوباره‌کاری/جداسازی بدون «زمان» ثبت شده؛ نفر-ساعت واقعی بیشتر از عدد بالاست.`);
+    const rowsQ = Q.list.slice(0,8).map(g=>`<tr>
+      <td><span style="color:${PK_KIND[g.kind].color}; font-weight:700;">${PK_KIND[g.kind].label}</span></td>
+      <td>${esc(g.name)}</td><td class="num">${fmt(g.qty,0)}</td>
+      <td class="num">${g.share===null?'—':pct(g.share,0)}</td>
+      <td class="num">${g.min>0 ? fmt(g.min/60,1) : '—'}</td><td class="num">${fmt(g.n,0)}</td></tr>`).join('');
+    qualityHtml = `
+  <div class="grid grid-4" style="margin:16px 0;">
+    ${kpiCard('نرخ ضایعات','', pct(Q.rates.scrap,2), null, PK_KIND.scrap.color, false, 'waste')}
+    ${kpiCard('نرخ دوباره‌کاری','', pct(Q.rates.rework,2), null, PK_KIND.rework.color, false, 'waste')}
+    ${kpiCard('نرخ جداسازی','', pct(Q.rates.seg,2), null, PK_KIND.seg.color, false, 'waste')}
+    ${kpiCard('نفر-ساعت دوباره‌کاری و جداسازی','نفر·ساعت', fmt(Q.mhLost,1), null, '#4c8dff', false, 'waste')}
+  </div>
+  ${ins.length ? `<div class="card" style="margin-bottom:16px;"><h3>🔎 برداشت سریع کیفیت <span class="muted">مخرج: ${fmt(Q.prod,0)} قطعه‌ی تولیدشده؛ سه نرخ عمداً جمع نشده‌اند</span></h3>${ins.map(t=>`<div style="padding:6px 0; border-bottom:1px solid var(--panel-border); font-size:13px; line-height:1.9;">${t}</div>`).join('')}</div>` : ''}
+  <div class="card" style="margin-bottom:16px;">
+    <h3>🧪 پارتوی علت‌ها <span class="muted">۸ علت برتر بر اساس تعداد؛ سهم = از کل همان نوع</span></h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>نوع</th><th>علت</th><th class="num">تعداد</th><th class="num">سهم از نوع</th><th class="num">نفر-ساعت</th><th class="num">ردیف ثبت</th></tr></thead>
+      <tbody>${rowsQ}</tbody></table></div>
+  </div>
+  <div class="card">
+    <h3>تعداد روزانه به‌تفکیک نوع</h3>
+    <div class="chart-box"><canvas id="chPkQual"></canvas></div>
+  </div>`;
+  }
+  const LS = pk_loss_(M);
+  let lossHtml = '';
+  if(!M.stop.length && !M.short.length){
+    lossHtml = `<div class="card" style="margin-top:16px;"><h3>⏸ زیان توقف و کسری قطعات</h3><div class="tbl-empty">در این ماه توقف یا کسری قطعه‌ای ثبت نشده است.</div></div>`;
+  } else {
+    const shortfall = Math.max(K.tgt - K.act, 0);
+    const ins = [];
+    if(LS.nU) ins.push(`توقف برنامه‌ریزی‌نشده: <b>${fmt(LS.nU,0)}</b> رویداد، <b>${fmt(LS.hU,1)}</b> ساعت (میانگین ${fmt(LS.avgDur,1)} ساعت در هر رویداد) — زیان برآوردی تولید ≈ <b>${fmt(LS.qU,0)}</b> قطعه${shortfall>0 ? `، یعنی ${LS.qU>=shortfall ? 'بیش از کل کسری تحقق ماه (' + fmt(shortfall,0) + ' قطعه؛ برآورد حداکثری است و بخشی با بافر جبران می‌شود)' : '~' + pct(LS.qU/shortfall,0) + ' از کسری تحقق ماه (' + fmt(shortfall,0) + ' قطعه)'}` : ''}.`);
+    if(LS.reasons[0]) ins.push(`علت غالب توقف: <b>${esc(LS.reasons[0].label)}</b> — ${fmt(LS.reasons[0].hours,1)} ساعت، ${fmt(LS.reasons[0].n,0)} رویداد، ≈ ${fmt(LS.reasons[0].lost,0)} قطعه${LS.reasons[0].n>=3 ? ' (تکرارشونده؛ نیازمند اقدام ریشه‌ای، نه رفع موردی)' : ''}.`);
+    if(LS.hP>0) ins.push(`توقف برنامه‌ریزی‌شده: ${fmt(LS.nP,0)} رویداد، ${fmt(LS.hP,1)} ساعت (جدا از زیان بالا حساب شده است).`);
+    if(LS.shortHours>0) ins.push(`<b>${fmt(LS.shortHours,1)}</b> ساعت از توقف‌ها علت «کسری/کمبود قطعه» داشته است.`);
+    if(LS.short.n) ins.push(`کسری قطعات: <b>${fmt(LS.short.n,0)}</b> مورد ثبت‌شده، مجموع <b>${fmt(LS.short.qty,0)}</b> قطعه؛ <b>${fmt(LS.short.open,0)}</b> مورد هنوز تأمین نشده است. (کسری مدت ندارد، پس زیان تولیدش جدا برآورد نمی‌شود.)`);
+    if(LS.unmatched) ins.push(`${fmt(LS.unmatched,0)} توقف با «نقشه نیروی استاندارد» قابل تطبیق نبود و در نفر-ساعت نیامد.`);
+    const rowsR = LS.reasons.slice(0,8).map(g=>`<tr><td>${esc(g.label)}</td><td class="num">${fmt(g.hours,1)}</td><td class="num">${fmt(g.n,0)}</td><td class="num">${fmt(g.lost,0)}</td><td class="num">${g.share===null?'—':pct(g.share,0)}</td></tr>`).join('');
+    const rowsP = LS.short.parts.slice(0,6).map(g=>`<tr><td>${esc(g.name)}</td><td class="num">${fmt(g.qty,0)}</td><td class="num">${fmt(g.n,0)}</td><td class="num">${g.open? '<b style="color:#ff9d42;">'+fmt(g.open,0)+'</b>' : '—'}</td></tr>`).join('');
+    lossHtml = `
+  <div class="grid grid-4" style="margin:16px 0;">
+    ${kpiCard('توقف برنامه‌ریزی‌نشده','ساعت', fmt(LS.hU,1), null, '#ff5d6c', false, 'stop')}
+    ${kpiCard('تولید ازدست‌رفته‌ی برآوردی','قطعه', fmt(LS.qU,0), null, '#ff9d42', false, 'stop')}
+    ${kpiCard('نفر-ساعت نیروی درگیر توقف','نفر·ساعت', fmt(LS.mhU,1), null, '#a78bfa', false, 'stop')}
+    ${kpiCard('کسری قطعات (تأمین‌نشده)','مورد', `${fmt(LS.short.open,0)} / ${fmt(LS.short.n,0)}`, null, LS.short.open? '#ffcf5c':'#2fd9c4', false, 'short')}
+  </div>
+  ${ins.length ? `<div class="card" style="margin-bottom:16px;"><h3>🔎 برداشت سریع توقف و کسری</h3>${ins.map(t=>`<div style="padding:6px 0; border-bottom:1px solid var(--panel-border); font-size:13px; line-height:1.9;">${t}</div>`).join('')}</div>` : ''}
+  ${LS.reasons.length ? `<div class="card" style="margin-bottom:16px;">
+    <h3>⏸ پارتوی علل توقف (برنامه‌ریزی‌نشده) <span class="muted">مرتب بر اساس قطعه‌ی ازدست‌رفته‌ی برآوردی</span></h3>
+    <div class="table-wrap"><table><thead><tr><th>علت</th><th class="num">ساعت</th><th class="num">رویداد</th><th class="num">قطعه ازدست‌رفته</th><th class="num">سهم ساعت</th></tr></thead><tbody>${rowsR}</tbody></table></div>
+  </div>` : ''}
+  ${LS.days.length ? `<div class="card" style="margin-bottom:16px;"><h3>ساعت توقف روزانه <span class="muted">برنامه‌ریزی‌نشده و برنامه‌ریزی‌شده جدا</span></h3><div class="chart-box"><canvas id="chPkLoss"></canvas></div></div>` : ''}
+  ${LS.short.parts.length ? `<div class="card">
+    <h3>🧩 قطعات پرکسری <span class="muted">۶ قطعه‌ی برتر بر اساس تعداد کسری</span></h3>
+    <div class="table-wrap"><table><thead><tr><th>قطعه</th><th class="num">مجموع کسری</th><th class="num">ردیف ثبت</th><th class="num">تأمین‌نشده</th></tr></thead><tbody>${rowsP}</tbody></table></div>
+  </div>` : ''}`;
+  }
+
+  /* ===== شاخص ۶: اضافه‌کاری ===== */
+  const OT = pk_ot_(M), POT = pk_prevOT_();
+  let otHtml = '';
+  if(!OT.days.length){
+    otHtml = `<div class="card" style="margin-top:16px;"><h3>⏱ وابستگی به اضافه‌کاری</h3><div class="tbl-empty">برای محاسبه، «تعداد نفر» روزانه در ورود داده لازم است.</div></div>`;
+  } else {
+    const N = OT.T.normal, F = OT.T.off, sh = (v)=> OT.mh>0 ? pct(v/OT.mh,1) : '—';
+    const ins = [];
+    ins.push(`سهم اضافه‌کاری از کل نفر-ساعت: <b>${pct(OT.share,1)}</b> — اضافه‌کاری روزهای عادی (ساعات بعد از ${fmt(OT.reg,0)} ساعت) <b>${sh(N.ot)}</b> + پنجشنبه/جمعه/تعطیل <b>${sh(F.ot)}</b>.`);
+    if(OT.outShare!==null) ins.push(`حدود <b>${pct(OT.outShare,0)}</b> تولید ماه (برآورد متناسب با ساعت) در ساعات اضافه ساخته شده؛ تولید ساعات عادی ≈ <b>${fmt(OT.out-OT.otOut,0)}</b> از <b>${fmt(OT.out,0)}</b> قطعه.`);
+    if(N.mh>0 && F.mh>0){ const pn = N.out/N.mh, pf = F.out/F.mh, d = (pf-pn)/pn; ins.push(`بهره‌وری روز عادی <b>${fmt(pn,2)}</b> قطعه/نفر-ساعت در برابر پنجشنبه/جمعه/تعطیل <b>${fmt(pf,2)}</b> (${d>0?'+':''}${fmt(d*100,0)}٪).`); }
+    if(POT && POT.share!==null && OT.share!==null){ const d=(OT.share-POT.share)*100; ins.push(`ماه قبل سهم اضافه‌کاری ${pct(POT.share,1)} بود (${d>0?'+':''}${fmt(d,1)} واحد درصد).`); }
+    const row = (lbl,g)=> g.days ? `<tr><td>${lbl}</td><td class="num">${fmt(g.days,0)}</td><td class="num">${fmt(g.hc/g.days,1)}</td><td class="num">${fmt(g.mh,0)}</td><td class="num">${fmt(g.ot,0)}</td><td class="num">${fmt(g.out,0)}</td><td class="num">${g.mh>0?fmt(g.out/g.mh,2):'—'}</td></tr>` : '';
+    otHtml = `
+  <div class="grid grid-4" style="margin:16px 0;">
+    ${kpiCard('سهم اضافه‌کاری از نفر-ساعت','', pct(OT.share,1), null, '#ff9d42', false, 'manhours')}
+    ${kpiCard('نفر-ساعت اضافه‌کاری','نفر·ساعت', fmt(OT.ot,0), null, '#ff9d42', false, 'manhours')}
+    ${kpiCard('سهم تولید در ساعات اضافه (برآورد)','', OT.outShare===null?'—':pct(OT.outShare,0), null, '#4c8dff', false, 'manhours')}
+    ${kpiCard('روز کاری پنجشنبه/جمعه/تعطیل','روز', fmt(F.days,0), null, '#a78bfa', false, 'manhours')}
+  </div>
+  <div class="card" style="margin-bottom:16px;"><h3>⏱ برداشت سریع اضافه‌کاری</h3>${ins.map(t=>`<div style="padding:6px 0; border-bottom:1px solid var(--panel-border); font-size:13px; line-height:1.9;">${t}</div>`).join('')}</div>
+  <div class="card" style="margin-bottom:16px;">
+    <h3>به‌تفکیک نوع روز <span class="muted">فقط روزهای دارای «تعداد نفر»</span></h3>
+    <div class="table-wrap"><table><thead><tr><th>نوع روز</th><th class="num">روز</th><th class="num">میانگین نفر</th><th class="num">نفر-ساعت</th><th class="num">اضافه‌کاری</th><th class="num">تولید</th><th class="num">قطعه/نفر-ساعت</th></tr></thead><tbody>${row('روز عادی',N)}${row('پنجشنبه/جمعه/تعطیل',F)}</tbody></table></div>
+  </div>
+  <div class="card"><h3>نفر-ساعت روزانه: عادی در برابر اضافه‌کاری</h3><div class="chart-box"><canvas id="chPkOT"></canvas></div></div>`;
+  }
+
+  /* ===== شاخص ۳: تراز خط ===== */
+  const U = an_unitTakt(M), SS = an_stationStats(M);
+  const stl = SS.list.filter(x=>x.ratio!==null).sort((a,b)=>b.ratio-a.ratio);
+  let balHtml = '';
+  if(!stl.length){
+    balHtml = `<div class="card" style="margin-top:16px;"><h3>⚖ تراز خط و سایکل به استاندارد</h3><div class="tbl-empty">برای محاسبه، «آمار روزانه ایستگاه‌ها» با ساعت شروع/پایان و تعداد، و استاندارد ساعتی هر ایستگاه (ستاپ ایستگاه‌ها) لازم است.</div></div>`;
+  } else {
+    const over = stl.filter(x=>x.ratio>1).length, slow = stl.filter(x=>x.ratio>1.15).length;
+    const ins = [];
+    const w = stl[0];
+    ins.push(`کندترین ایستگاه نسبت به استاندارد: <b>${esc(w.name)}</b> با سایکل <b>${fmt(w.ct,0)}</b> ثانیه در برابر استاندارد ${w.takt?fmt(w.takt,0):'—'} (<b>${pct(w.ratio,0)}</b>)${w.stopHrs>0 ? `؛ با حذف توقف ثبت‌شده ${pct(w.netRatio,0)}` : ''}.`);
+    ins.push(`<b>${fmt(slow,0)}</b> ایستگاه بیش از ۱۱۵٪ استاندارد، و جمعاً <b>${fmt(over,0)}</b> از <b>${fmt(stl.length,0)}</b> ایستگاه کندتر از استاندارد هستند.`);
+    ins.push(`پراکندگی تراز: سریع‌ترین ایستگاه ${pct(stl[stl.length-1].ratio,0)} و کندترین ${pct(w.ratio,0)} استاندارد است؛ هرچه فاصله بیشتر، بالانس خط ضعیف‌تر.`);
+    if(U.taktAvg && U.paceAvg) ins.push(`در سطح کل خط، میانگین تکت <b>${fmt(U.taktAvg,0)}</b> ثانیه و سرعت واقعی <b>${fmt(U.paceAvg,0)}</b> ثانیه به‌ازای هر قطعه است (سرعت ${U.paceAvg<=U.taktAvg?'سریع‌تر':'کندتر'} از تکت).`);
+    if(SS.skippedNoTime || SS.skippedNoQty) ins.push(`${fmt(SS.skippedNoTime,0)} ثبت بدون ساعت و ${fmt(SS.skippedNoQty,0)} ثبت بدون تعداد در محاسبه نیامد.`);
+    const rowsB = stl.slice(0,8).map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.stage||'—')}</td><td class="num">${x.takt?fmt(x.takt,0):'—'}</td><td class="num">${fmt(x.ct,0)}</td><td class="num" style="color:${pk_ratioColor_(x.ratio)}; font-weight:700;">${pct(x.ratio,0)}</td><td class="num">${x.netRatio===null?'—':pct(x.netRatio,0)}</td><td class="num">${x.stopHrs>0?fmt(x.stopHrs,1):'—'}</td></tr>`).join('');
+    balHtml = `
+  <div class="grid grid-4" style="margin:16px 0;">
+    ${kpiCard('تکت واحد (میانگین)','ثانیه', U.taktAvg?fmt(U.taktAvg,0):'—', null, '#4c8dff', false, 'takt')}
+    ${kpiCard('سرعت واقعی خط','ثانیه/قطعه', U.paceAvg?fmt(U.paceAvg,0):'—', null, (U.taktAvg && U.paceAvg) ? (U.paceAvg<=U.taktAvg?'#2fd9c4':'#ff5d6c') : '#93a4c3', false, 'takt')}
+    ${kpiCard('ایستگاه کندتر از استاندارد','ایستگاه', `${fmt(over,0)} / ${fmt(stl.length,0)}`, null, over? '#ffcf5c':'#2fd9c4', false, 'takt')}
+    ${kpiCard('ایستگاه بیش از ۱۱۵٪ استاندارد','ایستگاه', fmt(slow,0), null, slow? '#ff5d6c':'#2fd9c4', false, 'takt')}
+  </div>
+  <div class="card" style="margin-bottom:16px;"><h3>⚖ برداشت سریع تراز خط</h3>${ins.map(t=>`<div style="padding:6px 0; border-bottom:1px solid var(--panel-border); font-size:13px; line-height:1.9;">${t}</div>`).join('')}</div>
+  <div class="card" style="margin-bottom:16px;">
+    <h3>۸ ایستگاه کندتر <span class="muted">سایکل واقعی = ساعت ثبت‌شده ÷ تعداد؛ ۱۰۰٪ = برابر استاندارد ایستگاه</span></h3>
+    <div class="table-wrap"><table><thead><tr><th>ایستگاه</th><th>مرحله</th><th class="num">استاندارد (ث)</th><th class="num">واقعی (ث)</th><th class="num">نسبت</th><th class="num">نسبت بدون توقف</th><th class="num">ساعت توقف</th></tr></thead><tbody>${rowsB}</tbody></table></div>
+  </div>
+  <div class="card"><h3>نسبت سایکل به استاندارد، ۱۲ ایستگاه کندتر <span class="muted">سبز ≤۱۰۰٪، زرد ≤۱۱۵٪، قرمز بالاتر</span></h3><div class="chart-box" style="height:${Math.max(240, Math.min(stl.length,12)*28+40)}px;"><canvas id="chPkBal"></canvas></div></div>`;
+  }
+
+  /* ===== شاخص ۷: ارسال به تولید ===== */
+  const SH = pk_ship_(M);
+  let shipHtml = '';
+  if(!SH.daysShip){
+    shipHtml = `<div class="card" style="margin-top:16px;"><h3>🚚 ارسال در برابر تولید</h3><div class="tbl-empty">در این ماه ارسال به انبار ثبت نشده است.</div></div>`;
+  } else {
+    const ins = [];
+    ins.push(`ارسال در <b>${fmt(SH.daysShip,0)}</b> از <b>${fmt(SH.rows,0)}</b> روز تولیدی ثبت شده؛ نسبت‌ها فقط روی همین روزها حساب شده است.`);
+    if(SH.gap>0) ins.push(`اختلاف انباشته: <b>${fmt(SH.gap,0)}</b> قطعه تولید‌شده هنوز ارسال نشده${SH.gapDays!==null ? ` (≈ ${fmt(SH.gapDays,1)} روز تولید)` : ''} — موجودی بین‌راهی/انبار موقت.`);
+    else if(SH.gap<0) ins.push(`ارسال <b>${fmt(-SH.gap,0)}</b> قطعه بیشتر از تولید همین روزهاست (ارسال از موجودی قبل).`);
+    ins.push('مبنای سنجش عملکرد، تولید است؛ ارسال برای دیدن جریان به انبار و انباشت بین‌راهی است.');
+    shipHtml = `
+  <div class="grid grid-4" style="margin:16px 0;">
+    ${kpiCard('تولید ماه','قطعه', fmt(SH.prodAll,0), null, '#2fd9c4', false, 'prod')}
+    ${kpiCard('ارسال ماه','قطعه', fmt(SH.shipS,0), null, '#4c8dff', false, 'ship')}
+    ${kpiCard('نسبت ارسال به تولید','', SH.ratio===null?'—':pct(SH.ratio,1), null, '#4c8dff', false, 'ship')}
+    ${kpiCard('اختلاف انباشته (تولید − ارسال)','قطعه', fmt(SH.gap,0), null, SH.gap>0?'#ff9d42':'#2fd9c4', false, 'ship')}
+  </div>
+  <div class="card" style="margin-bottom:16px;"><h3>🚚 برداشت سریع ارسال</h3>${ins.map(t=>`<div style="padding:6px 0; border-bottom:1px solid var(--panel-border); font-size:13px; line-height:1.9;">${t}</div>`).join('')}</div>
+  <div class="card"><h3>تولید و ارسال تجمعی <span class="muted">روزهای دارای ثبت ارسال</span></h3><div class="chart-box"><canvas id="chPkShip"></canvas></div></div>`;
+  }
+
+  /* ===== شاخص ۸: سرعت پاسخ ===== */
+  const FR = pk_fr_(M);
+  let frHtml = '';
+  if(!FR.list.length && !FR.unacted && !FR.carry){
+    frHtml = `<div class="card" style="margin-top:16px;"><h3>🚨 سرعت پاسخ (Fast Response)</h3><div class="tbl-empty">در این ماه اقدامی ثبت نشده است.</div></div>`;
+  } else {
+    const ins = [];
+    if(FR.unacted) ins.push(`<b>${fmt(FR.unacted,0)}</b> اعلان (توقف/کسری/ضایعات) هنوز اقدام ندارد${FR.oldestH!==null ? `؛ قدیمی‌ترین ${acAgo_(FR.oldestH*3600e3)} است و ${fmt(FR.late24,0)} مورد بیش از ۲۴ ساعت منتظر مانده` : ''}.`);
+    if(FR.overdue.length) ins.push(`<b>${fmt(FR.overdue.length,0)}</b> اقدام از موعد گذشته و بسته نشده است.`);
+    if(FR.carry) ins.push(`<b>${fmt(FR.carry,0)}</b> اقدام باز از ماه‌های قبل منتقل شده است.`);
+    if(FR.devAgg!==null) ins.push(`انحراف تجمعی مدت واقعی از پیش‌بینی: <b>${FR.devAgg>0?'+':''}${fmt(FR.devAgg,0)}٪</b> ${FR.devAgg>0?'(دیرتر از پیش‌بینی)':'(زودتر از پیش‌بینی)'}.`);
+    if(FR.onTimeRate!==null) ins.push(`از <b>${fmt(FR.withDueN,0)}</b> اقدام بسته‌شده‌ی دارای موعد، <b>${pct(FR.onTimeRate,0)}</b> تا موعد انجام شده است.`);
+    const od = FR.overdue.slice().sort((a,b)=>FR.dueTs(a)-FR.dueTs(b)).slice(0,6);
+    const rowsF = od.map(x=>`<tr><td>${esc(x.title||x.description||'—')}</td><td>${esc(x.dept||'—')}</td><td>${esc(acSrcLabel_(x.sourceType)||'دستی')}</td><td class="num">${esc(acFmtDT_(x.dueDate,x.dueTime))}</td><td class="num" style="color:#ff5d6c; font-weight:700;">${acAgo_(FR.now-FR.dueTs(x))}</td></tr>`).join('');
+    frHtml = `
+  <div class="grid grid-4" style="margin:16px 0;">
+    ${kpiCard('اقدام باز / موعدگذشته','اقدام', `${fmt(FR.open.length,0)} / ${fmt(FR.overdue.length,0)}`, null, FR.overdue.length?'#ff5d6c':'#2fd9c4', false, 'actions')}
+    ${kpiCard('میانگین زمان واکنش (اعلام تا ثبت اقدام)','', FR.avgReact===null?'—':acAgo_(FR.avgReact), null, '#4c8dff', false, 'actions')}
+    ${kpiCard('میانگین زمان بستن (اعلام تا انجام)','', FR.avgClose===null?'—':acAgo_(FR.avgClose), null, '#4c8dff', false, 'actions')}
+    ${kpiCard('رعایت موعد','', FR.onTimeRate===null?'—':pct(FR.onTimeRate,0), null, FR.onTimeRate===null?'#93a4c3':pk_color_(FR.onTimeRate), false, 'actions')}
+  </div>
+  ${ins.length ? `<div class="card" style="margin-bottom:16px;"><h3>🚨 برداشت سریع پاسخ</h3>${ins.map(t=>`<div style="padding:6px 0; border-bottom:1px solid var(--panel-border); font-size:13px; line-height:1.9;">${t}</div>`).join('')}</div>` : ''}
+  ${od.length ? `<div class="card"><h3>اقدام‌های موعدگذشته <span class="muted">۶ مورد قدیمی‌تر</span></h3><div class="table-wrap"><table><thead><tr><th>عنوان</th><th>واحد</th><th>منبع</th><th class="num">موعد</th><th class="num">تأخیر</th></tr></thead><tbody>${rowsF}</tbody></table></div></div>` : ''}`;
+  }
+  const pkNav = [['plan','تحقق برنامه'],['labor','راندمان نیرو'],['qual','کیفیت'],['loss','توقف و کسری'],['ot','اضافه‌کاری'],['bal','تراز خط'],['ship','ارسال'],['fr','پاسخ سریع']]
+    .map(x=>`<button class="btn btn-ghost btn-sm" data-pk="${x[0]}">${x[1]}</button>`).join('');
+  view.innerHTML = renderMonthBar() + `
+  <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">${pkNav}</div>
+  <div id="pk-sec-plan"></div>
+  <div class="grid grid-4" style="margin-bottom:16px;">
+    ${kpiCard('تحقق هدف تولید (ماه)','', pct(K.attain,1), null, pk_color_(K.attain), false, 'prod')}
+    ${kpiCard('روزهای رسیده به هدف','روز', `${fmt(K.hitDays,0)} / ${fmt(K.days.length,0)}`, null, '#4c8dff', true, 'prod')}
+    ${kpiCard('تحقق نسبت به مسیر برنامه‌ی ماهانه','', K.paceRatio===null?'—':pct(K.paceRatio,1), null, pk_color_(K.paceRatio), false, 'target')}
+    ${kpiCard('تولید روزانه‌ی لازم تا پایان ماه','قطعه/روز', K.reqPerDay===null?'—':fmt(K.reqPerDay,0), null, '#ff9d42', false, 'target')}
+  </div>
+  ${insHtml}
+  <div class="card" style="margin-bottom:16px;">
+    <h3>تولید روزانه در برابر هدف <span class="muted">فقط ردیف‌های ثبت‌شده‌ی هر روز — رنگ ستون = درصد تحقق همان روز (۱۰۰٪+ سبز، ۹۰٪+ زرد، کمتر قرمز) — 🌙 = شیفت کوتاه/تعطیل</span></h3>
+    <div class="chart-box"><canvas id="chPkDaily"></canvas></div>
+  </div>
+  <div class="card">
+    <h3>تحقق به‌تفکیک خط <span class="muted">هدف هر خط متناسب با ساعت شیفت هر روز؛ روزی که برای آن خط ثبت نشده شمرده نمی‌شود، «توقف» با تولید صفر شمرده می‌شود</span></h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>خط</th><th class="num">تولید</th><th class="num">هدف</th><th class="num">تحقق</th><th class="num">مازاد / کسری</th><th class="num">روز رسیده به هدف</th><th class="num">روز توقف</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table></div>
+  </div><div id="pk-sec-labor"></div>${laborHtml}<div id="pk-sec-qual"></div>${qualityHtml}<div id="pk-sec-loss"></div>${lossHtml}<div id="pk-sec-ot"></div>${otHtml}<div id="pk-sec-bal"></div>${balHtml}<div id="pk-sec-ship"></div>${shipHtml}<div id="pk-sec-fr"></div>${frHtml}`;
+  bindMonthBar();
+  view.querySelectorAll('[data-pk]').forEach(b=>b.addEventListener('click', ()=>{ const el=document.getElementById('pk-sec-'+b.dataset.pk); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }));
+  mkChart('chPkDaily', { type:'bar', data:{
+      labels: K.days.map(d=> an_dayLabel(d.date) + moonSuffix_(d.e)),
+      datasets:[
+        { type:'bar', label:'تولید', data:K.days.map(d=>d.act), backgroundColor:K.days.map(d=>pk_color_(d.ratio)), borderRadius:5, maxBarThickness:28, order:2 },
+        { type:'line', label:'هدف', data:K.days.map(d=>Math.round(d.tgt)), borderColor:'#93a4c3', borderDash:[6,4], borderWidth:2, pointRadius:0, fill:false, order:1, noLabel:true }
+      ] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:true },
+        tooltip:{ callbacks:{ afterLabel:(ctx)=>{ const d = K.days[ctx.dataIndex]; return d && d.ratio!==null ? 'تحقق: '+pct(d.ratio,1) : ''; } } } },
+      scales:{ x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ grid:{color:'#182338'}, beginAtZero:true } } } });
+  if(LB.std && LB.series.length){
+    const lab = LB.series.map(r=> an_dayLabel(r.date) + moonSuffix_(r.e));
+    mkChart('chPkLabor', { type:'line', data:{ labels:lab, datasets:[
+        { label:'نیروی ثبت‌شده در ایستگاه', data:LB.series.map(r=>r.effW===null?null:+(r.effW*100).toFixed(1)), borderColor:'#2fd9c4', backgroundColor:'#2fd9c4', borderWidth:2.5, pointRadius:3, tension:.25, spanGaps:true },
+        { label:'کل نیروی حاضر', data:LB.series.map(r=>r.effA===null?null:+(r.effA*100).toFixed(1)), borderColor:'#4c8dff', backgroundColor:'#4c8dff', borderWidth:2.5, pointRadius:3, tension:.25, spanGaps:true },
+        { label:'استاندارد ۱۰۰٪', data:LB.series.map(()=>100), borderColor:'#93a4c3', borderDash:[6,4], borderWidth:1.5, pointRadius:0, fill:false, noLabel:true }
+      ] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true } },
+        scales:{ x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ grid:{color:'#182338'}, title:{display:true, text:'٪ راندمان', color:'#7c8aa5', font:{size:10}} } } } });
+  }
+  if(OT.days.length){
+    mkChart('chPkOT', { type:'bar', data:{ labels:OT.days.map(d=>an_dayLabel(d.date)+(d.off?' 🌙':'')),
+        datasets:[
+          { label:'ساعات عادی', data:OT.days.map(d=>Math.round(d.regMH)), backgroundColor:'#4c8dff', borderRadius:3, maxBarThickness:28 },
+          { label:'اضافه‌کاری', data:OT.days.map(d=>Math.round(d.otMH)), backgroundColor:'#ff9d42', borderRadius:3, maxBarThickness:28 } ] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true } },
+        scales:{ x:{ stacked:true, grid:{display:false}, ticks:{font:{size:10}} }, y:{ stacked:true, grid:{color:'#182338'}, beginAtZero:true, title:{display:true, text:'نفر-ساعت', color:'#7c8aa5', font:{size:10}} } } } });
+  }
+  if(stl.length){
+    const top = stl.slice(0,12);
+    mkChart('chPkBal', { type:'bar', data:{ labels:top.map(x=>x.name),
+        datasets:[{ label:'سایکل به استاندارد (٪)', data:top.map(x=>Math.round(x.ratio*100)), backgroundColor:top.map(x=>pk_ratioColor_(x.ratio)), borderRadius:4, maxBarThickness:20 }] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } },
+        scales:{ x:{ grid:{color:'#182338'}, beginAtZero:true }, y:{ grid:{display:false}, ticks:{font:{size:11}} } } } });
+  }
+  if(SH.daysShip){
+    mkChart('chPkShip', { type:'line', data:{ labels:SH.series.map(r=>an_dayLabel(r.date)+moonSuffix_(r.e)),
+        datasets:[
+          { label:'تولید تجمعی', data:SH.series.map(r=>r.cumP), borderColor:'#2fd9c4', backgroundColor:'#2fd9c4', borderWidth:2.5, pointRadius:2, tension:.2 },
+          { label:'ارسال تجمعی', data:SH.series.map(r=>r.cumS), borderColor:'#4c8dff', backgroundColor:'#4c8dff', borderWidth:2.5, pointRadius:2, tension:.2 } ] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true } },
+        scales:{ x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ grid:{color:'#182338'}, beginAtZero:true } } } });
+  }
+  if(LS.days.length){
+    mkChart('chPkLoss', { type:'bar', data:{ labels:LS.days.map(d=>an_dayLabel(d)),
+        datasets:[
+          { label:'برنامه‌ریزی‌نشده', data:LS.days.map(d=>+(LS.byDay[d].u).toFixed(2)), backgroundColor:'#ff5d6c', borderRadius:3, maxBarThickness:28 },
+          { label:'برنامه‌ریزی‌شده', data:LS.days.map(d=>+(LS.byDay[d].p).toFixed(2)), backgroundColor:'#93a4c3', borderRadius:3, maxBarThickness:28 } ] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true } },
+        scales:{ x:{ stacked:true, grid:{display:false}, ticks:{font:{size:10}} }, y:{ stacked:true, grid:{color:'#182338'}, beginAtZero:true, title:{display:true, text:'ساعت', color:'#7c8aa5', font:{size:10}} } } } });
+  }
+  if(Q.prod>0 && M.waste.length){
+    mkChart('chPkQual', { type:'bar', data:{ labels:Q.days.map(d=>an_dayLabel(d)),
+        datasets:['scrap','rework','seg'].map(k=>({ label:PK_KIND[k].label, data:Q.days.map(d=>Q.byDay[d][k]), backgroundColor:PK_KIND[k].color, borderRadius:3, maxBarThickness:28 })) },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true } },
+        scales:{ x:{ stacked:true, grid:{display:false}, ticks:{font:{size:10}} }, y:{ stacked:true, grid:{color:'#182338'}, beginAtZero:true } } } });
+  }
+}
+
 function renderTargetProgress(){
   const M = monthData();
   const rows = [...M.daily].sort((a,b)=>dateSortKey(a.date)-dateSortKey(b.date));
