@@ -1490,7 +1490,101 @@ function normalizeAllDates_(){
       Object.keys(r).forEach(f=>{ if((f === 'date' || /Date$/.test(f)) && typeof r[f] === 'string'){ const n = normalizeJalaliDate_(r[f]); if(n !== r[f]) r[f] = n; } }); });
   });
 }
-async function loadAll(){ const r = await loadAllBody_(); normalizeAllDates_(); return r; }
+/* =========================================================================
+   تنظیمات «ماه‌به‌ماه» — برنامه‌ی محصولی، هدف خطوط، روزهای کاری، ساعت شیفت، تعداد نفر استاندارد و...
+   قبلاً همه‌ی این‌ها یک مقدار سراسری بود؛ با بارگذاری برنامه‌ی ماه بعد، همه‌ی ماه‌های قبل (درصد تحقق، نیروی لازم، نفر-ساعت) عوض می‌شد.
+   حالا هر ماه تنظیمات خودش را دارد (DB.meta.monthSettings[ماه]) و با عوض‌کردن ماه، تنظیمات همان ماه جایگزین می‌شود.
+   ========================================================================= */
+const MONTH_SETTING_KEYS_ = ['productMonthlyTargets','monthlyTarget','lineTarget','ckdTarget','se206Target','darpooshTarget','dieselTarget','workingDaysPerMonth','normalShiftHours','standardHeadcount','stageTargets','nominalCapacity'];
+const MONTH_CAP_SCALARS_ = ['reg','ot','staff','basis','extraHolidays'];
+function programSum_(t){ return Object.values(t || {}).reduce((s,v)=>s+(+v||0),0); }
+function monthSettingsStore_(){ return DB.meta.monthSettings || (DB.meta.monthSettings = {}); }
+function monthSettingsCapture_(){
+  const out = {};
+  MONTH_SETTING_KEYS_.forEach(k=>{ if(DB.meta[k] !== undefined) out[k] = JSON.parse(JSON.stringify(DB.meta[k])); });
+  const c = DB.meta.capCfg || {}; out.capCfg = {};
+  MONTH_CAP_SCALARS_.forEach(k=>{ if(c[k] !== undefined) out.capCfg[k] = JSON.parse(JSON.stringify(c[k])); });
+  return out;
+}
+function monthSettingsApply_(snap){
+  MONTH_SETTING_KEYS_.forEach(k=>{ if(snap[k] !== undefined) DB.meta[k] = JSON.parse(JSON.stringify(snap[k])); });
+  if(snap.capCfg){
+    const c = cap_cfg();
+    MONTH_CAP_SCALARS_.forEach(k=>{
+      if(snap.capCfg[k] !== undefined) c[k] = JSON.parse(JSON.stringify(snap.capCfg[k]));
+      else if(k !== 'basis') delete c[k];
+    });
+  }
+}
+// تا وقتی «ناسازگاری برنامه با پشتیبان» حل نشده، ذخیره‌ی خودکار نباید برنامه‌ی بازیابی‌شده‌ی ماه را با برنامه‌ی ماه دیگر بازنویسی کند
+function monthSettingsPending_(){
+  const am = DB.meta.activeMonth, cur = (DB.meta.monthSettings || {})[am];
+  return !!(cur && cur.fromBackup && programSum_(cur.productMonthlyTargets) !== programSum_(DB.meta.productMonthlyTargets));
+}
+function monthSettingsSnapshotActive_(){
+  const am = DB.meta.activeMonth; if(!am || monthSettingsPending_()) return;
+  const cur = monthSettingsStore_()[am];
+  monthSettingsStore_()[am] = Object.assign({ savedAt:Date.now() }, monthSettingsCapture_());
+}
+function setActiveMonth_(key){
+  const old = DB.meta.activeMonth;
+  if(!key || old === key) return;
+  monthSettingsSnapshotActive_();                         // تنظیمات ماه خروجی ذخیره می‌شود
+  DB.meta.activeMonth = key;
+  const store = monthSettingsStore_();
+  if(store[key]) monthSettingsApply_(store[key]);        // ماه سابقه دارد: تنظیمات خودش برمی‌گردد
+  else DB.meta.productMonthlyTargets = {};               // ماهِ بدون سابقه: برنامه‌ی محصولیِ ماه دیگر به آن نسبت داده نمی‌شود
+}
+// محاسبه‌ی چندماهه (روند، مقایسه با ماه قبل): موقتاً تنظیمات همان ماه را جایگزین می‌کند و بعد دقیقاً برمی‌گرداند
+function withMonthSettings_(mk, fn){
+  const snap = (DB.meta.monthSettings || {})[mk];
+  if(!mk || mk === DB.meta.activeMonth || !snap) return fn();
+  const live = monthSettingsCapture_();
+  monthSettingsApply_(snap);
+  try{ return fn(); } finally { monthSettingsApply_(live); }
+}
+function monthSettingsReconcile_(){
+  if(currentLineId !== 'thermostat') return;               // پشتیبان داخل فایل فقط برای خط ترموستات است
+  const store = monthSettingsStore_(), am = DB.meta.activeMonth;
+  const eb = (typeof EMBEDDED_BACKUP !== 'undefined' && EMBEDDED_BACKUP.meta) ? EMBEDDED_BACKUP.meta : null;
+  // برنامه‌ی اصلیِ ماهی که پشتیبان داخل فایل برایش گرفته شده، اگر هنوز نگه‌داشته نشده، به‌عنوان سابقه‌ی همان ماه ثبت می‌شود
+  if(eb && eb.activeMonth && !store[eb.activeMonth] && programSum_(eb.productMonthlyTargets) > 0){
+    const snap = {}; MONTH_SETTING_KEYS_.forEach(k=>{ if(eb[k] !== undefined) snap[k] = JSON.parse(JSON.stringify(eb[k])); });
+    snap.capCfg = {}; snap.fromBackup = true; snap.savedAt = Date.now();
+    store[eb.activeMonth] = snap;
+  }
+  if(!store[am]){ monthSettingsSnapshotActive_(); return; }
+  const snap = store[am];
+  if(!snap.fromBackup) return;
+  if(programSum_(snap.productMonthlyTargets) === programSum_(DB.meta.productMonthlyTargets)){ delete snap.fromBackup; return; }
+  if(currentSessionRole() === 'admin') monthSettingsAskConflict_();
+}
+function monthSettingsAskConflict_(){
+  const am = DB.meta.activeMonth, snap = DB.meta.monthSettings[am], root = document.getElementById('modalRoot'); if(!root) return;
+  const next = addMonths(am, 1), cnt = t => Object.keys(t || {}).length;
+  root.innerHTML = `<div class="modal-bg" id="msbg"><div class="modal">
+    <h3>⚠️ برنامه‌ی محصولی ماه‌ها با هم قاطی شده است</h3>
+    <p class="desc">برنامه‌ی محصولیِ ذخیره‌شده‌ی فعلی <b>${fmt(programSum_(DB.meta.productMonthlyTargets),0)}</b> قطعه (${cnt(DB.meta.productMonthlyTargets)} محصول) است، ولی برنامه‌ی اصلی ماه «${monthLabel(am)}» در پشتیبان داخل فایل <b>${fmt(programSum_(snap.productMonthlyTargets),0)}</b> قطعه (${cnt(snap.productMonthlyTargets)} محصول) بوده. معمولاً یعنی برنامه‌ی ماه بعد بارگذاری شده و جای برنامه‌ی همین ماه را گرفته. برنامه‌ی فعلی متعلق به کدام ماه است؟</p>
+    <div class="modal-actions" style="flex-wrap:wrap; gap:8px;">
+      <button class="btn btn-primary" id="ms_next">مال «${monthLabel(next)}» است — برنامه‌ی «${monthLabel(am)}» را از پشتیبان برگردان</button>
+      <button class="btn" id="ms_same">مال همین ماه («${monthLabel(am)}») است — همین را نگه‌دار</button>
+      <button class="btn btn-ghost" id="ms_later">بعداً</button>
+    </div></div></div>`;
+  document.getElementById('ms_later').addEventListener('click', ()=>{ root.innerHTML = ''; });
+  document.getElementById('ms_same').addEventListener('click', ()=>{
+    delete snap.fromBackup; monthSettingsSnapshotActive_(); scheduleSave(); root.innerHTML = ''; toast('برنامه‌ی فعلی برای «'+monthLabel(am)+'» ثبت شد.','ok'); goTo(currentTab);
+  });
+  document.getElementById('ms_next').addEventListener('click', ()=>{
+    const store = monthSettingsStore_();
+    store[next] = Object.assign({ savedAt:Date.now() }, monthSettingsCapture_());      // برنامه‌ی فعلی ← ماه بعد
+    if(!DB.meta.months) DB.meta.months = [];
+    if(!DB.meta.months.includes(next)) DB.meta.months.push(next);
+    delete snap.fromBackup; monthSettingsApply_(snap);                                   // برنامه‌ی ماه فعلی ← از پشتیبان
+    scheduleSave(); root.innerHTML = '';
+    toast('برنامه‌ی «'+monthLabel(am)+'» برگشت و برنامه‌ی فعلی برای «'+monthLabel(next)+'» نگه داشته شد.','ok'); goTo(currentTab);
+  });
+}
+async function loadAll(){ const r = await loadAllBody_(); normalizeAllDates_(); try{ monthSettingsReconcile_(); }catch(e){ console.error(e); } return r; }
 async function loadAllBody_(){
   setSync('busy','در حال بارگذاری از فضای ابری…');
   // این نشانه‌گذاری برای جلوگیری از یک باگ جدی است: قبلاً اگر درخواست به گوگل‌شیت با خطا مواجه می‌شد
@@ -1695,6 +1789,7 @@ function snapshotKnownCounts(){
   SHRINK_GUARDED_KEYS.forEach(([k])=>{ lastKnownCounts[k] = (DB[k]||[]).length; });
 }
 async function saveAll(silent, allowShrink){
+  try{ monthSettingsSnapshotActive_(); }catch(e){ console.error(e); }
   if(dataLoadFailed){
     // بارگذاری اولیه از گوگل‌شیت شما شکست خورده و آنچه الان در حافظه است ممکن است نسخهٔ قدیمی/پیش‌فرض
     // باشد، نه آخرین داده‌ی واقعی — پس اجازه نمی‌دهیم چیزی نوشته شود تا با یک رفرش موفق این وضعیت پاک شود.
@@ -2864,6 +2959,39 @@ function weekWorkingFactor_(weekIdx, monthKey){
 function totalMonthWorkingFactor_(monthKey){
   let sum = 0; for(let w=0; w<4; w++) sum += weekWorkingFactor_(w, monthKey); return sum || 1;
 }
+// برنامه‌ی محصولی همیشه برای «یک ماه مشخص» ذخیره می‌شود؛ بارگذاری برنامه‌ی ماه بعد هرگز برنامه‌ی ماه فعال را عوض نمی‌کند
+function applyProgramToMonth_(mk, targets){
+  if(mk === DB.meta.activeMonth){ DB.meta.productMonthlyTargets = targets; }
+  else {
+    const store = monthSettingsStore_(), cur = store[mk] || { savedAt:Date.now() };
+    cur.productMonthlyTargets = targets; delete cur.fromBackup; store[mk] = cur;
+    if(!DB.meta.months) DB.meta.months = [];
+    if(!DB.meta.months.includes(mk)) DB.meta.months.push(mk);
+  }
+  scheduleSave();
+}
+function askProgramMonth_(targets, n){
+  const root = document.getElementById('modalRoot');
+  const months = allMonthKeys(), am = DB.meta.activeMonth;
+  const nextM = months.length ? addMonths(months[0], 1) : null;
+  const list = (nextM && !months.includes(nextM)) ? [nextM, ...months] : months;
+  const total = programSum_(targets);
+  const has = mk => programSum_(mk === am ? DB.meta.productMonthlyTargets : ((DB.meta.monthSettings||{})[mk]||{}).productMonthlyTargets) > 0;
+  root.innerHTML = `<div class="modal-bg" id="pmbg"><div class="modal">
+    <h3>📅 این برنامه برای کدام ماه است؟</h3>
+    <p class="desc">${fmt(n,0)} محصول، جمعاً <b>${fmt(total,0)}</b> قطعه. برنامه فقط برای همان ماهی که انتخاب می‌کنید ذخیره می‌شود و برنامه‌ی ماه‌های دیگر دست‌نخورده می‌ماند.</p>
+    <div class="field"><label>ماه برنامه</label><select id="pm_month">${list.map(mk=>`<option value="${mk}" ${mk===am?'selected':''}>${monthLabel(mk)}${mk===am?' (ماه فعال)':''}${has(mk)?' — برنامه‌ی قبلی دارد، جایگزین می‌شود':''}</option>`).join('')}</select></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="pm_cancel">انصراف</button><button class="btn btn-primary" id="pm_ok">ذخیره‌ی برنامه</button></div>
+  </div></div>`;
+  document.getElementById('pm_cancel').addEventListener('click', ()=>{ root.innerHTML = ''; });
+  document.getElementById('pmbg').addEventListener('click', e=>{ if(e.target.id==='pmbg') root.innerHTML = ''; });
+  document.getElementById('pm_ok').addEventListener('click', ()=>{
+    const mk = document.getElementById('pm_month').value;
+    applyProgramToMonth_(mk, targets); root.innerHTML = '';
+    toast('برنامه تولید ('+n+' محصول) برای «'+monthLabel(mk)+'» ذخیره شد.','ok');
+    renderShipMerged();
+  });
+}
 function handleProductPlanUpload_(file){
   if(typeof XLSX === 'undefined'){ toast('کتابخانه خواندن اکسل هنوز بارگذاری نشده — چند ثانیه صبر کنید و دوباره امتحان کنید.','err'); return; }
   const reader = new FileReader();
@@ -2882,10 +3010,7 @@ function handleProductPlanUpload_(file){
       });
       const n = Object.keys(targets).length;
       if(!n){ toast('هیچ ردیف معتبری در فایل پیدا نشد — ساختار فایل باید ۳ ستون باشد: تعداد برنامه، دما/نوع، نام محصول.','err'); return; }
-      DB.meta.productMonthlyTargets = targets;
-      scheduleSave();
-      toast('برنامه تولید (' + n + ' محصول) با موفقیت بارگذاری شد.','ok');
-      renderShipMerged();
+      askProgramMonth_(targets, n);
     }catch(err){ toast('خواندن فایل اکسل ناموفق بود.','err'); console.error(err); }
   };
   reader.readAsArrayBuffer(file);
@@ -4943,7 +5068,8 @@ function an_manHours(M){
 }
 
 /* ---------- خلاصه‌ی ماهانه برای روند ---------- */
-function an_monthSummary(mk){
+function an_monthSummary(mk){ return withMonthSettings_(mk, ()=>an_monthSummaryBody_(mk)); }
+function an_monthSummaryBody_(mk){
   const Mm = an_monthM(mk);
   const rows = Mm.daily.filter(an_dayHasData);
   const prodAll = rows.reduce((s,e)=>s+allLinesTotal(e), 0);
@@ -6053,6 +6179,7 @@ function an_planOf(mk){
   const mp = an_monthPlans()[mk];
   if(mp && +mp.plan > 0) return +mp.plan;
   if(mk === DB.meta.activeMonth){ const t = productMonthlyTargetSum_(); if(t > 0) return t; }
+  else { const snap = (DB.meta.monthSettings || {})[mk]; const t = snap ? programSum_(snap.productMonthlyTargets) : 0; if(t > 0) return t; }   // برنامه‌ی محصولیِ همان ماه
   return null;
 }
 function an_yearRows(){
@@ -7752,7 +7879,7 @@ function pk_ot_(M){
 }
 function pk_prevOT_(){
   const keys = allMonthKeys(), i = keys.indexOf(DB.meta.activeMonth);
-  for(let j=i+1; j<keys.length; j++){ const r = pk_ot_(an_monthM(keys[j])); if(r.days.length) return { key:keys[j], share:r.share }; }
+  for(let j=i+1; j<keys.length; j++){ const r = withMonthSettings_(keys[j], ()=>pk_ot_(an_monthM(keys[j]))); if(r.days.length) return { key:keys[j], share:r.share }; }
   return null;
 }
 /* ---------- شاخص ۳: تراز خط (سایکل ایستگاه به استاندارد) ---------- */
@@ -8997,9 +9124,9 @@ function renderMonthBar(){
 }
 function bindMonthBar(afterChangeCb){
   const sel = document.getElementById('monthBarSelect');
-  if(sel) sel.addEventListener('change', ()=>{ DB.meta.activeMonth = sel.value; scheduleSave(); (afterChangeCb||(()=>goTo(currentTab)))(); });
+  if(sel) sel.addEventListener('change', ()=>{ setActiveMonth_(sel.value); scheduleSave(); (afterChangeCb||(()=>goTo(currentTab)))(); });
   const back = document.getElementById('backToLatestMonthBtn');
-  if(back) back.addEventListener('click', ()=>{ const months = allMonthKeys(); DB.meta.activeMonth = months[0]; scheduleSave(); (afterChangeCb||(()=>goTo(currentTab)))(); });
+  if(back) back.addEventListener('click', ()=>{ const months = allMonthKeys(); setActiveMonth_(months[0]); scheduleSave(); (afterChangeCb||(()=>goTo(currentTab)))(); });
   const nb = document.getElementById('newMonthBtn');
   if(nb) nb.addEventListener('click', openNewMonthModal);
 }
@@ -9028,7 +9155,7 @@ function openNewMonthModal(){
     const key = parts[0] + '/' + String(parseInt(parts[1],10)).padStart(2,'0');
     if(!DB.meta.months) DB.meta.months = [];
     if(!DB.meta.months.includes(key)) DB.meta.months.push(key);
-    DB.meta.activeMonth = key;
+    setActiveMonth_(key);
     DB.meta.periodLabel = monthLabel(key);
     scheduleSave();
     root.innerHTML = '';
