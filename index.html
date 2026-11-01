@@ -8068,6 +8068,102 @@ function pk_dq_(M){
   issues.sort((a,b)=>sevOrder[a.sev]-sevOrder[b.sev] || b.count-a.count);
   return issues;
 }
+/* =========================================================================
+   خروجی برای Power BI — یک فایل اکسل مرتب (فرمت «بلند») با همه‌ی جدول‌ها و ستون‌های آماده
+   هدف هر ردیف و زیان توقف با تنظیمات «همان ماه» حساب می‌شود (مثل خود داشبورد).
+   ========================================================================= */
+const PBI_LINE_NAMES_ = { line1:'خط ۱ (پراید)', line2:'خط ۲ (پراید)', line3:'خط ۳', line4:'خط ۴', ckd:'CKD', se206:'سه‌راهی ۲۰۶', darpoosh:'درپوش', diesel:'دیزل/بنز' };
+function pbiTables_(){
+  const T = {};
+  const mk = d => monthKeyOf(d);
+  const tsIso = t => t ? new Date(t).toISOString().replace('T',' ').slice(0,16) : null;
+  const num_ = v => (v === null || v === undefined || v === '' || isNaN(+v)) ? null : +v;
+  // ---- ابعاد
+  T.Lines = Object.keys(PBI_LINE_NAMES_).map(k=>({ Line:k, LineName:PBI_LINE_NAMES_[k], Group: stopGroup_(PBI_LINE_NAMES_[k]) === 'main' ? 'اصلی' : PBI_LINE_NAMES_[k] }));
+  // ---- تولید روزانه (فرمت بلند، ۸ ردیف در هر روز) با هدف همان ماه
+  const tgCache = {}, nhCache = {};
+  const lineTarget = (m,k) => { const c = m+'|'+k; if(tgCache[c] === undefined) tgCache[c] = withMonthSettings_(m, ()=>pk_lineTarget_(k)); return tgCache[c]; };
+  const normalHrs = m => { if(nhCache[m] === undefined) nhCache[m] = withMonthSettings_(m, ()=>(DB.meta.normalShiftHours || 10)); return nhCache[m]; };
+  T.Production = [];
+  (DB.daily || []).slice().sort((a,b)=>dateSortKey(a.date)-dateSortKey(b.date)).forEach(e=>{
+    const m = mk(e.date), nh = normalHrs(m);
+    ALL_LINE_KEYS.forEach(k=>{
+      const L = (e.lines || {})[k] || {}, rec = L.status === 'stop' || (L.status === 'run' && L.qty !== null && L.qty !== undefined);
+      const t = lineTarget(m, k), f = (e.shiftHours || nh) / nh;
+      T.Production.push({ Date:e.date, YearMonth:m, Day:e.day || null, Headcount:num_(e.headcount), ShiftHours:num_(e.shiftHours), Line:k, LineName:PBI_LINE_NAMES_[k],
+        Status:L.status || null, Qty: rec ? (L.qty || 0) : null, Recorded: rec ? 1 : 0, Target: (rec && t > 0) ? Math.round(t*f*100)/100 : null });
+    });
+  });
+  // ---- ارسال به انبار
+  T.Shipping = [];
+  (DB.daily || []).forEach(e=>Object.keys(e.ship || {}).forEach(k=>{ const q = num_(e.ship[k]); if(q !== null) T.Shipping.push({ Date:e.date, YearMonth:mk(e.date), ShipItem:k, Qty:q }); }));
+  // ---- توقفات (با زیان تولید خام و سقف‌دار داشبورد)
+  const F = stopLossFactors_();
+  T.Stops = (DB.stop || []).map(x=>({ Id:x.id, Date:x.date, YearMonth:mk(x.date), Station:x.station || null, Reason:x.reason || null, Hours:num_(x.hours), Planned:x.planned === true,
+    Group:stopGroup_(x.station), RatePerHour: Math.round(resolveStationRate(x.station)*10)/10, LostQtyRaw:Math.round(stopLossRawOf_(x)), LostQtyCapped:Math.round(stopLossOf_(x, F)),
+    Description:x.description || null, StartTime:x.startTime || null, EndTime:x.endTime || null }));
+  // ---- ضایعات / دوباره‌کاری / جداسازی
+  T.Waste = (DB.waste || []).map(x=>({ Id:x.id, Date:x.date, YearMonth:mk(x.date), Station:x.station || null, Part:x.part || null, Operator:x.operator || null, Produced:num_(x.produced),
+    WasteType:x.wasteType || null, WasteCount:num_(x.wasteCount), Category:x.category || null, EventType:x.eventType || null, FinalProduct:x.finalProduct || null,
+    ReworkMinutes:num_(x.reworkMinutes), ExtraHours: num_(x.reworkMinutes) === null ? null : x.reworkMinutes/60, Kind:wasteKindLabel_(x) }));
+  // ---- کسری قطعات
+  T.Shortages = (DB.short || []).map(x=>({ Id:x.id, Date:x.date, YearMonth:mk(x.date), Part:x.part || null, Description:x.description || null, Status:x.status || null, Qty:num_(x.qty) }));
+  // ---- ایستگاه‌ها و آمار ساعتی
+  const stName = {}; (DB.meta.stations || []).forEach(s=>{ stName[s.id] = s.name; });
+  T.Stations = (DB.meta.stations || []).map(s=>({ StationId:s.id, StationName:s.name, HourlyStandard:num_(s.hourlyStandard), DailyTarget:num_(s.dailyTarget) }));
+  T.StationHourly = (DB.stationHourly || []).map(r=>{
+    const h = an_recHours(r), ops = an_opsOf(r).length;
+    return { Id:r.id, Date:r.date, YearMonth:mk(r.date), StationId:r.stationId, StationName:stName[r.stationId] || null, Total:num_(r.total), Target:num_(r.target), Operator:r.operator || null,
+      ShiftStart:r.shiftStart || null, ShiftEnd:r.shiftEnd || null, Product:r.product || null, Hours:h ? Math.round(h*100)/100 : null, Operators:ops, ManHours:h ? Math.round(h*ops*100)/100 : null };
+  });
+  // ---- برنامه‌ها و هدف‌ها
+  T.ProductPlan = []; const store = DB.meta.monthSettings || {}, am = DB.meta.activeMonth;
+  Object.keys(store).forEach(m=>{ const t = (store[m] || {}).productMonthlyTargets || {}; Object.keys(t).forEach(p=>T.ProductPlan.push({ Month:m, Product:p, Plan:num_(t[p]) })); });
+  if(am && !store[am]) Object.keys(DB.meta.productMonthlyTargets || {}).forEach(p=>T.ProductPlan.push({ Month:am, Product:p, Plan:num_(DB.meta.productMonthlyTargets[p]) }));
+  T.MonthlyPlan = Object.keys(DB.meta.monthPlans || {}).sort().map(m=>({ Month:m, Plan:num_((DB.meta.monthPlans[m] || {}).plan) }));
+  T.Targets = ALL_LINE_KEYS.map(k=>({ Line:k, LineName:PBI_LINE_NAMES_[k], Target:num_(pk_lineTarget_(k)), NormalShiftHours:DB.meta.normalShiftHours || 10 }));
+  // ---- مرکز اقدام
+  T.Actions = (DB.actions || []).map(a=>({ Id:a.id, Title:a.title || null, Dept:a.dept || null, Status:a.status || null, SourceType:a.sourceType || null, Month:a.month || mk(a.createdDate || a.etaDate || ''),
+    AnnouncedAt:tsIso(a.announcedTs), CreatedAt:tsIso(a.createdTs), EtaDate:a.etaDate || null, EtaTime:a.etaTime || null, ResolvedAt:tsIso(a.resolvedTs),
+    ReactionHours: (a.announcedTs && a.createdTs && a.createdTs >= a.announcedTs) ? Math.round((a.createdTs-a.announcedTs)/36e5*100)/100 : null,
+    CloseHours: (a.announcedTs && a.resolvedTs && a.resolvedTs >= a.announcedTs) ? Math.round((a.resolvedTs-a.announcedTs)/36e5*100)/100 : null,
+    IsOpen: (a.status !== 'انجام‌شده' && a.status !== 'لغو شده') }));
+  // ---- تقویم شمسی ↔ میلادی (با «روز تعطیل» طبق خود داشبورد)
+  const MN = ['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+  const WD = ['یکشنبه','دوشنبه','سه‌شنبه','چهارشنبه','پنجشنبه','جمعه','شنبه'];   // getDay(): 0 = یکشنبه
+  const years = new Set(); [].concat(DB.daily || [], DB.stop || [], DB.waste || [], DB.short || [], DB.stationHourly || []).forEach(e=>{ const y = +String(e.date).slice(0,4); if(y > 1300) years.add(y); });
+  const y0 = (years.size ? Math.min(...years) : 1404), y1 = (years.size ? Math.max(...years) : 1405) + 1;
+  T.Calendar = [];
+  for(let y = y0; y <= y1; y++) for(let m = 1; m <= 12; m++){
+    const dim = m <= 6 ? 31 : (m <= 11 ? 30 : 29 + (isJalaliLeap_(y) ? 1 : 0));
+    for(let d = 1; d <= dim; d++){
+      const js = y+'/'+String(m).padStart(2,'0')+'/'+String(d).padStart(2,'0'), g = jalaliToGregorian(y, m, d), dt = new Date(Date.UTC(g[0], g[1]-1, g[2])), gd = dt.getUTCDay();
+      let hol = null; try{ hol = cap_holidayOf(js); }catch(e){}
+      T.Calendar.push({ JalaliDate:js, GregorianDate:dt, JalaliYear:y, JalaliMonth:m, JalaliMonthName:MN[m-1], JalaliDay:d, WeekdayFa:WD[gd], WeekdayNo:((gd+1)%7)+1,
+        IsThuFri:(gd === 4 || gd === 5) ? 1 : 0, IsOffDay:cap_isOff(js) ? 1 : 0, HolidayName: hol ? String(hol) : null, YearMonth:y+'/'+String(m).padStart(2,'0') });
+    }
+  }
+  return T;
+}
+function isJalaliLeap_(y){ return [1, 5, 9, 13, 17, 22, 26, 30].includes(((y % 33) + 33) % 33); }
+function pbiBuildWorkbook_(){
+  const T = pbiTables_(), wb = XLSX.utils.book_new();
+  Object.keys(T).forEach(name=>{
+    const rows = T[name], cols = rows.length ? Object.keys(rows[0]) : [];
+    const ws = XLSX.utils.json_to_sheet(rows, { header: cols, cellDates: true });
+    ws['!cols'] = cols.map(c=>({ wch: Math.min(Math.max(c.length + 2, 11), 34) }));
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  });
+  return { wb, T };
+}
+function exportPowerBi_(){
+  ensureXLSX_().then(()=>{
+    const { wb, T } = pbiBuildWorkbook_();
+    const stamp = acTsToJ_(Date.now()).date.replace(/\//g,'-');
+    XLSX.writeFile(wb, 'ParsNikan_PowerBI_' + stamp + '.xlsx', { cellDates:true });
+    toast('فایل Power BI ساخته شد: ' + Object.keys(T).length + ' جدول، ' + fmt(T.Production.length,0) + ' ردیف تولید.', 'ok');
+  }).catch(e=>{ console.error(e); toast('ساخت فایل ناموفق بود: ' + (e && e.message ? e.message : 'کتابخانه اکسل بارگذاری نشد — اینترنت را بررسی کنید.'), 'err'); });
+}
 function pk_color_(r){ return r===null||r===undefined ? '#93a4c3' : (r>=1 ? '#2fd9c4' : (r>=0.9 ? '#ffcf5c' : '#ff5d6c')); }
 function renderProdKpi(){
   const M = monthData();
@@ -8287,7 +8383,7 @@ function renderProdKpi(){
     <div class="table-wrap"><table><thead><tr><th>اهمیت</th><th>مورد</th><th class="num">تعداد</th><th>توضیح / مثال</th><th></th></tr></thead><tbody>${DQ.map(i=>`<tr><td>${sevChip(i.sev)}</td><td><b>${i.title}</b></td><td class="num">${fmt(i.count,0)}</td><td class="hint" style="line-height:1.8; min-width:240px;">${esc(i.detail)}</td><td>${i.go?`<button class="btn btn-ghost btn-sm" data-pkgo="${i.go}">برو ←</button>`:''}</td></tr>`).join('')}</tbody></table></div></div>`
     : `<div class="card"><h3>🛡 کنترل کیفیت ورودی‌ها</h3><div class="tbl-empty">موردی برای بازبینی پیدا نشد.</div></div>`;
   const pkNav = [['plan','تحقق برنامه'],['labor','راندمان نیرو'],['qual','کیفیت'],['loss','توقف و کسری'],['ot','اضافه‌کاری'],['bal','تراز خط'],['ship','ارسال'],['fr','پاسخ سریع'],['dq','کنترل داده']]
-    .map(x=>`<button class="btn btn-ghost btn-sm" data-pk="${x[0]}">${x[1]}</button>`).join('');
+    .map(x=>`<button class="btn btn-ghost btn-sm" data-pk="${x[0]}">${x[1]}</button>`).join('') + `<button class="btn btn-primary btn-sm" id="pkPbi" title="همه‌ی داده‌ها را به‌صورت جدول‌های مرتب در یک فایل اکسل برای Power BI می‌سازد" style="margin-inline-start:auto;">📊 خروجی برای Power BI</button>`;
   view.innerHTML = renderMonthBar() + `
   <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px;">${pkNav}</div>
   <div id="pk-sec-plan"></div>
@@ -8306,6 +8402,7 @@ function renderProdKpi(){
     </table></div>
   </div>${pk_links_('plan')}<div id="pk-sec-labor"></div>${laborHtml}${pk_links_('labor')}<div id="pk-sec-qual"></div>${qualityHtml}${pk_links_('qual')}<div id="pk-sec-loss"></div>${lossHtml}${pk_links_('loss')}<div id="pk-sec-ot"></div>${otHtml}${pk_links_('ot')}<div id="pk-sec-bal"></div>${balHtml}${pk_links_('bal')}<div id="pk-sec-ship"></div>${shipHtml}${pk_links_('ship')}<div id="pk-sec-fr"></div>${frHtml}${pk_links_('fr')}<div id="pk-sec-dq"></div>${dqHtml}`;
   bindMonthBar();
+  const pbiBtn = document.getElementById('pkPbi'); if(pbiBtn) pbiBtn.addEventListener('click', exportPowerBi_);
   view.querySelectorAll('[data-pkgo]').forEach(b=>b.addEventListener('click', ()=>goTo(b.dataset.pkgo)));
   view.querySelectorAll('[data-pk]').forEach(b=>b.addEventListener('click', ()=>{ const el=document.getElementById('pk-sec-'+b.dataset.pk); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }));
   if(LB.std && LB.series.length){
