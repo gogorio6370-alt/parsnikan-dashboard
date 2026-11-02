@@ -3944,6 +3944,8 @@ function renderStopBody_(){
     <div class="card"><h3>تحلیل پارتو توقفات به تفکیک علت (ساعت)</h3><div class="chart-box"><canvas id="chStopReason"></canvas></div></div>
   </div>
 
+  ${supplyCardHtml_()}
+
   <div class="card" style="margin-bottom:16px;">
     <h3>توزیع توقفات بر اساس ساعت روز</h3>
     ${stopsWithClock.length? `<div class="chart-box"><canvas id="chStopHourly"></canvas></div>
@@ -3985,6 +3987,7 @@ function renderStopBody_(){
     </table></div>
   </div>`;
   bindMonthBar(()=>renderStop());
+  supplyBind_();
   wireSyncBtn('syncBtn_stop');
   wireSyncBtn('syncBtn_stop');
 
@@ -4049,6 +4052,7 @@ function renderStopBody_(){
 
   paretoChart('chStopStation', stationPareto, '#ff9d42');
   paretoChart('chStopReason', reasonPareto, '#b389ff');
+  supplyChart_();
   if(stopsWithClock.length){
     const maxHours = Math.max(...hourBuckets.map(b=>b.hours));
     mkChart('chStopHourly', { type:'bar', data:{ labels: hourBuckets.map((_,h)=>String(h).padStart(2,'0')+':00'),
@@ -8101,7 +8105,8 @@ function pbiTables_(){
   const F = stopLossFactors_();
   T.Stops = (DB.stop || []).map(x=>({ Id:x.id, Date:x.date, YearMonth:mk(x.date), Station:x.station || null, Reason:x.reason || null, Hours:num_(x.hours), Planned:x.planned === true,
     Group:stopGroup_(x.station), RatePerHour: Math.round(resolveStationRate(x.station)*10)/10, LostQtyRaw:Math.round(stopLossRawOf_(x)), LostQtyCapped:Math.round(stopLossOf_(x, F)),
-    Description:x.description || null, StartTime:x.startTime || null, EndTime:x.endTime || null }));
+    Description:x.description || null, StartTime:x.startTime || null, EndTime:x.endTime || null,
+    IsSupply: supplyClassify_(x) ? 1 : 0, SupplyParts: (supplyClassify_(x) || { parts:[] }).parts.join(' + ') || null }));
   // ---- ضایعات / دوباره‌کاری / جداسازی
   T.Waste = (DB.waste || []).map(x=>({ Id:x.id, Date:x.date, YearMonth:mk(x.date), Station:x.station || null, Part:x.part || null, Operator:x.operator || null, Produced:num_(x.produced),
     WasteType:x.wasteType || null, WasteCount:num_(x.wasteCount), Category:x.category || null, EventType:x.eventType || null, FinalProduct:x.finalProduct || null,
@@ -8163,6 +8168,163 @@ function exportPowerBi_(){
     XLSX.writeFile(wb, 'ParsNikan_PowerBI_' + stamp + '.xlsx', { cellDates:true });
     toast('فایل Power BI ساخته شد: ' + Object.keys(T).length + ' جدول، ' + fmt(T.Production.length,0) + ' ردیف تولید.', 'ok');
   }).catch(e=>{ console.error(e); toast('ساخت فایل ناموفق بود: ' + (e && e.message ? e.message : 'کتابخانه اکسل بارگذاری نشد — اینترنت را بررسی کنید.'), 'err'); });
+}
+/* =========================================================================
+   پارتوی توقف ناشی از «عدم تأمین» به‌تفکیک قطعه
+   نام قطعه از «توضیح» توقف خوانده می‌شود؛ نام‌های مختلف یک قطعه (نبود قرص / قرص / عدم تامین قرص / قرص+دریچه…) با کلمه‌های کلیدیِ
+   هر گروه یکی می‌شوند. گروه‌ها در تنظیمات قابل‌ویرایش‌اند (DB.meta.supplyPartGroups).
+   ========================================================================= */
+const SUPPLY_UNKNOWN_ = 'نامشخص (نام قطعه ثبت نشده)';
+const SUPPLY_DEFAULT_GROUPS_ = [
+  { name:'قرص', keys:['قرص'] }, { name:'سیلندر', keys:['سیلندر'] }, { name:'کلاهک', keys:['کلاهی','کلاهک'] },
+  { name:'پایه ترموستات', keys:['پایه'] }, { name:'درپوش', keys:['درپوش','درپوش سه راهی'] }, { name:'سه‌راهی آب بغل', keys:['سه راهی'] },
+  { name:'بوش فلزی', keys:['بوش فلزی','بوش'] }, { name:'پین', keys:['پین'] }, { name:'دریچه', keys:['دریچه'] },
+  { name:'پولکی بای‌پس', keys:['پولکی'] }, { name:'منگوله', keys:['منگوله'] }, { name:'بدنه CKD', keys:['بدنه'] }, { name:'فنر', keys:['فنر'] }
+];
+function supplyNorm_(t){
+  return String(t == null ? '' : t).replace(/[يى]/g,'ی').replace(/ك/g,'ک').replace(/[ۀة]/g,'ه')
+    .replace(/[\u200c\u200e\u200f\s]+/g,'').replace(/[()（）\[\]\-–—_.:؛]/g,'').toLowerCase();
+}
+function supplyGroups_(){ const g = DB.meta.supplyPartGroups; return (Array.isArray(g) && g.length) ? g : SUPPLY_DEFAULT_GROUPS_; }
+function supplyMatch_(text){                       // طولانی‌ترین کلمه‌ی کلیدی برنده است
+  const n = supplyNorm_(text); if(!n) return null;
+  let best = null, bl = 0;
+  supplyGroups_().forEach(g=>(g.keys || []).forEach(k=>{ const nk = supplyNorm_(k); if(nk && n.includes(nk) && nk.length > bl){ best = g.name; bl = nk.length; } }));
+  return best;
+}
+function supplyTokens_(desc){ return String(desc || '').split(/[+|،,؛;\/\n]| و /).map(t=>t.trim()).filter(Boolean); }
+const SUPPLY_REASON_RE_ = /^(عدمتامین|عدمتأمین|تامین|تأمین|کمبود|نبود|نرسیدن|نداشتنقطعه|عدمموجودی)/;
+const SUPPLY_REASON_EXC_ = /(نیرو|تنظیم|کیفی|باد)/;
+const SUPPLY_CUE_RE_ = /(عدمتامین|عدمتأمین|کمبود|نبود|نرسیدن)/;
+const SUPPLY_SUSPECT_RE_ = /(خرابی|روغن|نشت|قالب|تعمیر)/;
+// {via:'reason'|'desc', parts:[...], suspect:bool} یا null (توقف تأمینی نیست)
+function supplyClassify_(x){
+  if(!x || x.planned === true) return null;
+  const r = supplyNorm_(x.reason), toks = supplyTokens_(x.description);
+  if(SUPPLY_REASON_RE_.test(r) && !SUPPLY_REASON_EXC_.test(r)){
+    const parts = []; let suspect = false;
+    toks.forEach(t=>{ const g = supplyMatch_(t); if(g){ if(!parts.includes(g)) parts.push(g); if(SUPPLY_SUSPECT_RE_.test(supplyNorm_(t))) suspect = true; } });
+    if(!parts.length){ const g = supplyMatch_(x.reason); if(g) parts.push(g); }   // مثل علت «نبودسیلندر»
+    return { via:'reason', parts: parts.length ? parts : [SUPPLY_UNKNOWN_], suspect };
+  }
+  // علت دیگری ثبت شده، ولی خودِ توضیح «نبود/عدم تامین <قطعه>» می‌گوید
+  const parts = [];
+  toks.forEach(t=>{ if(SUPPLY_CUE_RE_.test(supplyNorm_(t))){ const g = supplyMatch_(t); if(g && !parts.includes(g)) parts.push(g); } });
+  return parts.length ? { via:'desc', parts, suspect:false } : null;
+}
+function supplyStopsOfScope_(scope){ return scope === 'all' ? (DB.stop || []) : (monthData().stop || []); }
+function supplyAnalyze_(stops){
+  const F = stopLossFactors_(), G = {}, unm = {};
+  let total = 0, unplanned = 0, events = 0, viaDesc = 0, multi = 0;
+  stops.forEach(x=>{
+    if(x.planned === true) return;
+    const h = +x.hours || 0; unplanned += h;     // مقدار غیرعددی یا خالی = ۰
+    const c = supplyClassify_(x); if(!c) return;
+    total += h; events++; if(c.via === 'desc') viaDesc += h; if(c.parts.length > 1) multi++;
+    const lost = stopLossOf_(x, F), raw = String(x.description || '').trim() || '(بدون توضیح)';
+    c.parts.forEach(pn=>{
+      const g = G[pn] || (G[pn] = { name:pn, hours:0, events:0, lost:0, suspect:0, variants:{}, last:'' });
+      g.hours += h / c.parts.length; g.events++; g.lost += lost / c.parts.length; if(c.suspect) g.suspect += h / c.parts.length;
+      g.variants[raw] = (g.variants[raw] || 0) + 1; if(!g.last || dateSortKey(x.date) > dateSortKey(g.last)) g.last = x.date;
+    });
+    if(c.parts.length === 1 && c.parts[0] === SUPPLY_UNKNOWN_){ const k = raw; const u = unm[k] || (unm[k] = { text:raw, hours:0, events:0 }); u.hours += h; u.events++; }
+  });
+  const rows = Object.values(G).sort((a,b)=>b.hours - a.hours);
+  let cum = 0; rows.forEach(r=>{ cum += r.hours; r.share = total > 0 ? r.hours/total : null; r.cum = total > 0 ? cum/total : null; });
+  const unknown = G[SUPPLY_UNKNOWN_] ? G[SUPPLY_UNKNOWN_].hours : 0;
+  return { rows, total, events, unplanned, viaDesc, multi, unknown, unmatched: Object.values(unm).sort((a,b)=>b.hours - a.hours),
+    lost: rows.reduce((a,r)=>a + r.lost, 0), shareOfUnplanned: unplanned > 0 ? total/unplanned : null };
+}
+function supplyCardHtml_(){
+  const scope = filters.supplyScope === 'all' ? 'all' : 'month';
+  const A = supplyAnalyze_(supplyStopsOfScope_(scope));
+  const btn = (k, lbl) => `<button class="btn btn-sm ${scope===k?'btn-primary':'btn-ghost'}" data-supply-scope="${k}">${lbl}</button>`;
+  const head = `<div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; align-items:center;">${btn('month','این ماه ('+monthLabel(DB.meta.activeMonth)+')')}${btn('all','همه‌ی ماه‌ها')}<button class="btn btn-ghost btn-sm" id="supplyEdit" style="margin-inline-start:auto;">⚙️ گروه‌بندی قطعات و نام‌های مترادف</button></div>`;
+  if(!A.events){
+    return `<div class="card" style="margin-bottom:16px;"><h3>🧩 پارتوی توقف ناشی از عدم تأمین — به‌تفکیک قطعه</h3>${head}<div class="tbl-empty">در این بازه توقفی با علت «عدم تأمین/نبود قطعه» ثبت نشده است.</div></div>`;
+  }
+  const top = A.rows[0];
+  const rowsHtml = A.rows.map((r,i)=>{
+    const vs = Object.entries(r.variants).sort((a,b)=>b[1]-a[1]), shown = vs.slice(0,5).map(([t,n])=>`${esc(t)}${n>1?' ×'+n:''}`).join(' · ') + (vs.length > 5 ? ` … (+${vs.length-5})` : '');
+    return `<tr><td>${i+1}</td><td><b>${esc(r.name)}</b></td><td class="num">${fmt(r.hours,1)}</td><td class="num">${pct(r.share,1)}</td><td class="num">${pct(r.cum,0)}</td>
+      <td class="num">${fmt(r.events,0)}</td><td class="num">${fmt(r.hours/Math.max(r.events,1),1)}</td><td class="num">${r.lost>0?fmt(r.lost,0):'—'}</td>
+      <td class="hint" style="min-width:240px; line-height:1.8;">${shown}</td><td class="num">${r.suspect>0?'<span style="color:#ffcf5c;">'+fmt(r.suspect,1)+'</span>':'—'}</td></tr>`;
+  }).join('');
+  const notes = [];
+  if(A.viaDesc > 0) notes.push(`${fmt(A.viaDesc,1)} ساعت با علت دیگری ثبت شده بود ولی توضیحش «نبود/عدم تأمین …» می‌گفت و اینجا شمرده شد.`);
+  if(A.multi) notes.push(`${fmt(A.multi,0)} رویداد چندقطعه‌ای (مثل «قرص + دریچه») ساعتشان مساوی بین قطعه‌ها تقسیم شده است.`);
+  if(A.unknown > 0) notes.push(`${fmt(A.unknown,1)} ساعت (${pct(A.unknown/A.total,0)}) نام قطعه ندارد؛ در «گروه‌بندی قطعات» می‌توانید متن‌های ثبت‌شده را به قطعه وصل کنید، یا در ثبت توقف، نام قطعه را در «توضیح» بنویسید.`);
+  const sus = A.rows.reduce((a,r)=>a + r.suspect, 0);
+  if(sus > 0) notes.push(`${fmt(sus,1)} ساعت توضیحی مثل «خرابی/روغن/قالب» دارد (ستون «مشکوک به خرابی»)؛ ممکن است علتش تأمین نبوده و خرابی دستگاه باشد.`);
+  return `<div class="card" style="margin-bottom:16px;">
+    <h3>🧩 پارتوی توقف ناشی از عدم تأمین — به‌تفکیک قطعه <span class="muted">مبنا: توقف‌های برنامه‌ریزی‌نشده با علت «عدم تأمین/نبود…»؛ نام قطعه از «توضیح» خوانده و نام‌های مترادف یکی می‌شود</span></h3>
+    ${head}
+    <div class="grid grid-4" style="margin-bottom:14px;">
+      ${kpiCard('توقف ناشی از عدم تأمین','ساعت', fmt(A.total,1), null, '#ff5d6c', false, null)}
+      ${kpiCard('سهم از کل توقف برنامه‌ریزی‌نشده','', A.shareOfUnplanned===null?'—':pct(A.shareOfUnplanned,0), null, '#ff9d42', false, null)}
+      ${kpiCard('قطعه‌ی اول پارتو','', esc(top.name) + ' — ' + pct(top.share,0), null, '#4c8dff', true, null)}
+      ${kpiCard('زیان تولید (برآورد سقف‌دار)','قطعه', fmt(A.lost,0), null, '#a78bfa', false, null)}
+    </div>
+    <div class="chart-box"><canvas id="chSupplyPareto"></canvas></div>
+    <div class="table-wrap" style="margin-top:12px;"><table><thead><tr><th>#</th><th>قطعه</th><th class="num">ساعت</th><th class="num">سهم</th><th class="num">تجمعی</th><th class="num">رویداد</th><th class="num">میانگین ساعت</th><th class="num">زیان تولید</th><th>نام‌هایی که یکی شدند</th><th class="num">مشکوک به خرابی (ساعت)</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
+    ${notes.length ? `<div class="hint" style="margin-top:10px; line-height:2;">${notes.map(esc).join('<br>')}</div>` : ''}
+  </div>`;
+}
+function supplyChart_(){
+  if(!document.getElementById('chSupplyPareto')) return;
+  const scope = filters.supplyScope === 'all' ? 'all' : 'month';
+  const A = supplyAnalyze_(supplyStopsOfScope_(scope)); if(!A.rows.length) return;
+  mkChart('chSupplyPareto', { type:'bar', data:{ labels:A.rows.map(r=>r.name), datasets:[
+      { type:'bar', label:'ساعت توقف', data:A.rows.map(r=>Math.round(r.hours*10)/10), backgroundColor:A.rows.map((r,i)=>i===0?'#ff5d6c':'#ff9d42'), borderRadius:5, maxBarThickness:42, order:2, yAxisID:'y' },
+      { type:'line', label:'درصد تجمعی', data:A.rows.map(r=>Math.round((r.cum||0)*1000)/10), borderColor:'#4c8dff', backgroundColor:'#4c8dff', borderWidth:2.5, pointRadius:3, tension:.15, order:1, yAxisID:'y2', noLabel:true }
+    ] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:true } },
+      scales:{ x:{ grid:{display:false}, ticks:{font:{size:11}} }, y:{ grid:{color:'#182338'}, beginAtZero:true, title:{display:true, text:'ساعت', color:'#7c8aa5', font:{size:10}} },
+        y2:{ position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'٪'} } } } });
+}
+function supplyBind_(){
+  document.querySelectorAll('#view [data-supply-scope]').forEach(b=>b.addEventListener('click', ()=>{ filters.supplyScope = b.dataset.supplyScope; renderStop(); }));
+  const e = document.getElementById('supplyEdit'); if(e) e.addEventListener('click', supplyEditor_);
+}
+function supplyEditor_(){
+  const root = document.getElementById('modalRoot'); if(!root) return;
+  const groups = JSON.parse(JSON.stringify(supplyGroups_()));
+  const A = supplyAnalyze_(supplyStopsOfScope_('all'));
+  const row = g => `<div class="sg-row" style="display:grid; grid-template-columns:170px 1fr auto; gap:8px; align-items:start; margin-bottom:8px;">
+      <input class="sg-name" value="${esc(g.name)}" placeholder="نام قطعه">
+      <textarea class="sg-keys" rows="2" placeholder="کلمات کلیدی، با ویرگول یا خط جدید جدا کنید">${esc((g.keys||[]).join('، '))}</textarea>
+      <button class="btn btn-ghost btn-sm sg-del" type="button">حذف</button></div>`;
+  const unmHtml = A.unmatched.length ? `<h4 style="margin:14px 0 6px;">متن‌هایی که به هیچ قطعه‌ای وصل نشده‌اند</h4>
+      <div class="hint" style="margin-bottom:6px;">یک گروه انتخاب و «افزودن» را بزنید تا آن متن به‌عنوان کلمه‌ی کلیدی همان گروه اضافه شود (بعد «ذخیره»).</div>
+      ${A.unmatched.filter(u=>u.text !== '(بدون توضیح)').slice(0,12).map((u,i)=>`<div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;"><span style="flex:1;">${esc(u.text)} <span class="hint">(${fmt(u.hours,1)} ساعت، ${fmt(u.events,0)} رویداد)</span></span>
+        <select class="sg-assign" data-i="${i}">${groups.map((g,gi)=>`<option value="${gi}">${esc(g.name)}</option>`).join('')}</select><button class="btn btn-ghost btn-sm sg-addkey" data-text="${esc(u.text)}" data-i="${i}" type="button">افزودن</button></div>`).join('')}` : '';
+  root.innerHTML = `<div class="modal-bg" id="sgbg"><div class="modal" style="max-width:820px; max-height:90vh; overflow:auto;">
+    <h3>⚙️ گروه‌بندی قطعات و نام‌های مترادف</h3>
+    <p class="desc">هر گروه یک قطعه است و هر کلمه‌ی کلیدی نامی که ممکن است برایش ثبت شده باشد. توضیح هر توقف اگر یکی از این کلمه‌ها را داشته باشد (فاصله، نیم‌فاصله و «ي/ی»، «ك/ک» مهم نیستند)، به همان قطعه می‌رود؛ اگر چند کلمه جور شد، طولانی‌ترین برنده است.</p>
+    <div id="sgList">${groups.map(row).join('')}</div>
+    <button class="btn btn-ghost btn-sm" id="sgAdd" type="button">➕ گروه جدید</button>
+    ${unmHtml}
+    <div class="modal-actions" style="margin-top:14px;"><button class="btn btn-ghost" id="sgReset" type="button">بازگشت به پیش‌فرض</button><button class="btn btn-ghost" id="sgCancel" type="button">انصراف</button><button class="btn btn-primary" id="sgSave" type="button">ذخیره</button></div>
+  </div></div>`;
+  const bindDel = () => root.querySelectorAll('.sg-del').forEach(b=>{ b.onclick = ()=>b.closest('.sg-row').remove(); });
+  bindDel();
+  document.getElementById('sgAdd').onclick = ()=>{ document.getElementById('sgList').insertAdjacentHTML('beforeend', row({ name:'', keys:[] })); bindDel(); };
+  root.querySelectorAll('.sg-addkey').forEach(b=>{ b.onclick = ()=>{
+    const sel = root.querySelector(`.sg-assign[data-i="${b.dataset.i}"]`), ta = root.querySelectorAll('.sg-keys')[+sel.value];
+    if(ta){ ta.value = (ta.value.trim() ? ta.value.trim() + '، ' : '') + b.dataset.text; b.textContent = 'افزوده شد ✓'; b.disabled = true; }
+  }; });
+  document.getElementById('sgCancel').onclick = ()=>{ root.innerHTML = ''; };
+  document.getElementById('sgbg').addEventListener('click', e=>{ if(e.target.id === 'sgbg') root.innerHTML = ''; });
+  document.getElementById('sgReset').onclick = ()=>{ delete DB.meta.supplyPartGroups; scheduleSave(); root.innerHTML = ''; toast('گروه‌بندی به پیش‌فرض برگشت.','ok'); renderStop(); };
+  document.getElementById('sgSave').onclick = ()=>{
+    const out = [];
+    root.querySelectorAll('.sg-row').forEach(r=>{
+      const name = r.querySelector('.sg-name').value.trim(), keys = r.querySelector('.sg-keys').value.split(/[،,\n]/).map(t=>t.trim()).filter(Boolean);
+      if(name && keys.length) out.push({ name, keys });
+    });
+    if(!out.length){ toast('حداقل یک گروه با کلمه‌ی کلیدی لازم است.','err'); return; }
+    DB.meta.supplyPartGroups = out; scheduleSave(); root.innerHTML = ''; toast('گروه‌بندی قطعات ذخیره شد.','ok'); renderStop();
+  };
 }
 function pk_color_(r){ return r===null||r===undefined ? '#93a4c3' : (r>=1 ? '#2fd9c4' : (r>=0.9 ? '#ffcf5c' : '#ff5d6c')); }
 function renderProdKpi(){
