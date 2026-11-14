@@ -102,6 +102,87 @@ button{font-family:inherit;}
 .sync-dot{ width:8px;height:8px;border-radius:50%; background:var(--teal); box-shadow:0 0 0 3px rgba(47,217,196,.18); flex:0 0 8px;}
 .sync-dot.off{ background:var(--red); box-shadow:0 0 0 3px rgba(255,93,108,.18); }
 .sync-dot.busy{ background:var(--yellow); box-shadow:0 0 0 3px rgba(255,207,92,.18); animation:pulse 1s infinite; }
+/* ===== کاوشگر توقفات (sx) ===== */
+.sx-head{display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap;}
+.sx-title{font-size:17px; font-weight:800; display:flex; align-items:center; gap:8px;}
+.sx-sub{color:var(--text-mute); font-size:12.5px; margin-top:4px;}
+.sx-ctrls{display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+.sx-seg{display:inline-flex; background:var(--panel-2); border:1px solid var(--panel-border); border-radius:10px; padding:3px; gap:2px;}
+.sx-seg button{border:0; background:transparent; color:var(--text-dim); font:inherit; font-size:12.5px; font-weight:600; padding:6px 12px; border-radius:8px; cursor:pointer; transition:.15s;}
+.sx-seg button:hover{color:var(--text);}
+.sx-seg button.on{background:var(--amber); color:#241400; box-shadow:0 2px 10px -3px rgba(255,157,66,.6);}
+.sx-switch{display:inline-flex; align-items:center; gap:8px; font:inherit; font-size:12.5px; color:var(--text-dim); cursor:pointer; user-select:none; background:none; border:0; padding:0;}
+.sx-switch i{width:34px; height:19px; border-radius:20px; background:var(--panel-2); border:1px solid var(--panel-border); position:relative; transition:.15s;}
+.sx-switch i::after{content:''; position:absolute; top:2px; inset-inline-start:2px; width:13px; height:13px; border-radius:50%; background:var(--text-mute); transition:.15s;}
+.sx-switch.on{color:var(--text);} .sx-switch.on i{background:rgba(255,157,66,.25); border-color:var(--amber);} .sx-switch.on i::after{inset-inline-start:17px; background:var(--amber);}
+.sx-menu{position:relative;}
+.sx-gear{width:34px; height:34px; border-radius:10px; border:1px solid var(--panel-border); background:var(--panel-2); color:var(--text-dim); cursor:pointer; font-size:15px;}
+.sx-gear:hover{color:var(--text);}
+.sx-menu-pop{position:absolute; left:0; top:calc(100% + 6px); min-width:230px; background:var(--panel); border:1px solid var(--panel-border); border-radius:12px; padding:6px; box-shadow:var(--shadow); z-index:30; display:none;}
+.sx-menu.open .sx-menu-pop{display:block;}
+.sx-menu-pop button{display:block; width:100%; text-align:start; background:none; border:0; color:var(--text); font:inherit; font-size:13px; padding:9px 10px; border-radius:8px; cursor:pointer;}
+.sx-menu-pop button:hover{background:rgba(255,255,255,.06);}
+.sx-insight{margin:14px 0; padding:12px 14px; border-radius:12px; background:linear-gradient(270deg, rgba(255,157,66,.11), rgba(255,157,66,0)); border-inline-start:3px solid var(--amber); font-size:13.5px; line-height:2;}
+.sx-insight b{color:var(--amber-2);}
+.sx-ribbon{display:flex; gap:3px; height:14px; margin-bottom:16px;}
+.sx-ribbon button{border:0; padding:0; border-radius:6px; cursor:pointer; transition:.2s; min-width:6px;}
+.sx-ribbon button:hover{transform:scaleY(1.45);}
+.sx-ribbon.dim button:not(.on){opacity:.3;}
+.sx-body{display:grid; grid-template-columns:300px minmax(0,1fr); gap:16px; align-items:start;} .sx-body>*{min-width:0;}
+.sx-cats{display:flex; flex-direction:column; gap:8px;}
+.sx-cat{--c:#93a4c3; position:relative; display:grid; grid-template-columns:auto 1fr auto; gap:6px 10px; align-items:center; padding:11px 12px; border-radius:12px; background:var(--panel-2); border:1px solid var(--panel-border); color:var(--text); cursor:pointer; transition:.15s; outline:none;}
+.sx-cat:hover,.sx-cat:focus-visible{border-color:var(--c);}
+.sx-cat.on{border-color:var(--c); background:color-mix(in srgb, var(--c) 13%, var(--panel-2)); box-shadow:0 8px 22px -14px var(--c);}
+.sx-chk{width:17px; height:17px; border-radius:5px; border:1.5px solid var(--text-mute); display:grid; place-items:center; transition:.15s; flex:none;}
+.sx-chk:hover{border-color:var(--c);}
+.sx-cat.on .sx-chk{background:var(--c); border-color:var(--c);} .sx-cat.on .sx-chk::after{content:'✓'; color:#10131c; font-size:12px; font-weight:900; line-height:1;}
+.sx-cat-name{font-weight:800; font-size:13.5px;}
+.sx-cat-num{font-variant-numeric:tabular-nums; font-weight:800; font-size:15px;} .sx-cat-num small{color:var(--text-mute); font-weight:500; font-size:11px; margin-inline-start:3px;}
+.sx-cat-meter{grid-column:1/-1; display:flex; align-items:center; gap:8px; margin-top:2px;}
+.sx-cat-meter .sx-bar{flex:1;} .sx-cat-meter span{font-size:11.5px; color:var(--text-dim); min-width:34px; text-align:end; font-variant-numeric:tabular-nums;}
+.sx-cat.all{--c:var(--amber);} .sx-cat.all .sx-chk{display:none;} .sx-cat.all{grid-template-columns:1fr auto;}
+.sx-bar{height:7px; background:rgba(255,255,255,.06); border-radius:6px; overflow:hidden;}
+.sx-bar i{display:block; height:100%; border-radius:6px; transition:width .35s ease;}
+.sx-panel{background:var(--panel-2); border:1px solid var(--panel-border); border-radius:14px; padding:16px; min-width:0;}
+.sx-ptitle{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:16px; font-weight:800;}
+.sx-ptitle .dot{width:10px; height:10px; border-radius:50%;}
+.sx-stats{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:12px 0 14px;}
+.sx-stat{padding:10px 12px; border-radius:11px; background:rgba(255,255,255,.03); border:1px solid var(--line);}
+.sx-stat small{display:block; color:var(--text-mute); font-size:11.5px; margin-bottom:2px;}
+.sx-stat b{font-size:21px; font-variant-numeric:tabular-nums; font-weight:800;} .sx-stat em{font-style:normal; font-size:11.5px; color:var(--text-dim); margin-inline-start:4px;}
+.sx-dimrow{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;} .sx-dimrow>span{font-size:12.5px; color:var(--text-mute);}
+.sx-chart{height:290px; position:relative; min-width:0;} .sx.card{overflow:hidden;}
+.sx-tabs{display:flex; gap:20px; border-bottom:1px solid var(--line); margin:16px 0 8px;}
+.sx-tabs button{background:none; border:0; color:var(--text-mute); font:inherit; font-weight:700; padding:8px 2px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;}
+.sx-tabs button.on{color:var(--text); border-color:var(--amber);}
+.sx-tabs small{margin-inline-start:6px; background:var(--panel); border:1px solid var(--line); padding:1px 8px; border-radius:20px; color:var(--text-dim); font-weight:600; font-size:11px;}
+.sx-rowh,.sx-row{display:grid; grid-template-columns:24px minmax(110px,1.4fr) minmax(130px,2fr) 54px 54px 44px 28px; gap:10px; align-items:center; padding:9px 4px;}
+.sx-rowh{color:var(--text-mute); font-size:11.5px; border-bottom:1px solid var(--line);}
+.sx-row{border-bottom:1px solid var(--line); cursor:pointer; transition:background .12s;}
+.sx-row:hover{background:rgba(255,255,255,.035);}
+.sx-row .rk{color:var(--text-mute); font-size:12px; text-align:center;}
+.sx-row .nm{min-width:0;} .sx-row .nm b{display:block; font-size:13.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;} .sx-row .nm small{color:var(--text-mute); font-size:11.5px;}
+.sx-hrs{display:flex; align-items:center; gap:8px;} .sx-hrs .sx-bar{flex:1;} .sx-hrs b{min-width:46px; text-align:end; font-variant-numeric:tabular-nums; font-size:13px;}
+.sx-n{text-align:end; font-variant-numeric:tabular-nums; font-size:12.5px; color:var(--text-dim);}
+.sx-exp{border:0; background:transparent; color:var(--text-mute); cursor:pointer; font-size:12px; border-radius:6px; transition:transform .15s;} .sx-exp:hover{color:var(--text); background:rgba(255,255,255,.06);}
+.sx-row.open .sx-exp{transform:rotate(180deg);}
+.sx-more{display:none; padding:8px 40px 12px; color:var(--text-dim); font-size:12.5px; line-height:2; border-bottom:1px solid var(--line); background:rgba(255,255,255,.02);}
+.sx-row.open + .sx-more{display:block;}
+.sx-more .k{color:var(--text-mute);}
+.sx-evh,.sx-ev{display:grid; grid-template-columns:96px minmax(110px,1fr) minmax(160px,2.2fr) 68px; gap:10px; padding:9px 4px; align-items:start;}
+.sx-evh{color:var(--text-mute); font-size:11.5px; border-bottom:1px solid var(--line);}
+.sx-ev{border-bottom:1px solid var(--line); font-size:13px;} .sx-ev:hover{background:rgba(255,255,255,.03);}
+.sx-ev .rs b{display:block; font-weight:700;} .sx-ev .rs small{display:block; color:var(--text-mute); margin-top:2px; line-height:1.7;}
+.sx-ev .dt{color:var(--text-dim); font-variant-numeric:tabular-nums;} .sx-ev .hr{text-align:end; font-weight:800; font-variant-numeric:tabular-nums;}
+.sx-dot{width:8px; height:8px; border-radius:50%; display:inline-block; margin-inline-end:6px;}
+.sx-crumb{display:inline-flex; align-items:center; gap:6px; background:rgba(255,157,66,.12); border:1px solid rgba(255,157,66,.35); color:var(--amber-2); padding:3px 4px 3px 12px; border-radius:20px; font-size:12px; margin-bottom:6px;}
+.sx-crumb button{border:0; background:transparent; color:inherit; cursor:pointer; font-size:15px; line-height:1; padding:0 4px;}
+.sx-notes{margin-top:14px; border:1px dashed var(--panel-border); border-radius:11px; padding:8px 12px; color:var(--text-dim); font-size:12.5px; line-height:2;}
+.sx-notes summary{cursor:pointer; font-weight:700; color:var(--text-dim);} .sx-notes ul{margin:6px 0 2px; padding-inline-start:18px;}
+.sx-empty{padding:40px 10px; text-align:center; color:var(--text-mute);}
+@media (max-width:1000px){ .sx-body{grid-template-columns:minmax(0,1fr);} .sx-cats{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr));} .sx-cat.all{grid-column:1/-1;} .sx-stats{grid-template-columns:repeat(2,minmax(0,1fr));} }
+@media (max-width:640px){ .sx-cats{grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;} .sx-cat{padding:10px; gap:5px 8px;} .sx-cat-name{font-size:12.5px;} .sx-cat-num{font-size:13.5px;} .sx-rowh{display:none;} .sx-row{grid-template-columns:22px 1fr 54px 28px; grid-template-areas:'rk nm n1 ex' 'bar bar bar bar';} .sx-row .rk{grid-area:rk;} .sx-row .nm{grid-area:nm;} .sx-row .sx-hrs{grid-area:bar;} .sx-row .c-share,.sx-row .c-cum{display:none;} .sx-row .c-ev{grid-area:n1;} .sx-row .sx-exp{grid-area:ex;} .sx-evh{display:none;} .sx-ev{grid-template-columns:1fr 60px;} .sx-ev .dt{grid-column:1/-1;} .sx-ev .st{display:none;} }
+@media print{ .sx-ctrls,.sx-menu,.sx-tabs button:not(.on){display:none;} }
 @keyframes bootspin{to{transform:rotate(360deg)}} .boot-spin{width:22px;height:22px;border:3px solid rgba(147,164,195,.25);border-top-color:#4c8dff;border-radius:50%;animation:bootspin .8s linear infinite;display:inline-block;}
 @keyframes pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
 
@@ -2036,16 +2117,16 @@ function renderManHoursMerged(){
   an_subBar_('manhours', [['mh','👷 نفر-ساعت و بهره‌گیری'], ['cap','🧮 برنامه در برابر ظرفیت و نیرو']]);
 }
 // جدول‌های بلند فقط ۱۰۰ ردیف اول را می‌سازند؛ «۱۰۰ ردیف بعدی/نمایش همه» بقیه را اضافه می‌کند (فیلتر، جستجو و خروجی CSV همچنان روی همه‌ی ردیف‌هاست)
-const LIST_STEP_ = 100; let listLimit_ = {};
-function listSlice_(key, arr){ const n = listLimit_[key] || LIST_STEP_; return arr.length > n ? arr.slice(0, n) : arr; }
+const LIST_STEP_ = 100; let listLimit_ = {}; const listStep_ = {};
+function listSlice_(key, arr, step){ if(step) listStep_[key] = step; const n = listLimit_[key] || listStep_[key] || LIST_STEP_; return arr.length > n ? arr.slice(0, n) : arr; }
 function listMoreHtml_(key, arr){
-  const n = listLimit_[key] || LIST_STEP_; if(arr.length <= n) return '';
-  return `<div style="text-align:center; padding:10px; display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap;"><span class="hint">${fmt(n,0)} از ${fmt(arr.length,0)} ردیف نمایش داده شده</span><button class="btn btn-ghost btn-sm" data-more="${key}">۱۰۰ ردیف بعدی</button><button class="btn btn-ghost btn-sm" data-more-all="${key}">نمایش همه</button></div>`;
+  const st = listStep_[key] || LIST_STEP_, n = listLimit_[key] || st; if(arr.length <= n) return '';
+  return `<div class="no-print" style="text-align:center; padding:12px; display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap;"><span class="hint">${fmt(n,0)} از ${fmt(arr.length,0)} نمایش داده شده</span><button class="btn btn-ghost btn-sm" data-more="${key}">${fmt(st,0)} مورد بعدی</button><button class="btn btn-ghost btn-sm" data-more-all="${key}">نمایش همه</button></div>`;
 }
 function bindListMore_(rerender){
   document.querySelectorAll('#view [data-more], #view [data-more-all]').forEach(b=>b.addEventListener('click', ()=>{
-    const k = b.dataset.more || b.dataset.moreAll;
-    listLimit_[k] = b.dataset.moreAll ? 1e9 : (listLimit_[k] || LIST_STEP_) + LIST_STEP_;
+    const k = b.dataset.more || b.dataset.moreAll, st = listStep_[k] || LIST_STEP_;
+    listLimit_[k] = b.dataset.moreAll ? 1e9 : (listLimit_[k] || st) + st;
     rerender();
   }));
 }
@@ -3939,11 +4020,6 @@ function renderStopBody_(){
     </div>
   </div>
 
-  <div class="grid grid-2" style="margin-bottom:16px;">
-    <div class="card"><h3>تحلیل پارتو توقفات به تفکیک ایستگاه (ساعت)</h3><div class="chart-box"><canvas id="chStopStation"></canvas></div></div>
-    <div class="card"><h3>تحلیل پارتو توقفات به تفکیک علت (ساعت)</h3><div class="chart-box"><canvas id="chStopReason"></canvas></div></div>
-  </div>
-
   ${stopExplorerHtml_()}
 
   <div class="card" style="margin-bottom:16px;">
@@ -4050,8 +4126,6 @@ function renderStopBody_(){
     downloadFile('ثبت-توقفات.csv', toCSV(headers, rr), 'text/csv;charset=utf-8');
   });
 
-  paretoChart('chStopStation', stationPareto, '#ff9d42');
-  paretoChart('chStopReason', reasonPareto, '#b389ff');
   stopExplorerChart_();
   if(stopsWithClock.length){
     const maxHours = Math.max(...hourBuckets.map(b=>b.hours));
@@ -8265,9 +8339,19 @@ function stopCatOf_(x){
   return { cat:STOP_CAT_OTHER_, sc:null };
 }
 function stopExplorerState_(){
-  const f = filters;
-  return { scope: f.stopScope === 'all' ? 'all' : 'month', dim: ['reason','detail','station','day'].includes(f.stopDim) ? f.stopDim : 'reason',
-           planned: !!f.stopPlanned, sel: Array.isArray(f.stopCats) ? f.stopCats : [] };
+  const f = filters, dim = ['reason','detail','station','day'].includes(f.stopDim) ? f.stopDim : 'reason';
+  return { scope: f.stopScope === 'all' ? 'all' : 'month', dim, planned: !!f.stopPlanned, sel: Array.isArray(f.stopCats) ? f.stopCats : [],
+           tab: f.stopTab === 'events' ? 'events' : 'pareto', item: (f.stopItem && f.stopItem.dim === dim) ? f.stopItem : null };
+}
+// گروه(های) یک رویداد در بُعد انتخاب‌شده؛ رویدادهای چندقطعه‌ای ساعتشان بین قطعه‌ها تقسیم می‌شود
+function sxKeys_(e, dim){
+  const x = e.x;
+  if(dim === 'reason'){ const n = x.reason || '(بدون علت)'; return [{ key:'r:'+n, name:n, share:1, variant:String(x.description||'').trim() || null }]; }
+  if(dim === 'station'){ const n = x.station || '(بدون ایستگاه)'; return [{ key:'s:'+n, name:n, share:1, variant:x.reason || null }]; }
+  if(dim === 'day'){ const n = x.date || '—'; return [{ key:'d:'+n, name:n, share:1, variant:x.reason || null }]; }
+  if(e.sc) return e.sc.parts.map(pn=>({ key:'p:'+pn, name:pn, share:1/e.sc.parts.length, variant:String(x.description||'').trim() || '(بدون توضیح)', suspect:e.sc.suspect }));
+  const raw = String(x.description || '').trim() || '(بدون توضیح)';
+  return [{ key:'t:'+supplyNorm_(raw), name:raw, share:1, variant:x.reason || null }];
 }
 function stopExplorerData_(){
   const st = stopExplorerState_(), F = stopLossFactors_();
@@ -8276,120 +8360,188 @@ function stopExplorerData_(){
   });
   const total = evs.reduce((a,e)=>a + e.h, 0), catMap = {};
   evs.forEach(e=>{ const t = catMap[e.cat] || (catMap[e.cat] = { name:e.cat, hours:0, events:0, lost:0 }); t.hours += e.h; t.events++; t.lost += e.lost; });
-  const order = stopCats_().map(c=>c.name).concat([STOP_CAT_OTHER_]);
-  const cats = order.map(n=>catMap[n]).filter(Boolean);
+  const cats = Object.values(catMap).sort((a,b)=>(a.name === STOP_CAT_OTHER_) - (b.name === STOP_CAT_OTHER_) || b.hours - a.hours);
   const chosen = st.sel.length ? evs.filter(e=>st.sel.includes(e.cat)) : evs;
   const G = {};
-  const add = (key, name, e, share, variant, suspect) => {
-    const g = G[key] || (G[key] = { name, hours:0, events:0, lost:0, suspect:0, variants:{}, cats:{} });
-    g.hours += e.h * share; g.events++; g.lost += e.lost * share; if(suspect) g.suspect += e.h * share;
-    if(variant) g.variants[variant] = (g.variants[variant] || 0) + 1; g.cats[e.cat] = (g.cats[e.cat] || 0) + e.h * share;
-  };
   chosen.forEach(e=>{
-    const x = e.x;
-    if(st.dim === 'reason') add('r:'+(x.reason||''), x.reason || '(بدون علت)', e, 1, String(x.description||'').trim() || null, false);
-    else if(st.dim === 'station') add('s:'+(x.station||''), x.station || '(بدون ایستگاه)', e, 1, x.reason || null, false);
-    else if(st.dim === 'day') add('d:'+(x.date||''), x.date || '—', e, 1, x.reason || null, false);
-    else if(e.sc){ e.sc.parts.forEach(pn=>add('p:'+pn, pn, e, 1/e.sc.parts.length, String(x.description||'').trim() || '(بدون توضیح)', e.sc.suspect)); }
-    else { const raw = String(x.description || '').trim() || '(بدون توضیح)'; add('t:'+supplyNorm_(raw), raw, e, 1, (x.reason || '') , false); }
+    e.keys = sxKeys_(e, st.dim);
+    e.keys.forEach(k=>{
+      const g = G[k.key] || (G[k.key] = { key:k.key, name:k.name, hours:0, events:0, lost:0, suspect:0, variants:{}, cats:{} });
+      g.hours += e.h * k.share; g.events++; g.lost += e.lost * k.share; if(k.suspect) g.suspect += e.h * k.share;
+      if(k.variant) g.variants[k.variant] = (g.variants[k.variant] || 0) + 1; g.cats[e.cat] = (g.cats[e.cat] || 0) + e.h * k.share;
+    });
   });
   const chosenTotal = chosen.reduce((a,e)=>a + e.h, 0);
   let rows = Object.values(G);
   rows = st.dim === 'day' ? rows.sort((a,b)=>dateSortKey(a.name) - dateSortKey(b.name)) : rows.sort((a,b)=>b.hours - a.hours);
   let cum = 0; rows.forEach(r=>{ cum += r.hours; r.share = chosenTotal > 0 ? r.hours/chosenTotal : null; r.cum = chosenTotal > 0 ? cum/chosenTotal : null;
-    r.domCat = Object.entries(r.cats).sort((a,b)=>b[1]-a[1])[0][0]; });
-  const events = chosen.slice().sort((a,b)=>b.h - a.h);
-  return { st, total, cats, rows, chosen, chosenTotal, events, lost:chosen.reduce((a,e)=>a + e.lost, 0), nAll:evs.length };
+    r.domCat = Object.entries(r.cats).sort((a,b)=>b[1] - a[1])[0][0]; });
+  let events = chosen.slice().sort((a,b)=>b.h - a.h);
+  if(st.item) events = events.filter(e=>(e.keys || []).some(k=>k.key === st.item.key));
+  // برای سرخط: بزرگ‌ترین «قطعه/توضیح» داخل بزرگ‌ترین دسته
+  let topDetail = null;
+  if(cats[0]){ const T = {}; let th = 0; evs.filter(e=>e.cat === cats[0].name).forEach(e=>sxKeys_(e, 'detail').forEach(k=>{ T[k.name] = (T[k.name] || 0) + e.h * k.share; th += e.h * k.share; }));
+    const best = Object.entries(T).sort((a,b)=>b[1] - a[1])[0]; if(best && th > 0) topDetail = { name:best[0], share:best[1]/th }; }
+  return { st, total, cats, rows, chosen, chosenTotal, events, topDetail, lost:chosen.reduce((a,e)=>a + e.lost, 0) };
+}
+function sxWrap_(s, n){
+  const w = String(s).split(' '), out = []; let cur = '';
+  w.forEach(t=>{ if(cur && (cur + ' ' + t).length > n){ out.push(cur); cur = t; } else cur = cur ? cur + ' ' + t : t; });
+  if(cur) out.push(cur); return out.length ? out : [''];
+}
+function sxChartRows_(D){
+  const rows = D.rows;
+  if(D.st.dim === 'day' || rows.length <= 10) return rows;
+  const rest = rows.slice(9), h = rest.reduce((a,r)=>a + r.hours, 0);
+  return rows.slice(0, 9).concat([{ key:'__rest', bucket:true, name:'سایر موارد ('+rest.length+')', hours:h, share:h/(D.chosenTotal||1), cum:1, domCat:STOP_CAT_OTHER_ }]);
 }
 function stopExplorerHtml_(){
-  const D = stopExplorerData_(), st = D.st;
-  const seg = (attr, cur, items) => items.map(([v,l])=>`<button class="btn btn-sm ${cur===v?'btn-primary':'btn-ghost'}" ${attr}="${v}">${l}</button>`).join('');
-  const chip = c => { const on = st.sel.includes(c.name), col = c.name === STOP_CAT_OTHER_ ? '#93a4c3' : stopCatColor_(c.name);
-    return `<button class="btn btn-sm ${on?'btn-primary':'btn-ghost'}" data-stopcat="${esc(c.name)}" style="border:1px solid ${col}; ${on?'':'color:'+col+';'} display:inline-flex; gap:6px; align-items:baseline;"><b>${esc(c.name)}</b><span style="opacity:.85;">${fmt(c.hours,1)} ساعت · ${D.total>0?pct(c.hours/D.total,0):'—'}</span></button>`; };
-  const head = `<div class="no-print" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px;">
-      <button class="btn btn-sm ${st.sel.length?'btn-ghost':'btn-primary'}" data-stopcat="__all"><b>همه‌ی دسته‌ها</b> <span style="opacity:.85;">${fmt(D.total,1)} ساعت</span></button>${D.cats.map(chip).join('')}
-    </div>
-    <div class="no-print" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
-      <span class="hint">پارتو بر اساس:</span>${seg('data-stopdim', st.dim, [['reason','علت'],['detail','قطعه / توضیح'],['station','ایستگاه'],['day','روز']])}
-      <span class="hint" style="margin-inline-start:10px;">بازه:</span>${seg('data-stopscope', st.scope, [['month','این ماه ('+monthLabel(DB.meta.activeMonth)+')'],['all','همه‌ی ماه‌ها']])}
-      <button class="btn btn-sm ${st.planned?'btn-primary':'btn-ghost'}" data-stopplanned="1">شامل برنامه‌ریزی‌شده</button>
-      <span style="margin-inline-start:auto; display:flex; gap:6px;"><button class="btn btn-ghost btn-sm" id="stopCatEdit">⚙️ دسته‌ها</button><button class="btn btn-ghost btn-sm" id="supplyEdit">⚙️ نام قطعه‌ها</button></span>
+  const D = stopExplorerData_(), st = D.st, cats = stopCats_();
+  const col = n => n === STOP_CAT_OTHER_ ? '#93a4c3' : stopCatColor_(n);
+  const scopeLbl = st.scope === 'all' ? 'همه‌ی ماه‌ها' : monthLabel(DB.meta.activeMonth);
+  const isSupplyCat = n => !!(cats.find(c=>c.name === n) || {}).supply;
+  const seg = (attr, cur, items) => `<div class="sx-seg">${items.map(([v,l])=>`<button type="button" class="${cur===v?'on':''}" ${attr}="${v}">${l}</button>`).join('')}</div>`;
+  const ctrls = `<div class="sx-ctrls no-print">
+      ${seg('data-stopscope', st.scope, [['month','این ماه'],['all','همه‌ی ماه‌ها']])}
+      <button type="button" class="sx-switch ${st.planned?'on':''}" data-stopplanned="1" role="switch" aria-checked="${st.planned}"><i></i>شامل برنامه‌ریزی‌شده</button>
+      <div class="sx-menu"><button type="button" class="sx-gear" id="sxGear" title="تنظیمات دسته‌ها و نام قطعه‌ها" aria-label="تنظیمات">⚙</button>
+        <div class="sx-menu-pop"><button type="button" id="sxMenuCats">دسته‌های توقف…</button><button type="button" id="sxMenuParts">نام قطعه‌ها و مترادف‌ها…</button></div></div>
     </div>`;
-  const title = st.sel.length ? st.sel.map(esc).join(' + ') : 'همه‌ی دسته‌ها';
-  if(!D.chosen.length) return `<div class="card" style="margin-bottom:16px;"><h3>🔎 کاوشگر توقفات — ${title}</h3>${head}<div class="tbl-empty">در این بازه و انتخاب، توقفی ثبت نشده است.</div></div>`;
-  const dimTitle = { reason:'علت', detail: (st.sel.length === 1 && D.cats.find(c=>c.name===st.sel[0] && stopCats_().find(k=>k.name===c.name && k.supply))) ? 'قطعه' : 'قطعه / توضیح', station:'ایستگاه', day:'روز' }[st.dim];
-  const rowsHtml = D.rows.map((r,i)=>{
-    let extra = '';
-    if(st.dim === 'detail' || st.dim === 'reason'){
-      const vs = Object.entries(r.variants).sort((a,b)=>b[1]-a[1]);
-      extra = vs.slice(0,5).map(([t,n])=>`${esc(t)}${n>1?' ×'+n:''}`).join(' · ') + (vs.length > 5 ? ` … (+${vs.length-5})` : '');
-    } else extra = Object.entries(r.variants).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([t,n])=>`${esc(t)}${n>1?' ×'+n:''}`).join(' · ');
-    return `<tr><td>${i+1}</td><td><b>${esc(r.name)}</b></td><td><span style="color:${stopCatColor_(r.domCat)};">${esc(r.domCat)}</span></td><td class="num">${fmt(r.hours,1)}</td><td class="num">${pct(r.share,1)}</td><td class="num">${st.dim==='day'?'—':pct(r.cum,0)}</td>
-      <td class="num">${fmt(r.events,0)}</td><td class="num">${fmt(r.hours/Math.max(r.events,1),1)}</td><td class="num">${r.lost>0?fmt(r.lost,0):'—'}</td>
-      <td class="hint" style="min-width:230px; line-height:1.8;">${extra}</td><td class="num">${r.suspect>0?'<span style="color:#ffcf5c;">'+fmt(r.suspect,1)+'</span>':'—'}</td></tr>`;
+  const header = `<div class="sx-head"><div><div class="sx-title">🔎 کاوشگر توقفات <span style="color:var(--text-mute); font-weight:600; font-size:13px;">· ${esc(scopeLbl)}</span></div>
+      <div class="sx-sub">روی هر دسته کلیک کنید تا جزئیاتش باز شود؛ برای مقایسه‌ی چند دسته، تیک کنار آن‌ها را بزنید.</div></div>${ctrls}</div>`;
+  if(!D.total) return `<div class="card sx" style="margin-bottom:16px;">${header}<div class="sx-empty">در این بازه توقفی ثبت نشده است.</div></div>`;
+  // ---- سرخط (جمله‌ی خلاصه)
+  let headline;
+  if(!st.sel.length){
+    const t = D.cats[0];
+    headline = `در ${esc(scopeLbl)} <b>${fmt(D.total,0)}</b> ساعت توقف ثبت شده؛ <b>${pct(t.hours/D.total,0)}</b> آن «<b>${esc(t.name)}</b>» بوده${isSupplyCat(t.name) && D.topDetail ? ` و «${esc(D.topDetail.name)}» به‌تنهایی ${pct(D.topDetail.share,0)} همین دسته را ساخته` : ''}.`;
+  } else if(D.rows[0]){
+    const r = D.rows[0];
+    headline = `«<b>${st.sel.map(esc).join('</b> + <b>')}</b>»: <b>${fmt(D.chosenTotal,0)}</b> ساعت (${pct(D.chosenTotal/D.total,0)} کل توقف) در <b>${fmt(D.chosen.length,0)}</b> رویداد؛ بزرگ‌ترین سهم «<b>${esc(r.name)}</b>» با ${pct(r.share,0)}${D.lost > 0 ? ` و زیان تولید حدود ${fmt(D.lost,0)} قطعه` : ''}.`;
+  } else headline = '';
+  // ---- نوار ترکیب + فهرست دسته‌ها
+  const ribbon = `<div class="sx-ribbon ${st.sel.length?'dim':''} no-print" role="group" aria-label="سهم دسته‌ها">${D.cats.map(c=>`<button type="button" class="${st.sel.includes(c.name)?'on':''}" data-stopcat="${esc(c.name)}" style="flex:${Math.max(c.hours,0.0001)}; background:${col(c.name)};" title="${esc(c.name)} — ${fmt(c.hours,1)} ساعت (${pct(c.hours/D.total,0)})"></button>`).join('')}</div>`;
+  const catRow = c => { const on = st.sel.includes(c.name); return `<div class="sx-cat ${on?'on':''}" role="button" tabindex="0" data-stopcat="${esc(c.name)}" style="--c:${col(c.name)};" aria-pressed="${on}">
+      <span class="sx-chk" role="checkbox" aria-checked="${on}" tabindex="-1" data-stopcat-toggle="1" title="افزودن به مقایسه"></span><span class="sx-cat-name">${esc(c.name)}</span>
+      <span class="sx-cat-num">${fmt(c.hours,1)}<small>ساعت</small></span>
+      <span class="sx-cat-meter"><span class="sx-bar"><i style="width:${(c.hours/D.cats[0].hours*100).toFixed(1)}%; background:${col(c.name)};"></i></span><span>${pct(c.hours/D.total,0)}</span></span></div>`; };
+  const allRow = `<div class="sx-cat all ${st.sel.length?'':'on'}" role="button" tabindex="0" data-stopcat="__all" aria-pressed="${!st.sel.length}">
+      <span class="sx-cat-name">همه‌ی دسته‌ها</span><span class="sx-cat-num">${fmt(D.total,1)}<small>ساعت</small></span>
+      <span class="sx-cat-meter"><span class="sx-bar"><i style="width:100%; background:var(--amber);"></i></span><span>${D.cats.length} دسته</span></span></div>`;
+  // ---- پنل جزئیات
+  const dimTitle = { reason:'علت', detail:(st.sel.length && st.sel.every(isSupplyCat)) ? 'قطعه' : 'قطعه / توضیح', station:'ایستگاه', day:'روز' }[st.dim];
+  const ptitle = st.sel.length ? `<span class="dot" style="background:${col(st.sel[0])}"></span>${st.sel.map(esc).join(' + ')}` : `<span class="dot" style="background:var(--amber)"></span>همه‌ی دسته‌ها`;
+  const stats = `<div class="sx-stats">
+      <div class="sx-stat"><small>ساعت توقف</small><b>${fmt(D.chosenTotal,1)}</b></div>
+      ${st.sel.length ? `<div class="sx-stat"><small>سهم از کل توقف</small><b>${pct(D.chosenTotal/D.total,0)}</b></div>` : `<div class="sx-stat"><small>میانگین هر رویداد</small><b>${fmt(D.chosenTotal/Math.max(D.chosen.length,1),1)}</b><em>ساعت</em></div>`}
+      <div class="sx-stat"><small>تعداد رویداد</small><b>${fmt(D.chosen.length,0)}</b></div>
+      <div class="sx-stat"><small>زیان تولید (برآورد)</small><b>${fmt(D.lost,0)}</b><em>قطعه</em></div></div>`;
+  const dims = `<div class="sx-dimrow no-print"><span>پارتو بر اساس</span>${seg('data-stopdim', st.dim, [['reason','علت'],['detail','قطعه / توضیح'],['station','ایستگاه'],['day','روز']])}</div>`;
+  const maxH = Math.max(...D.rows.map(r=>r.hours), 0.0001);
+  const shownRows = listSlice_('sxRows', D.rows, 15);
+  const rowsHtml = shownRows.map((r,i)=>{
+    const vs = Object.entries(r.variants).sort((a,b)=>b[1] - a[1]), ctn = col(r.domCat);
+    const more = [];
+    if(vs.length) more.push(`<div><span class="k">${st.dim==='detail'||st.dim==='reason'?'نام‌های ثبت‌شده':'علت‌ها'}:</span> ${vs.slice(0,8).map(([t,n])=>esc(t)+(n>1?' ×'+n:'')).join(' · ')}${vs.length>8?' … (+'+(vs.length-8)+')':''}</div>`);
+    more.push(`<div><span class="k">میانگین هر رویداد:</span> ${fmt(r.hours/Math.max(r.events,1),1)} ساعت${r.lost>0?` &nbsp;·&nbsp; <span class="k">زیان تولید:</span> ${fmt(r.lost,0)} قطعه`:''}${r.suspect>0?` &nbsp;·&nbsp; <span style="color:#ffcf5c;">${fmt(r.suspect,1)} ساعت توضیح «خرابی/قالب/روغن» دارد</span>`:''}</div>`);
+    return `<div class="sx-row ${st.item && st.item.key===r.key?'open':''}" data-stopitem="${esc(r.key)}" data-stopitem-name="${esc(r.name)}" title="کلیک: فقط رویدادهای «${esc(r.name)}»">
+        <span class="rk">${i+1}</span><span class="nm"><b>${esc(r.name)}</b><small><span class="sx-dot" style="background:${ctn}"></span>${esc(r.domCat)}</small></span>
+        <span class="sx-hrs"><span class="sx-bar"><i style="width:${(r.hours/maxH*100).toFixed(1)}%; background:${ctn};"></i></span><b>${fmt(r.hours,1)}</b></span>
+        <span class="sx-n c-share">${pct(r.share,0)}</span><span class="sx-n c-cum">${st.dim==='day'?'—':pct(r.cum,0)}</span><span class="sx-n c-ev">${fmt(r.events,0)}</span>
+        <button type="button" class="sx-exp no-print" data-sxexpand="1" aria-label="جزئیات بیشتر">▾</button></div>
+      <div class="sx-more">${more.join('')}</div>`;
   }).join('');
-  const evShown = listSlice_('stopExplorer', D.events);
-  const evHtml = evShown.map(e=>`<tr><td>${esc(e.x.date || '')}</td><td>${esc(e.x.station || '—')}</td><td>${esc(e.x.reason || '—')}</td><td><span style="color:${stopCatColor_(e.cat)};">${esc(e.cat)}</span></td><td class="hint">${esc(String(e.x.description || ''))}</td><td class="num">${fmt(e.h,1)}</td><td class="num">${e.x.planned===true?'برنامه‌ریزی‌شده':'—'}</td><td class="num">${e.lost>0?fmt(e.lost,0):'—'}</td></tr>`).join('');
+  const paretoTab = `<div class="sx-rowh"><span></span><span>${dimTitle}</span><span>ساعت</span><span style="text-align:end;">سهم</span><span style="text-align:end;">تجمعی</span><span style="text-align:end;">رویداد</span><span></span></div>
+      <div class="sx-rows">${rowsHtml}</div>${listMoreHtml_('sxRows', D.rows)}`;
+  const evShown = listSlice_('stopExplorer', D.events, 12);
+  const crumb = st.item ? `<div class="sx-crumb no-print">فقط «${esc(st.item.name)}» <button type="button" data-stopitem-clear="1" aria-label="حذف فیلتر">×</button></div>` : '';
+  const evHtml = evShown.map(e=>`<div class="sx-ev"><span class="dt">${esc(e.x.date || '')}</span><span class="st">${esc(e.x.station || '—')}</span>
+      <span class="rs"><b><span class="sx-dot" style="background:${col(e.cat)}"></span>${esc(e.x.reason || '—')}${e.x.planned===true?' <small style="display:inline;">· برنامه‌ریزی‌شده</small>':''}</b>${e.x.description?`<small>${esc(String(e.x.description))}</small>`:''}</span><span class="hr">${fmt(e.h,1)}</span></div>`).join('');
+  const eventsTab = `${crumb}<div class="sx-evh"><span>تاریخ</span><span>ایستگاه</span><span>علت و توضیح</span><span style="text-align:end;">ساعت</span></div>${evHtml || '<div class="sx-empty">رویدادی برای این انتخاب نیست.</div>'}${listMoreHtml_('stopExplorer', D.events)}`;
+  // ---- نکته‌ها (جمع‌شده)
   const notes = [];
-  const supplyOn = !st.sel.length || st.sel.some(n=>(stopCats_().find(c=>c.name===n)||{}).supply);
+  const supplyOn = !st.sel.length || st.sel.some(isSupplyCat);
   if(supplyOn){
     const sup = D.chosen.filter(e=>e.sc);
     const viaDesc = sup.filter(e=>e.sc.via === 'desc').reduce((a,e)=>a + e.h, 0), multi = sup.filter(e=>e.sc.parts.length > 1).length;
     const unk = sup.filter(e=>e.sc.parts.length === 1 && e.sc.parts[0] === SUPPLY_UNKNOWN_).reduce((a,e)=>a + e.h, 0);
-    if(viaDesc > 0) notes.push(`${fmt(viaDesc,1)} ساعت با علت دیگری ثبت شده بود ولی توضیحش «نبود/عدم تأمین …» می‌گفت و در دسته‌ی تأمین شمرده شد.`);
+    if(viaDesc > 0) notes.push(`${fmt(viaDesc,1)} ساعت با علت دیگری ثبت شده بود ولی توضیحش «نبود/عدم تأمین …» می‌گفت؛ در دسته‌ی تأمین شمرده شد.`);
     if(st.dim === 'detail' && multi) notes.push(`${fmt(multi,0)} رویداد چندقطعه‌ای (مثل «قرص + دریچه») ساعتشان مساوی بین قطعه‌ها تقسیم شده است.`);
-    if(unk > 0) notes.push(`${fmt(unk,1)} ساعت تأمین نام قطعه ندارد؛ از «⚙️ نام قطعه‌ها» متن‌های ثبت‌شده را به قطعه وصل کنید، یا نام قطعه را در «توضیح» بنویسید.`);
+    if(unk > 0) notes.push(`${fmt(unk,1)} ساعت تأمین نام قطعه ندارد؛ از ⚙ ← «نام قطعه‌ها» وصلش کنید یا نام قطعه را در «توضیح» ثبت کنید.`);
   }
-  if(st.dim === 'detail'){ const nd = D.rows.find(r=>r.name === '(بدون توضیح)'); if(nd && nd.share > 0.2) notes.push(`${fmt(nd.hours,1)} ساعت (${pct(nd.share,0)}) «توضیح» ندارد؛ برای دیدن جزئیات این توقف‌ها «ایستگاه» را انتخاب کنید، یا در ثبت توقف توضیح بنویسید.`); }
+  if(st.dim === 'detail'){ const nd = D.rows.find(r=>r.name === '(بدون توضیح)'); if(nd && nd.share > 0.2) notes.push(`${fmt(nd.hours,1)} ساعت (${pct(nd.share,0)}) «توضیح» ندارد؛ برای دیدن جزئیات «ایستگاه» را انتخاب کنید یا در ثبت توقف توضیح بنویسید.`); }
   const sus = D.rows.reduce((a,r)=>a + r.suspect, 0);
-  if(sus > 0) notes.push(`${fmt(sus,1)} ساعت توضیحی مثل «خرابی/روغن/قالب» دارد (ستون «مشکوک به خرابی»)؛ ممکن است تأمین نبوده و خرابی دستگاه باشد.`);
+  if(sus > 0) notes.push(`${fmt(sus,1)} ساعت توضیحی مثل «خرابی/روغن/قالب» دارد؛ ممکن است تأمین نبوده و خرابی دستگاه باشد.`);
   const otherH = (D.cats.find(c=>c.name === STOP_CAT_OTHER_) || { hours:0 }).hours;
-  if(otherH > 0) notes.push(`${fmt(otherH,1)} ساعت در دسته‌ی «${STOP_CAT_OTHER_}» است (علتشان به هیچ دسته‌ای وصل نشده)؛ از «⚙️ دسته‌ها» وصلشان کنید.`);
-  return `<div class="card" style="margin-bottom:16px;">
-    <h3>🔎 کاوشگر توقفات — ${title} <span class="muted">روی هر دسته کلیک کنید تا به تفصیل دیده شود؛ می‌توان چند دسته را هم‌زمان انتخاب کرد</span></h3>
-    ${head}
-    <div class="grid grid-4" style="margin-bottom:14px;">
-      ${kpiCard('ساعت توقف انتخاب‌شده','ساعت', fmt(D.chosenTotal,1), null, '#ff5d6c', false, null)}
-      ${kpiCard('سهم از کل توقف','', D.total>0?pct(D.chosenTotal/D.total,0):'—', null, '#ff9d42', false, null)}
-      ${kpiCard('رویداد','مورد', fmt(D.chosen.length,0), null, '#4c8dff', false, null)}
-      ${kpiCard('زیان تولید (برآورد سقف‌دار)','قطعه', fmt(D.lost,0), null, '#a78bfa', false, null)}
-    </div>
-    <div class="chart-box"><canvas id="chStopExplorer"></canvas></div>
-    <h4 style="margin:14px 0 6px;">پارتو بر اساس ${dimTitle}</h4>
-    <div class="table-wrap"><table><thead><tr><th>#</th><th>${dimTitle}</th><th>دسته</th><th class="num">ساعت</th><th class="num">سهم</th><th class="num">تجمعی</th><th class="num">رویداد</th><th class="num">میانگین ساعت</th><th class="num">زیان تولید</th><th>${st.dim==='detail'?'نام‌هایی که یکی شدند':(st.dim==='reason'?'توضیح‌های ثبت‌شده':'علت‌ها')}</th><th class="num">مشکوک به خرابی</th></tr></thead><tbody>${rowsHtml}</tbody></table></div>
-    ${notes.length ? `<div class="hint" style="margin-top:10px; line-height:2;">${notes.map(esc).join('<br>')}</div>` : ''}
-    <h4 style="margin:16px 0 6px;">رویدادها (بیشترین ساعت اول)</h4>
-    <div class="table-wrap" style="max-height:420px; overflow:auto;"><table><thead><tr><th>تاریخ</th><th>ایستگاه</th><th>علت</th><th>دسته</th><th>توضیح</th><th class="num">ساعت</th><th class="num">نوع</th><th class="num">زیان تولید</th></tr></thead><tbody>${evHtml}</tbody></table></div>
-    ${listMoreHtml_('stopExplorer', D.events)}
-  </div>`;
+  if(otherH > 0) notes.push(`${fmt(otherH,1)} ساعت در دسته‌ی «${STOP_CAT_OTHER_}» است (علتش به دسته‌ای وصل نشده)؛ از ⚙ ← «دسته‌های توقف» وصلش کنید.`);
+  const notesHtml = notes.length ? `<details class="sx-notes"><summary>💡 نکته‌ها و کیفیت داده (${notes.length})</summary><ul>${notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></details>` : '';
+  return `<div class="card sx" style="margin-bottom:16px;">${header}
+    <div class="sx-insight">${headline}</div>${ribbon}
+    <div class="sx-body">
+      <div><div class="sx-cats">${allRow}${D.cats.map(catRow).join('')}</div></div>
+      <div class="sx-panel">
+        <div class="sx-ptitle">${ptitle}</div>${stats}${dims}
+        <div class="sx-chart"><canvas id="chStopExplorer"></canvas></div>
+        <div class="sx-tabs no-print"><button type="button" class="${st.tab==='pareto'?'on':''}" data-stoptab="pareto">جزئیات پارتو<small>${fmt(D.rows.length,0)}</small></button><button type="button" class="${st.tab==='events'?'on':''}" data-stoptab="events">رویدادها<small>${fmt(D.events.length,0)}</small></button></div>
+        ${st.tab === 'events' ? eventsTab : paretoTab}${notesHtml}
+      </div></div></div>`;
 }
 function stopExplorerChart_(){
-  if(!document.getElementById('chStopExplorer')) return;
+  const cv = document.getElementById('chStopExplorer'); if(!cv) return;
   const D = stopExplorerData_(); if(!D.rows.length) return;
-  const rows = D.st.dim === 'day' ? D.rows : D.rows.slice(0, 15);
-  const isDay = D.st.dim === 'day';
-  const colors = rows.map((r,i)=> (D.st.dim === 'station' || isDay) ? (i === 0 && !isDay ? '#ff5d6c' : '#ff9d42') : stopCatColor_(r.domCat));
-  const ds = [{ type:'bar', label:'ساعت توقف', data:rows.map(r=>Math.round(r.hours*10)/10), backgroundColor:colors, borderRadius:5, maxBarThickness:42, order:2, yAxisID:'y' }];
-  const scales = { x:{ grid:{display:false}, ticks:{font:{size:11}} }, y:{ grid:{color:'#182338'}, beginAtZero:true, title:{display:true, text:'ساعت', color:'#7c8aa5', font:{size:10}} } };
-  if(!isDay){
-    ds.push({ type:'line', label:'درصد تجمعی', data:rows.map(r=>Math.round((r.cum||0)*1000)/10), borderColor:'#4c8dff', backgroundColor:'#4c8dff', borderWidth:2.5, pointRadius:3, tension:.15, order:1, yAxisID:'y2', noLabel:true });
-    scales.y2 = { position:'right', min:0, max:100, grid:{display:false}, ticks:{callback:v=>v+'٪'} };
+  const isDay = D.st.dim === 'day', rows = sxChartRows_(D), single = D.st.sel.length === 1 ? stopCatColor_(D.st.sel[0]) : null;
+  const box = cv.parentElement, horiz = !isDay && box.clientWidth > 0 && (box.clientWidth < 520 || rows.length * 68 > box.clientWidth);   // جای کم برای برچسب‌ها: ستون‌های افقی
+  if(horiz) box.style.height = Math.max(240, rows.length*40 + 40) + 'px';
+  const item = D.st.item, colors = rows.map(r=>{ const c = r.bucket ? '#5b6b8a' : (single || (D.st.dim === 'station' || isDay ? '#ff9d42' : stopCatColor_(r.domCat))); return (item && r.key !== item.key) ? c + '55' : c; });   // با انتخاب یک مورد، بقیه کم‌رنگ می‌شوند
+  const ds = [{ type:'bar', label:'ساعت توقف', data:rows.map(r=>Math.round(r.hours*10)/10), backgroundColor:colors, borderRadius:6, maxBarThickness:horiz?24:46, order:2, yAxisID:horiz?undefined:'y',
+    datalabels:{ display:ctx=>ctx.dataset.data[ctx.dataIndex] >= Math.max(...ctx.dataset.data) * 0.04, anchor:horiz?'start':'end', align:horiz?'start':'end', color:'#dfe6f3', font:{ weight:'700', size:11 } } }];
+  const grid = { color:'rgba(255,255,255,.05)' }, tk = { color:'#7c8aa5', font:{ size:10 } };
+  let scales;
+  if(horiz) scales = { x:{ grid, border:{ display:false }, beginAtZero:true, ticks:tk, reverse:true }, y:{ grid:{ display:false }, border:{ color:'#243252' }, position:'right', ticks:{ font:{ size:11 }, color:'#cfd8ea' } } };
+  else {
+    scales = { x:{ grid:{ display:false }, border:{ color:'#243252' }, ticks:{ font:{ size:11 }, color:'#aab4c8', maxRotation:0, autoSkip:isDay } },
+      y:{ grid, border:{ display:false }, beginAtZero:true, ticks:tk, title:{ display:true, text:'ساعت', color:'#7c8aa5', font:{ size:10 } } } };
+    if(!isDay){
+      ds.push({ type:'line', label:'درصد تجمعی', data:rows.map(r=>Math.round((r.cum||0)*1000)/10), borderColor:'#7aa7ff', backgroundColor:'#7aa7ff', borderWidth:2, pointRadius:3, pointBackgroundColor:'#0c1220', pointBorderWidth:2, tension:.25, order:1, yAxisID:'y2', noLabel:true, datalabels:{ display:false } });
+      ds.push({ type:'line', label:'خط ۸۰٪', data:rows.map(()=>80), borderColor:'rgba(255,255,255,.28)', borderDash:[5,5], borderWidth:1, pointRadius:0, order:3, yAxisID:'y2', noLabel:true, datalabels:{ display:false } });
+      scales.y2 = { position:'right', min:0, max:100, grid:{ display:false }, border:{ display:false }, ticks:{ color:'#7c8aa5', font:{ size:10 }, callback:v=>v+'٪' } };
+    }
   }
-  mkChart('chStopExplorer', { type:'bar', data:{ labels:rows.map(r=>r.name), datasets:ds }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:!isDay } }, scales } });
+  mkChart('chStopExplorer', { type:'bar', data:{ labels:rows.map(r=>isDay ? r.name.slice(5) : sxWrap_(r.name === SUPPLY_UNKNOWN_ ? 'نامشخص' : r.name, horiz ? 22 : 13)), datasets:ds }, options:{ indexAxis:horiz?'y':'x', responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:18, right:horiz?4:0 } },
+    interaction:{ mode:horiz?'nearest':'index', intersect:false, axis:horiz?'y':'x' },
+    plugins:{ legend:{ display:!isDay && !horiz, position:'top', labels:{ usePointStyle:true, boxWidth:8, font:{ size:11 }, color:'#aab4c8', filter:i=>i.text !== 'خط ۸۰٪' } },
+      tooltip:{ rtl:true, callbacks:{ title:items=>{ const r = rows[items[0].dataIndex]; return r ? r.name : ''; }, label:c=>c.dataset.label === 'ساعت توقف' ? ` ${horiz ? c.parsed.x : c.parsed.y} ساعت` : (c.dataset.label === 'درصد تجمعی' ? ` تجمعی ${c.parsed.y}٪` : null) } } },
+    scales,
+    onClick:(e, els)=>{ const hit = els.find(x=>x.datasetIndex === 0); if(!hit) return; const r = rows[hit.index]; if(!r || r.bucket) return; filters.stopItem = { dim:D.st.dim, key:r.key, name:r.name }; filters.stopTab = 'events'; renderStop(); },
+    onHover:(e, els)=>{ if(e.native && e.native.target) e.native.target.style.cursor = els.some(x=>x.datasetIndex === 0) ? 'pointer' : 'default'; } } });
 }
 function stopExplorerBind_(){
-  const rerender = ()=>renderStop();
-  document.querySelectorAll('#view [data-stopcat]').forEach(b=>b.addEventListener('click', ()=>{
-    const v = b.dataset.stopcat, cur = Array.isArray(filters.stopCats) ? filters.stopCats.slice() : [];
-    if(v === '__all') filters.stopCats = [];
-    else { const i = cur.indexOf(v); if(i >= 0) cur.splice(i,1); else cur.push(v); filters.stopCats = cur; }
-    listLimit_ = {}; rerender();
+  const rerender = ()=>renderStop(), F = filters;
+  const autoDim = ()=>{ const sel = F.stopCats || []; if(sel.length === 1){ const c = stopCats_().find(k=>k.name === sel[0]); F.stopDim = (c && c.supply) ? 'detail' : 'station'; } else F.stopDim = 'reason'; };
+  document.querySelectorAll('#view [data-stopcat]').forEach(el=>{
+    const act = ev=>{
+      const v = el.dataset.stopcat, cur = Array.isArray(F.stopCats) ? F.stopCats.slice() : [], viaCheck = !!(ev && ev.target && ev.target.closest && ev.target.closest('[data-stopcat-toggle]'));
+      if(v === '__all') F.stopCats = [];
+      else if(viaCheck){ const i = cur.indexOf(v); if(i >= 0) cur.splice(i,1); else cur.push(v); F.stopCats = cur; }
+      else F.stopCats = (cur.length === 1 && cur[0] === v) ? [] : [v];
+      F.stopItem = null; autoDim(); listLimit_ = {}; rerender();
+    };
+    el.addEventListener('click', act);
+    el.addEventListener('keydown', e=>{ if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); act(e); } });
+  });
+  document.querySelectorAll('#view [data-stopdim]').forEach(b=>b.addEventListener('click', ()=>{ F.stopDim = b.dataset.stopdim; F.stopItem = null; listLimit_ = {}; rerender(); }));
+  document.querySelectorAll('#view [data-stopscope]').forEach(b=>b.addEventListener('click', ()=>{ F.stopScope = b.dataset.stopscope; F.stopItem = null; listLimit_ = {}; rerender(); }));
+  document.querySelectorAll('#view [data-stopplanned]').forEach(b=>b.addEventListener('click', ()=>{ F.stopPlanned = !F.stopPlanned; F.stopItem = null; listLimit_ = {}; rerender(); }));
+  document.querySelectorAll('#view [data-stoptab]').forEach(b=>b.addEventListener('click', ()=>{ F.stopTab = b.dataset.stoptab; rerender(); }));
+  document.querySelectorAll('#view [data-stopitem]').forEach(r=>r.addEventListener('click', ev=>{
+    if(ev.target.closest('[data-sxexpand]')){ r.classList.toggle('open'); return; }
+    F.stopItem = { dim:stopExplorerState_().dim, key:r.dataset.stopitem, name:r.dataset.stopitemName }; F.stopTab = 'events'; listLimit_ = {}; rerender();
   }));
-  document.querySelectorAll('#view [data-stopdim]').forEach(b=>b.addEventListener('click', ()=>{ filters.stopDim = b.dataset.stopdim; rerender(); }));
-  document.querySelectorAll('#view [data-stopscope]').forEach(b=>b.addEventListener('click', ()=>{ filters.stopScope = b.dataset.stopscope; listLimit_ = {}; rerender(); }));
-  document.querySelectorAll('#view [data-stopplanned]').forEach(b=>b.addEventListener('click', ()=>{ filters.stopPlanned = !filters.stopPlanned; listLimit_ = {}; rerender(); }));
-  const e1 = document.getElementById('stopCatEdit'); if(e1) e1.addEventListener('click', stopCatEditor_);
-  const e2 = document.getElementById('supplyEdit'); if(e2) e2.addEventListener('click', supplyEditor_);
+  document.querySelectorAll('#view [data-stopitem-clear]').forEach(b=>b.addEventListener('click', ()=>{ F.stopItem = null; listLimit_ = {}; rerender(); }));
+  const g = document.getElementById('sxGear'); if(g) g.addEventListener('click', ev=>{ ev.stopPropagation(); g.closest('.sx-menu').classList.toggle('open'); });
+  const m1 = document.getElementById('sxMenuCats'); if(m1) m1.addEventListener('click', ()=>{ g.closest('.sx-menu').classList.remove('open'); stopCatEditor_(); });
+  const m2 = document.getElementById('sxMenuParts'); if(m2) m2.addEventListener('click', ()=>{ g.closest('.sx-menu').classList.remove('open'); supplyEditor_(); });
+  if(!window.__sxDocBound){ window.__sxDocBound = true; document.addEventListener('click', e=>{ document.querySelectorAll('.sx-menu.open').forEach(mn=>{ if(!mn.contains(e.target)) mn.classList.remove('open'); }); }); }
   bindListMore_(rerender);
 }
 function stopCatEditor_(){
